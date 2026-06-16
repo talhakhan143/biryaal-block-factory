@@ -15,6 +15,12 @@ class DatabaseSeeder extends Seeder
             CatalogSeeder::class,
         ]);
 
+        $superAdmin = User::updateOrCreate(
+            ['email' => 'mr.talha143@gmail.com'],
+            ['name' => 'Talha (Super Admin)', 'password' => 'Spazio@786', 'is_active' => true],
+        );
+        $superAdmin->syncRoles(['Super Admin']);
+
         $owner = User::updateOrCreate(
             ['email' => 'owner@blockfactory.test'],
             [

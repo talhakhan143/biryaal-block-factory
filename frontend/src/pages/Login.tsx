@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { apiError } from '../lib/api'
 import { Button, Card, Field, Input } from '../components/ui'
@@ -50,6 +50,9 @@ export default function Login() {
           <Button type="submit" disabled={busy} className="w-full">
             {busy ? 'Signing in…' : 'Sign in'}
           </Button>
+          <Link to="/forgot-password" className="block text-center text-sm hover:underline" style={{ color: 'var(--primary)' }}>
+            Forgot password?
+          </Link>
         </form>
       </Card>
       <p className="mt-6 text-center text-[11px]" style={{ color: 'var(--muted)' }}>

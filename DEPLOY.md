@@ -50,6 +50,17 @@ This fires `blocks:promote-cured` daily at 00:30 (curing → ready stock).
 Frontend and API are separate origins. In `backend/config/cors.php` (publish if absent) set
 `allowed_origins` to your SPA domain. Bearer-token auth needs no cookies/credentials.
 
+## Email (password reset)
+Password reset links email to the user's own address. Set SMTP + frontend URL in `.env`:
+```
+FRONTEND_URL=https://app.yourdomain.com
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.hostinger.com   MAIL_PORT=465   MAIL_ENCRYPTION=ssl
+MAIL_USERNAME=you@yourdomain.com   MAIL_PASSWORD=...   MAIL_FROM_ADDRESS=you@yourdomain.com
+```
+Locally `MAIL_MAILER=log` writes the reset link to `storage/logs/laravel.log` (no SMTP needed).
+Super Admin / Owner can also set any user's password directly from the Users page (no email).
+
 ## Backups
 Add a daily cron to dump the DB:
 ```

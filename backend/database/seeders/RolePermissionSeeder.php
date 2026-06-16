@@ -39,6 +39,10 @@ class RolePermissionSeeder extends Seeder
             Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
         }
 
+        // Super Admin (developer) — full access; also bypasses via Gate::before.
+        $superAdmin = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
+        $superAdmin->syncPermissions($permissions);
+
         $owner = Role::firstOrCreate(['name' => 'Owner', 'guard_name' => 'web']);
         $owner->syncPermissions($permissions); // full access
 
