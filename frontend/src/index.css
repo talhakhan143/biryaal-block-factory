@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+/* Theming via CSS variables. Default = dark (black). html.light flips to white. */
+:root {
+  /* ===== Dark theme (default, black) ===== */
+  --bg: #07070a;
+  --surface: #111118;
+  --surface-2: #181822;
+  --surface-hover: #1f1f2b;
+  --border: #262632;
+  --text: #f4f4f5;
+  --muted: #9aa0ac;
+  --primary: #3b82f6;        /* blue */
+  --primary-hover: #2563eb;
+  --primary-fg: #ffffff;
+  --secondary: #f97316;      /* dark orange */
+  --secondary-fg: #ffffff;
+  --ring: #3b82f6;
+  --green: #34d399;
+  --red: #f87171;
+  --amber: #fbbf24;
+}
+
+html.light {
+  /* ===== Light theme (white) ===== */
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --surface-hover: #eef2f7;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --muted: #64748b;
+  --primary: #1e3a8a;        /* dark blue */
+  --primary-hover: #1e40af;
+  --primary-fg: #ffffff;
+  --secondary: #c2410c;      /* dark orange */
+  --secondary-fg: #ffffff;
+  --ring: #1e3a8a;
+  --green: #059669;
+  --red: #dc2626;
+  --amber: #b45309;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* thin scrollbars in dark */
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+/* themed table rows (avoids per-row classes across pages) */
+table tbody tr { border-top: 1px solid var(--border); }
+table tbody tr:hover { background: var(--surface-hover); }
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; color: #000; }
+}

@@ -1,0 +1,29 @@
+# Dependencies
+/backend/vendor
+/frontend/node_modules
+node_modules
+
+# Env / secrets (never commit) — keep .env.example only
+.env
+.env.*
+!.env.example
+/backend/.env
+/frontend/.env
+
+# Build output
+/frontend/dist
+/frontend/dist-ssr
+
+# Laravel
+/backend/storage/*.key
+/backend/public/storage
+/backend/.phpunit.cache
+
+# Logs / OS
+*.log
+.DS_Store
+
+# Editor
+.idea
+.vscode
+*.swp
