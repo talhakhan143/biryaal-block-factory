@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DispatchResource;
 use App\Models\Dispatch;
+use App\Models\Sale;
 use App\Services\Dispatch\DispatchService;
 use Illuminate\Http\Request;
 
@@ -23,6 +24,31 @@ class DispatchController extends Controller
             ->paginate($request->integer('per_page', 15));
 
         return DispatchResource::collection($dispatches);
+    }
+
+    /** Sales (POS orders) that have not been dispatched yet. */
+    public function pending()
+    {
+        $sales = Sale::with(['customer', 'items.product'])
+            ->whereDoesntHave('dispatches')
+            ->latest('sale_date')
+            ->limit(100)
+            ->get()
+            ->map(fn (Sale $s) => [
+                'sale_id' => $s->id,
+                'invoice_no' => $s->invoice_no,
+                'sale_date' => $s->sale_date->toDateString(),
+                'customer_id' => $s->customer_id,
+                'customer_name' => $s->customer?->name ?? 'Walk-in',
+                'total' => (int) $s->total,
+                'items' => $s->items->map(fn ($i) => [
+                    'product_id' => $i->product_id,
+                    'product_name' => $i->product?->name,
+                    'quantity' => (int) $i->quantity,
+                ]),
+            ]);
+
+        return response()->json(['data' => $sales]);
     }
 
     public function store(Request $request)

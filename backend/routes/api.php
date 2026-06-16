@@ -142,6 +142,7 @@ Route::prefix('v1')->group(function () {
         // Dispatch / Challan
         Route::middleware('permission:dispatch.view')->group(function () {
             Route::get('dispatches', [DispatchController::class, 'index']);
+            Route::get('dispatches/pending', [DispatchController::class, 'pending']);
             Route::get('dispatches/{dispatch}', [DispatchController::class, 'show']);
         });
         Route::middleware('permission:dispatch.manage')->group(function () {

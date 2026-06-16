@@ -39,6 +39,11 @@ class Sale extends Model implements AuditableContract
         return $this->hasMany(SaleItem::class);
     }
 
+    public function dispatches(): HasMany
+    {
+        return $this->hasMany(Dispatch::class);
+    }
+
     public function allocatedPayments(): MorphMany
     {
         return $this->morphMany(Payment::class, 'allocatable');
