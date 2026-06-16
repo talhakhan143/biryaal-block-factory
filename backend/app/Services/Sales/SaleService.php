@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Sale;
+use App\Services\Accounting\CashAccountResolver;
 use App\Services\Accounting\LedgerService;
 use App\Services\Inventory\InventoryService;
 use App\Support\Sequence;
@@ -74,6 +75,7 @@ class SaleService
                 'balance' => $balance,
                 'status' => $this->status($total, $paid),
                 'payment_method' => $data['payment_method'] ?? ($paid > 0 ? 'cash' : null),
+                'bank_ref' => $data['bank_ref'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'created_by' => Auth::id(),
             ]);
@@ -95,7 +97,7 @@ class SaleService
             }
 
             // journal: Dr Cash/Bank (paid) + Dr Receivable (balance); Cr Sales (total)
-            $cashAccount = ($data['payment_method'] ?? 'cash') === 'bank' ? Account::BANK : Account::CASH;
+            $cashAccount = CashAccountResolver::code($data['payment_method'] ?? 'cash');
             $lines = [];
             if ($paid > 0) {
                 $lines[] = ['account' => $cashAccount, 'debit' => $paid];

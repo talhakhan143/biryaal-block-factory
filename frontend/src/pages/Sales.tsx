@@ -77,6 +77,9 @@ function InvoiceModal({ id, onClose }: { id: string; onClose: () => void }) {
               <p className="text-xs text-slate-500">Sales Invoice</p>
               <p className="mt-1 font-mono text-sm">{String(data.invoice_no)}</p>
               <p className="text-xs text-slate-500">{data.sale_date} · {data.customer?.name ?? 'Walk-in'} · {String(data.type).toUpperCase()}</p>
+              {data.payment_method && (
+                <p className="text-xs text-slate-500">Paid via {String(data.payment_method).toUpperCase()}{data.bank_ref ? ` (${data.bank_ref})` : ''}</p>
+              )}
             </div>
             <div className="my-4 border-y border-dashed border-slate-300 py-3 text-sm">
               {items.map((it, i) => (

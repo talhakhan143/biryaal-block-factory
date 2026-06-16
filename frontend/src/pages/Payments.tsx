@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, Modal, OutstandingNote, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, MethodField, Modal, OutstandingNote, PageHeader, Select, Spinner, Table } from '../components/ui'
 
 interface Payment {
   id: string
@@ -14,6 +14,7 @@ interface Payment {
   payment_date: string
   amount: number
   method: string
+  bank_ref?: string
 }
 
 export default function Payments() {
@@ -48,7 +49,7 @@ export default function Payments() {
       {isLoading ? (
         <Spinner />
       ) : (
-        <Table head={['Ref', 'Date', 'Direction', 'Party', 'Amount', 'Method']}>
+        <Table head={['Ref', 'Date', 'Direction', 'Party', 'Amount', 'Method', 'Bank / ref']}>
           {data?.data.map((p) => (
             <tr key={p.id}>
               <td className="px-4 py-3 font-mono text-xs">{p.reference}</td>
@@ -58,7 +59,10 @@ export default function Payments() {
               </td>
               <td className="px-4 py-3">{p.party_name}</td>
               <td className="px-4 py-3">{formatPaisa(p.amount)}</td>
-              <td className="px-4 py-3 capitalize">{p.method}</td>
+              <td className="px-4 py-3">
+                <Badge color={p.method === 'bank' ? 'blue' : 'slate'}>{p.method}</Badge>
+              </td>
+              <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)' }}>{p.bank_ref ?? '—'}</td>
             </tr>
           ))}
         </Table>
@@ -80,7 +84,7 @@ export default function Payments() {
 function PaymentForm({ kind, onSubmit, busy, error }: { kind: string; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
   const partyResource = kind === 'receipt' ? 'customers' : 'suppliers'
   const parties = useList<{ id: string; name: string; balance: number }>(partyResource, { per_page: 100 })
-  const [form, setForm] = useState({ party: '', payment_date: new Date().toISOString().slice(0, 10), amount: '', method: 'cash' })
+  const [form, setForm] = useState({ party: '', payment_date: new Date().toISOString().slice(0, 10), amount: '', method: 'cash', bank_ref: '' })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
 
   const selected = parties.data?.data.find((p) => p.id === form.party)
@@ -91,7 +95,7 @@ function PaymentForm({ kind, onSubmit, busy, error }: { kind: string; onSubmit: 
       onSubmit={(e) => {
         e.preventDefault()
         const idKey = kind === 'receipt' ? 'customer_id' : 'supplier_id'
-        onSubmit({ [idKey]: form.party, payment_date: form.payment_date, amount: Number(form.amount), method: form.method })
+        onSubmit({ [idKey]: form.party, payment_date: form.payment_date, amount: Number(form.amount), method: form.method, bank_ref: form.method === 'bank' ? form.bank_ref : undefined })
       }}
       className="space-y-3"
     >
@@ -110,12 +114,7 @@ function PaymentForm({ kind, onSubmit, busy, error }: { kind: string; onSubmit: 
             <Field label="Date"><Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} required /></Field>
             <Field label="Amount (Rs)"><Input type="number" step="0.01" value={form.amount} onChange={(e) => set('amount', e.target.value)} required /></Field>
           </div>
-          <Field label="Method">
-            <Select value={form.method} onChange={(e) => set('method', e.target.value)}>
-              <option value="cash">Cash</option>
-              <option value="bank">Bank</option>
-            </Select>
-          </Field>
+          <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
         </>
       )}
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}

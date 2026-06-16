@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, Modal, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, MethodField, Modal, PageHeader, Select, Spinner, Table } from '../components/ui'
 
 interface Expense {
   id: string
@@ -65,7 +65,7 @@ export default function Expenses() {
 }
 
 function ExpenseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
-  const [form, setForm] = useState({ expense_date: new Date().toISOString().slice(0, 10), category: 'diesel', title: '', amount: '', method: 'cash' })
+  const [form, setForm] = useState({ expense_date: new Date().toISOString().slice(0, 10), category: 'diesel', title: '', amount: '', method: 'cash', bank_ref: '' })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, amount: Number(form.amount) }) }} className="space-y-3">
@@ -78,16 +78,9 @@ function ExpenseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, u
         </Field>
       </div>
       <Field label="Title"><Input value={form.title} onChange={(e) => set('title', e.target.value)} required /></Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Amount (Rs)"><Input type="number" step="0.01" value={form.amount} onChange={(e) => set('amount', e.target.value)} required /></Field>
-        <Field label="Method">
-          <Select value={form.method} onChange={(e) => set('method', e.target.value)}>
-            <option value="cash">Cash</option>
-            <option value="bank">Bank</option>
-          </Select>
-        </Field>
-      </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <Field label="Amount (Rs)"><Input type="number" step="0.01" value={form.amount} onChange={(e) => set('amount', e.target.value)} required /></Field>
+      <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
+      {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
       <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Save'}</Button>
     </form>
   )

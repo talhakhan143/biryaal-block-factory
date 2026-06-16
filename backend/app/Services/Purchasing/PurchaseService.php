@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\MaterialPurchase;
 use App\Models\RawMaterial;
 use App\Models\Supplier;
+use App\Services\Accounting\CashAccountResolver;
 use App\Services\Accounting\LedgerService;
 use App\Support\Sequence;
 use Illuminate\Support\Facades\Auth;
@@ -44,6 +45,7 @@ class PurchaseService
                 'total_cost' => $totalCost,
                 'paid_amount' => $paid,
                 'payment_status' => $this->status($totalCost, $paid),
+                'bank_ref' => $data['bank_ref'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'created_by' => Auth::id(),
             ]);
@@ -57,7 +59,7 @@ class PurchaseService
             }
 
             // journal: Dr Inventory; Cr Cash (paid) + Cr Payable (unpaid)
-            $cashAccount = ($data['method'] ?? 'cash') === 'bank' ? Account::BANK : Account::CASH;
+            $cashAccount = CashAccountResolver::code($data['method'] ?? 'cash');
             $lines = [['account' => Account::INVENTORY, 'debit' => $totalCost, 'memo' => 'Material purchase']];
             if ($paid > 0) {
                 $lines[] = ['account' => $cashAccount, 'credit' => $paid];

@@ -17,7 +17,7 @@ class Sale extends Model implements AuditableContract
     protected $fillable = [
         'invoice_no', 'customer_id', 'sale_date', 'type', 'subtotal',
         'discount', 'total', 'paid', 'balance', 'status', 'payment_method',
-        'notes', 'created_by',
+        'bank_ref', 'notes', 'created_by',
     ];
 
     protected $casts = [

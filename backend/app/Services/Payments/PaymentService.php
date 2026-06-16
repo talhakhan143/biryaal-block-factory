@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Customer;
 use App\Models\Payment;
 use App\Models\Supplier;
+use App\Services\Accounting\CashAccountResolver;
 use App\Services\Accounting\LedgerService;
 use App\Support\Sequence;
 use Illuminate\Database\Eloquent\Model;
@@ -37,13 +38,14 @@ class PaymentService
                 'payment_date' => $data['payment_date'],
                 'amount' => $amount,
                 'method' => $data['method'] ?? 'cash',
+                'bank_ref' => $data['bank_ref'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'created_by' => Auth::id(),
             ]);
 
             $customer->decrement('balance', $amount);
 
-            $cashAccount = ($data['method'] ?? 'cash') === 'bank' ? Account::BANK : Account::CASH;
+            $cashAccount = CashAccountResolver::code($data['method'] ?? 'cash');
             $this->ledger->post(
                 $data['payment_date'],
                 "Receipt {$payment->reference} from {$customer->name}",
@@ -78,13 +80,14 @@ class PaymentService
                 'payment_date' => $data['payment_date'],
                 'amount' => $amount,
                 'method' => $data['method'] ?? 'cash',
+                'bank_ref' => $data['bank_ref'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'created_by' => Auth::id(),
             ]);
 
             $supplier->decrement('balance', $amount);
 
-            $cashAccount = ($data['method'] ?? 'cash') === 'bank' ? Account::BANK : Account::CASH;
+            $cashAccount = CashAccountResolver::code($data['method'] ?? 'cash');
             $this->ledger->post(
                 $data['payment_date'],
                 "Payment {$payment->reference} to {$supplier->name}",
@@ -117,13 +120,14 @@ class PaymentService
                 'payment_date' => $data['payment_date'],
                 'amount' => $amount,
                 'method' => $data['method'] ?? 'cash',
+                'bank_ref' => $data['bank_ref'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'created_by' => Auth::id(),
             ]);
 
             $party->decrement('balance', $amount);
 
-            $cashAccount = ($data['method'] ?? 'cash') === 'bank' ? Account::BANK : Account::CASH;
+            $cashAccount = CashAccountResolver::code($data['method'] ?? 'cash');
             $name = $party->name ?? class_basename($party);
             $this->ledger->post(
                 $data['payment_date'],

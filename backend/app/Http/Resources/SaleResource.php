@@ -23,6 +23,7 @@ class SaleResource extends JsonResource
             'balance' => (int) $this->balance,
             'status' => $this->status,
             'payment_method' => $this->payment_method,
+            'bank_ref' => $this->bank_ref,
             'notes' => $this->notes,
             'items' => SaleItemResource::collection($this->whenLoaded('items')),
             'created_at' => $this->created_at,

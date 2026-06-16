@@ -13,7 +13,7 @@ class Expense extends Model implements AuditableContract
 
     protected $fillable = [
         'reference', 'expense_date', 'category', 'amount',
-        'method', 'title', 'notes', 'created_by',
+        'method', 'title', 'bank_ref', 'notes', 'created_by',
     ];
 
     protected $casts = [

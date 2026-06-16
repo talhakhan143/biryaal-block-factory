@@ -24,6 +24,7 @@ class StorePurchaseRequest extends FormRequest
             'unloading_cost' => ['nullable', 'numeric', 'min:0'],
             'paid_amount' => ['nullable', 'numeric', 'min:0'],
             'method' => ['nullable', 'in:cash,bank'],
+            'bank_ref' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
         ];
     }

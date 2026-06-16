@@ -25,6 +25,7 @@ class MaterialPurchaseResource extends JsonResource
             'total_cost' => (int) $this->total_cost,
             'paid_amount' => (int) $this->paid_amount,
             'payment_status' => $this->payment_status,
+            'bank_ref' => $this->bank_ref,
             'notes' => $this->notes,
             'created_at' => $this->created_at,
         ];

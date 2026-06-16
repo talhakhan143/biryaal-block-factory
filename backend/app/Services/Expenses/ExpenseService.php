@@ -4,6 +4,7 @@ namespace App\Services\Expenses;
 
 use App\Models\Account;
 use App\Models\Expense;
+use App\Services\Accounting\CashAccountResolver;
 use App\Services\Accounting\LedgerService;
 use App\Support\Sequence;
 use Illuminate\Support\Facades\Auth;
@@ -25,12 +26,13 @@ class ExpenseService
                 'category' => $data['category'],
                 'amount' => (int) $data['amount'],
                 'method' => $data['method'] ?? 'cash',
+                'bank_ref' => $data['bank_ref'] ?? null,
                 'title' => $data['title'],
                 'notes' => $data['notes'] ?? null,
                 'created_by' => Auth::id(),
             ]);
 
-            $cashAccount = ($data['method'] ?? 'cash') === 'bank' ? Account::BANK : Account::CASH;
+            $cashAccount = CashAccountResolver::code($data['method'] ?? 'cash');
             $this->ledger->post(
                 $data['expense_date'],
                 "Expense {$expense->reference} - {$expense->title}",

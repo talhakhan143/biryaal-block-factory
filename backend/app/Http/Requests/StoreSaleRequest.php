@@ -20,6 +20,7 @@ class StoreSaleRequest extends FormRequest
             'discount' => ['nullable', 'numeric', 'min:0'],     // rupees
             'paid' => ['nullable', 'numeric', 'min:0'],         // rupees (credit sales)
             'payment_method' => ['nullable', 'in:cash,bank'],
+            'bank_ref' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'uuid', 'exists:products,id'],

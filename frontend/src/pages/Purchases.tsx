@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, Modal, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, MethodField, Modal, PageHeader, Select, Spinner, Table } from '../components/ui'
 
 interface Purchase {
   id: string
@@ -72,7 +72,7 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
   const materials = useList<{ id: string; name: string; unit: string }>('raw-materials', { per_page: 100 })
   const [form, setForm] = useState({
     supplier_id: '', raw_material_id: '', purchase_date: new Date().toISOString().slice(0, 10),
-    quantity: '', unit_cost: '', transport_cost: '0', loading_cost: '0', unloading_cost: '0', paid_amount: '0', method: 'cash',
+    quantity: '', unit_cost: '', transport_cost: '0', loading_cost: '0', unloading_cost: '0', paid_amount: '0', method: 'cash', bank_ref: '',
   })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
 
@@ -112,13 +112,8 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
         <Field label="Loading (Rs)"><Input type="number" step="0.01" value={form.loading_cost} onChange={(e) => set('loading_cost', e.target.value)} /></Field>
         <Field label="Unloading (Rs)"><Input type="number" step="0.01" value={form.unloading_cost} onChange={(e) => set('unloading_cost', e.target.value)} /></Field>
         <Field label="Paid now (Rs)"><Input type="number" step="0.01" value={form.paid_amount} onChange={(e) => set('paid_amount', e.target.value)} /></Field>
-        <Field label="Method">
-          <Select value={form.method} onChange={(e) => set('method', e.target.value)}>
-            <option value="cash">Cash</option>
-            <option value="bank">Bank</option>
-          </Select>
-        </Field>
       </div>
+      <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Record Purchase'}</Button>
     </form>

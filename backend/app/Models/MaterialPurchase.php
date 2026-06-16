@@ -16,7 +16,7 @@ class MaterialPurchase extends Model implements AuditableContract
         'reference', 'supplier_id', 'raw_material_id', 'purchase_date',
         'quantity', 'unit_cost', 'transport_cost', 'loading_cost',
         'unloading_cost', 'total_cost', 'paid_amount', 'payment_status',
-        'notes', 'created_by',
+        'bank_ref', 'notes', 'created_by',
     ];
 
     protected $casts = [

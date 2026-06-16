@@ -123,6 +123,28 @@ export function Spinner() {
   return <div className="p-8 text-center text-sm" style={{ color: 'var(--muted)' }}>Loading…</div>
 }
 
+/**
+ * Cash/Bank method selector. When Bank is chosen, a free-text field records
+ * which bank / cheque / transfer ref so it's known where the money is.
+ */
+export function MethodField({ method, bankRef, onChange }: { method: string; bankRef: string; onChange: (method: string, bankRef: string) => void }) {
+  return (
+    <>
+      <Field label="Payment method (kaise)">
+        <Select value={method} onChange={(e) => onChange(e.target.value, e.target.value === 'bank' ? bankRef : '')}>
+          <option value="cash">Cash (haath me)</option>
+          <option value="bank">Bank / online</option>
+        </Select>
+      </Field>
+      {method === 'bank' && (
+        <Field label="Bank / reference (kaunsa bank, cheque/transfer #)">
+          <Input value={bankRef} onChange={(e) => onChange(method, e.target.value)} placeholder="e.g. Meezan — cheque 123" />
+        </Field>
+      )}
+    </>
+  )
+}
+
 /** Shows an outstanding balance inside a payment form, with a "fill full" shortcut. */
 export function OutstandingNote({ label, amount, onFill }: { label: string; amount: number; onFill?: (rupees: number) => void }) {
   const rupees = (amount / 100).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

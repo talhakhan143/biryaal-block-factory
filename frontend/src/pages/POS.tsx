@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
-import { Button, Card, Field, Input, OutstandingNote, Select } from '../components/ui'
+import { Button, Card, Field, Input, MethodField, OutstandingNote, Select } from '../components/ui'
 
 interface Product {
   id: string
@@ -24,6 +24,8 @@ export default function POS() {
   const [customerId, setCustomerId] = useState('')
   const [discount, setDiscount] = useState('0')
   const [paid, setPaid] = useState('0')
+  const [method, setMethod] = useState('cash')
+  const [bankRef, setBankRef] = useState('')
   const [receipt, setReceipt] = useState<Record<string, unknown> | null>(null)
 
   const subtotal = useMemo(() => cart.reduce((s, l) => s + l.product.sale_price * l.qty, 0), [cart])
@@ -47,6 +49,8 @@ export default function POS() {
       setCart([])
       setDiscount('0')
       setPaid('0')
+      setMethod('cash')
+      setBankRef('')
       setCustomerId('')
       products.refetch()
     },
@@ -59,7 +63,8 @@ export default function POS() {
       type,
       discount: Number(discount),
       paid: type === 'credit' ? Number(paid) : undefined,
-      payment_method: 'cash',
+      payment_method: method,
+      bank_ref: method === 'bank' ? bankRef : undefined,
       items: cart.map((l) => ({ product_id: l.product.id, quantity: l.qty })),
     })
   }
@@ -141,6 +146,10 @@ export default function POS() {
           <Field label="Discount (Rs)">
             <Input type="number" value={discount} onChange={(e) => setDiscount(e.target.value)} />
           </Field>
+
+          {(type === 'cash' || Number(paid) > 0) && (
+            <MethodField method={method} bankRef={bankRef} onChange={(m, b) => { setMethod(m); setBankRef(b) }} />
+          )}
 
           <div className="flex justify-between text-sm"><span>Subtotal</span><span>{formatPaisa(subtotal)}</span></div>
           <div className="flex justify-between text-lg font-bold"><span>Total</span><span>{formatPaisa(total)}</span></div>

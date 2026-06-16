@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Payment;
 use App\Models\Salary;
 use App\Models\Staff;
+use App\Services\Accounting\CashAccountResolver;
 use App\Services\Accounting\LedgerService;
 use App\Support\Sequence;
 use Illuminate\Support\Facades\Auth;
@@ -83,6 +84,7 @@ class PayrollService
                 'payment_date' => $data['payment_date'],
                 'amount' => $amount,
                 'method' => $data['method'] ?? 'cash',
+                'bank_ref' => $data['bank_ref'] ?? null,
                 'allocatable_type' => $salary->getMorphClass(),
                 'allocatable_id' => $salary->id,
                 'created_by' => Auth::id(),
@@ -95,7 +97,7 @@ class PayrollService
                 'status' => $paid >= $salary->amount ? 'paid' : 'partial',
             ]);
 
-            $cashAccount = ($data['method'] ?? 'cash') === 'bank' ? Account::BANK : Account::CASH;
+            $cashAccount = CashAccountResolver::code($data['method'] ?? 'cash');
             $this->ledger->post(
                 $data['payment_date'],
                 "Salary payment {$payment->reference} - {$staff->name}",

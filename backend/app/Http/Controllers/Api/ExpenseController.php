@@ -32,6 +32,7 @@ class ExpenseController extends Controller
             'category' => ['required', 'in:electricity,diesel,maintenance,internet,misc'],
             'amount' => ['required', 'numeric', 'gt:0'],
             'method' => ['nullable', 'in:cash,bank'],
+            'bank_ref' => ['nullable', 'string', 'max:255'],
             'title' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
         ]);

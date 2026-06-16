@@ -45,6 +45,7 @@ class DriverController extends Controller
             'payment_date' => ['required', 'date'],
             'amount' => ['required', 'numeric', 'gt:0'],
             'method' => ['nullable', 'in:cash,bank'],
+            'bank_ref' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
         ]);
         $data['amount'] = Money::toPaisa($data['amount']);

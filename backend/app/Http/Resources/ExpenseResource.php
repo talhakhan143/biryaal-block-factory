@@ -16,6 +16,7 @@ class ExpenseResource extends JsonResource
             'category' => $this->category,
             'amount' => (int) $this->amount,
             'method' => $this->method,
+            'bank_ref' => $this->bank_ref,
             'title' => $this->title,
             'notes' => $this->notes,
             'created_at' => $this->created_at,

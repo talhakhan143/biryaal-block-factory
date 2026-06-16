@@ -17,7 +17,7 @@ class Payment extends Model implements AuditableContract
 
     protected $fillable = [
         'reference', 'direction', 'party_type', 'party_id', 'payment_date',
-        'amount', 'method', 'allocatable_type', 'allocatable_id',
+        'amount', 'method', 'bank_ref', 'allocatable_type', 'allocatable_id',
         'notes', 'created_by',
     ];
 
