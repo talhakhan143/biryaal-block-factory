@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
 
 interface Payment {
   id: string
@@ -21,7 +21,9 @@ export default function Payments() {
   const { can } = useAuth()
   const qc = useQueryClient()
   const [modal, setModal] = useState<'receipt' | 'supplier' | null>(null)
-  const { data, isLoading } = useList<Payment>('payments')
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const { data, isLoading } = useList<Payment>('payments', { page, search })
 
   const mutate = useMutation({
     mutationFn: ({ kind, payload }: { kind: string; payload: Record<string, unknown> }) =>
@@ -46,6 +48,9 @@ export default function Payments() {
           )
         }
       />
+      <div className="mb-4">
+        <Input placeholder="Search ref or party name…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs" />
+      </div>
       {isLoading ? (
         <Spinner />
       ) : (
@@ -67,6 +72,7 @@ export default function Payments() {
           ))}
         </Table>
       )}
+      <Pagination meta={data?.meta} page={page} onPage={setPage} />
       {modal && (
         <Modal title={modal === 'receipt' ? 'Receive from Customer' : 'Pay Supplier'} onClose={() => setModal(null)}>
           <PaymentForm

@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, Modal, PageHeader, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, Modal, PageHeader, Pagination, Spinner, Table } from '../components/ui'
 
 interface Customer {
   id: string
@@ -17,9 +17,10 @@ export default function Customers() {
   const { can } = useAuth()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [creating, setCreating] = useState(false)
   const [ledgerId, setLedgerId] = useState<string | null>(null)
-  const { data, isLoading } = useList<Customer>('customers', { search })
+  const { data, isLoading } = useList<Customer>('customers', { search, page })
 
   const create = useMutation({
     mutationFn: (payload: Record<string, string>) => api.post('/customers', payload),
@@ -38,7 +39,7 @@ export default function Customers() {
       />
 
       <div className="mb-4">
-        <Input placeholder="Search name or phone…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
+        <Input placeholder="Search name or phone…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs" />
       </div>
 
       {isLoading ? (
@@ -66,6 +67,7 @@ export default function Customers() {
           )}
         </Table>
       )}
+      <Pagination meta={data?.meta} page={page} onPage={setPage} />
 
       {creating && (
         <Modal title="New Customer" onClose={() => setCreating(false)}>

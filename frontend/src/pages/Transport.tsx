@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, Modal, MoneyInput, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, Modal, MoneyInput, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
 
 interface Trip {
   id: string
@@ -25,7 +25,8 @@ export default function Transport() {
   const { can } = useAuth()
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
-  const { data, isLoading } = useList<Trip>('transport-trips')
+  const [page, setPage] = useState(1)
+  const { data, isLoading } = useList<Trip>('transport-trips', { page })
 
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/transport-trips', p),
@@ -54,6 +55,7 @@ export default function Transport() {
           ))}
         </Table>
       )}
+      <Pagination meta={data?.meta} page={page} onPage={setPage} />
       {creating && (
         <Modal title="New Trip" onClose={() => setCreating(false)}>
           <TripForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />

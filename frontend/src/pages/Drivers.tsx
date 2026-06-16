@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, Spinner, Table } from '../components/ui'
 
 interface Driver {
   id: string
@@ -18,9 +18,11 @@ export default function Drivers() {
   const { can } = useAuth()
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [payId, setPayId] = useState<string | null>(null)
   const [ledgerId, setLedgerId] = useState<string | null>(null)
-  const { data, isLoading } = useList<Driver>('drivers')
+  const { data, isLoading } = useList<Driver>('drivers', { search, page })
 
   const create = useMutation({
     mutationFn: (p: Record<string, string>) => api.post('/drivers', p),
@@ -34,6 +36,9 @@ export default function Drivers() {
   return (
     <div>
       <PageHeader title="Drivers" subtitle="Driver ka baqi aur payment" actions={can('transport.manage') && <Button onClick={() => setCreating(true)}>+ Driver</Button>} />
+      <div className="mb-4">
+        <Input placeholder="Search name or phone…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs" />
+      </div>
       {isLoading ? (
         <Spinner />
       ) : (
@@ -51,6 +56,7 @@ export default function Drivers() {
           ))}
         </Table>
       )}
+      <Pagination meta={data?.meta} page={page} onPage={setPage} />
       {creating && (
         <Modal title="New Driver" onClose={() => setCreating(false)}>
           <DriverForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />

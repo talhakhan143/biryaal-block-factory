@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, Spinner, Table } from '../components/ui'
 
 interface Sale {
   id: string
@@ -24,9 +24,10 @@ export default function Sales() {
   const { can } = useAuth()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [viewId, setViewId] = useState<string | null>(null)
   const [receiveFor, setReceiveFor] = useState<Sale | null>(null)
-  const { data, isLoading } = useList<Sale>('sales', { search })
+  const { data, isLoading } = useList<Sale>('sales', { search, page })
 
   const receive = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/sales/${id}/receive`, payload),
@@ -40,7 +41,7 @@ export default function Sales() {
     <div>
       <PageHeader title="Sales" subtitle="Saari bikri — cash aur udhaar" />
       <div className="mb-4">
-        <Input placeholder="Search invoice no…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
+        <Input placeholder="Search invoice no…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs" />
       </div>
       {isLoading ? (
         <Spinner />
@@ -68,6 +69,7 @@ export default function Sales() {
           ))}
         </Table>
       )}
+      <Pagination meta={data?.meta} page={page} onPage={setPage} />
       {viewId && <InvoiceModal id={viewId} onClose={() => setViewId(null)} />}
       {receiveFor && (
         <Modal title={`Receive — ${receiveFor.invoice_no}`} onClose={() => setReceiveFor(null)}>

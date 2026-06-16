@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
-import { Badge, Button, Field, Input, Modal, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, Modal, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
 
 interface AppUser {
   id: number
@@ -17,7 +17,9 @@ export default function Users() {
   const qc = useQueryClient()
   const [editing, setEditing] = useState<AppUser | null>(null)
   const [creating, setCreating] = useState(false)
-  const { data, isLoading } = useList<AppUser>('users')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const { data, isLoading } = useList<AppUser>('users', { search, page })
   const roles = useQuery({ queryKey: ['roles'], queryFn: async () => (await api.get<string[]>('/roles')).data })
 
   const save = useMutation({
@@ -37,6 +39,9 @@ export default function Users() {
         subtitle="Staff logins & roles (kaun kya access kar sakta hai)"
         actions={<Button onClick={() => setCreating(true)}>+ User</Button>}
       />
+      <div className="mb-4">
+        <Input placeholder="Search name or email…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs" />
+      </div>
       {isLoading ? (
         <Spinner />
       ) : (
@@ -55,6 +60,7 @@ export default function Users() {
           ))}
         </Table>
       )}
+      <Pagination meta={data?.meta} page={page} onPage={setPage} />
       {(creating || editing) && (
         <Modal title={editing ? 'Edit User' : 'New User'} onClose={() => { setCreating(false); setEditing(null) }}>
           <UserForm

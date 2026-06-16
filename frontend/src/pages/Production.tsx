@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, Modal, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, Modal, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
 
 interface Batch {
   id: string
@@ -20,7 +20,8 @@ export default function Production() {
   const { can } = useAuth()
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
-  const { data, isLoading } = useList<Batch>('production')
+  const [page, setPage] = useState(1)
+  const { data, isLoading } = useList<Batch>('production', { page })
 
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/production', p),
@@ -92,6 +93,7 @@ export default function Production() {
           ))}
         </Table>
       )}
+      <Pagination meta={data?.meta} page={page} onPage={setPage} />
       {creating && (
         <Modal title="Record Production" onClose={() => setCreating(false)}>
           <ProductionForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />

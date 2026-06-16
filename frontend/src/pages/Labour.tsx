@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
 
 interface Labourer {
   id: string
@@ -19,8 +19,10 @@ export default function Labour() {
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
   const [marking, setMarking] = useState(false)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [payId, setPayId] = useState<string | null>(null)
-  const { data, isLoading } = useList<Labourer>('labourers')
+  const { data, isLoading } = useList<Labourer>('labourers', { search, page })
   const invalidate = () => { qc.invalidateQueries({ queryKey: ['labourers'] }) }
 
   const create = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/labourers', p), onSuccess: () => { invalidate(); setCreating(false) } })
@@ -39,6 +41,9 @@ export default function Labour() {
           </>
         )}
       />
+      <div className="mb-4">
+        <Input placeholder="Search labourer name…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs" />
+      </div>
       {isLoading ? (
         <Spinner />
       ) : (
@@ -56,6 +61,7 @@ export default function Labour() {
           ))}
         </Table>
       )}
+      <Pagination meta={data?.meta} page={page} onPage={setPage} />
       {creating && (
         <Modal title="New Labourer" onClose={() => setCreating(false)}>
           <LabourerForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />

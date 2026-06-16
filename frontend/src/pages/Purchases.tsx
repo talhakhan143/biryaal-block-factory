@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
 
 interface Purchase {
   id: string
@@ -24,8 +24,9 @@ export default function Purchases() {
   const { can } = useAuth()
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
+  const [page, setPage] = useState(1)
   const [payFor, setPayFor] = useState<Purchase | null>(null)
-  const { data, isLoading } = useList<Purchase>('purchases')
+  const { data, isLoading } = useList<Purchase>('purchases', { page })
 
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/purchases', p),
@@ -72,6 +73,7 @@ export default function Purchases() {
           ))}
         </Table>
       )}
+      <Pagination meta={data?.meta} page={page} onPage={setPage} />
       {payFor && (
         <Modal title={`Pay — ${payFor.reference}`} onClose={() => setPayFor(null)}>
           <PayBillForm

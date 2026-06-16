@@ -163,6 +163,37 @@ export function Spinner() {
   return <div className="p-8 text-center text-sm" style={{ color: 'var(--muted)' }}>Loading…</div>
 }
 
+/** Prev/next pager for list pages. Hidden when only one page. */
+export function Pagination({ meta, page, onPage }: { meta?: { current_page: number; last_page: number; total: number }; page: number; onPage: (p: number) => void }) {
+  if (!meta || meta.total === 0) return null
+  return (
+    <div className="mt-3 flex items-center justify-between text-sm" style={{ color: 'var(--muted)' }}>
+      <span>Total {meta.total}</span>
+      {meta.last_page > 1 && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onPage(page - 1)}
+            disabled={meta.current_page <= 1}
+            className="rounded-lg border px-3 py-1 disabled:opacity-40"
+            style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
+          >
+            ← Prev
+          </button>
+          <span>Page {meta.current_page} / {meta.last_page}</span>
+          <button
+            onClick={() => onPage(page + 1)}
+            disabled={meta.current_page >= meta.last_page}
+            className="rounded-lg border px-3 py-1 disabled:opacity-40"
+            style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
+          >
+            Next →
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /**
  * Cash/Bank method selector. When Bank is chosen, a free-text field records
  * which bank / cheque / transfer ref so it's known where the money is.

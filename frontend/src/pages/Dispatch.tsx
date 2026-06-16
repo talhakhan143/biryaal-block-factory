@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Card, Field, Input, Modal, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Card, Field, Input, Modal, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
 
 interface Dispatch {
   id: string
@@ -39,7 +39,8 @@ export default function DispatchPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [prefill, setPrefill] = useState<Prefill | null>(null)
   const [challanId, setChallanId] = useState<string | null>(null)
-  const { data, isLoading } = useList<Dispatch>('dispatches')
+  const [page, setPage] = useState(1)
+  const { data, isLoading } = useList<Dispatch>('dispatches', { page })
   const pending = useQuery({
     queryKey: ['dispatches-pending'],
     queryFn: async () => (await api.get<{ data: PendingOrder[] }>('/dispatches/pending')).data,
@@ -129,6 +130,7 @@ export default function DispatchPage() {
             ))}
           </Table>
         )}
+        <Pagination meta={data?.meta} page={page} onPage={setPage} />
       </div>
 
       {formOpen && (

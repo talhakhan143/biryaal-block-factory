@@ -17,6 +17,14 @@ class PaymentController extends Controller
     {
         $payments = Payment::query()
             ->with('party')
+            ->when($request->search, function ($q, $s) {
+                $q->where('reference', 'like', "%{$s}%")
+                    ->orWhereHasMorph(
+                        'party',
+                        [\App\Models\Customer::class, \App\Models\Supplier::class, \App\Models\Driver::class, \App\Models\Labourer::class, \App\Models\Staff::class],
+                        fn ($q) => $q->where('name', 'like', "%{$s}%"),
+                    );
+            })
             ->when($request->direction, fn ($q, $d) => $q->where('direction', $d))
             ->when($request->from, fn ($q, $d) => $q->whereDate('payment_date', '>=', $d))
             ->when($request->to, fn ($q, $d) => $q->whereDate('payment_date', '<=', $d))

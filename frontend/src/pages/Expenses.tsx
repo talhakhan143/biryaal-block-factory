@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
 
 interface Expense {
   id: string
@@ -22,7 +22,8 @@ export default function Expenses() {
   const { can } = useAuth()
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
-  const { data, isLoading } = useList<Expense>('expenses')
+  const [page, setPage] = useState(1)
+  const { data, isLoading } = useList<Expense>('expenses', { page })
 
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/expenses', p),
@@ -55,6 +56,7 @@ export default function Expenses() {
           ))}
         </Table>
       )}
+      <Pagination meta={data?.meta} page={page} onPage={setPage} />
       {creating && (
         <Modal title="New Expense" onClose={() => setCreating(false)}>
           <ExpenseForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />
