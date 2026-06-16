@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, Modal, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, Modal, MoneyInput, PageHeader, Select, Spinner, Table } from '../components/ui'
 
 interface Trip {
   id: string
@@ -89,8 +89,8 @@ function TripForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, unkn
         </Field>
         <Field label="Date"><Input type="date" value={form.trip_date} onChange={(e) => set('trip_date', e.target.value)} required /></Field>
         <Field label="To"><Input value={form.to_location} onChange={(e) => set('to_location', e.target.value)} /></Field>
-        <Field label="Rate (Rs)"><Input type="number" value={form.rate} onChange={(e) => set('rate', e.target.value)} required /></Field>
-        <Field label="Paid now (Rs)"><Input type="number" value={form.paid} onChange={(e) => set('paid', e.target.value)} /></Field>
+        <Field label="Rate (Rs)"><MoneyInput value={form.rate} onChange={(v) => set('rate', v)} required /></Field>
+        <Field label="Paid now (Rs)"><MoneyInput value={form.paid} onChange={(v) => set('paid', v)} /></Field>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Record Trip'}</Button>

@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, OutstandingNote, PageHeader, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Spinner, Table } from '../components/ui'
 
 interface Driver {
   id: string
@@ -96,7 +96,7 @@ function PayForm({ outstanding, onSubmit, busy, error }: { outstanding: number; 
       ) : (
         <>
           <Field label="Date"><Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} required /></Field>
-          <Field label="Amount (Rs)"><Input type="number" value={form.amount} onChange={(e) => set('amount', e.target.value)} required /></Field>
+          <Field label="Amount (Rs)"><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} required /></Field>
           <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
         </>
       )}

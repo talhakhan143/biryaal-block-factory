@@ -51,6 +51,46 @@ export function Input({ className = '', ...props }: InputHTMLAttributes<HTMLInpu
   return <input className={`${inputCls} ${className}`} style={inputStyle} {...props} />
 }
 
+// Group the integer part with thousands commas, keep decimals as typed.
+function groupMoney(raw: string): string {
+  if (raw === '') return ''
+  const neg = raw.startsWith('-') ? '-' : ''
+  const clean = raw.replace('-', '')
+  const [int, dec] = clean.split('.')
+  const grouped = (int || '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return dec !== undefined ? `${neg}${grouped}.${dec}` : `${neg}${grouped}`
+}
+
+/**
+ * Money input showing comma grouping while typing (e.g. 1,00,000 -> 100,000),
+ * but onChange returns the raw numeric string (no commas) for the form state.
+ */
+export function MoneyInput({
+  value,
+  onChange,
+  className = '',
+  ...props
+}: { value: string; onChange: (raw: string) => void } & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'>) {
+  return (
+    <input
+      inputMode="decimal"
+      className={`${inputCls} ${className}`}
+      style={inputStyle}
+      value={groupMoney(value)}
+      onChange={(e) => {
+        // keep only digits, one dot, optional leading minus
+        let raw = e.target.value.replace(/,/g, '').replace(/[^\d.-]/g, '')
+        const firstDot = raw.indexOf('.')
+        if (firstDot !== -1) {
+          raw = raw.slice(0, firstDot + 1) + raw.slice(firstDot + 1).replace(/\./g, '')
+        }
+        onChange(raw)
+      }}
+      {...props}
+    />
+  )
+}
+
 export function Select({ className = '', children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select className={`${inputCls} ${className}`} style={inputStyle} {...props}>

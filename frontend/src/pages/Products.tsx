@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, Modal, PageHeader, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, Modal, MoneyInput, PageHeader, Spinner, Table } from '../components/ui'
 
 interface Product {
   id: string
@@ -112,7 +112,7 @@ function ProductForm({ product, onSubmit, busy, error }: { product: Product | nu
         <Field label="Size"><Input value={form.size} onChange={(e) => set('size', e.target.value)} placeholder="4 inch" /></Field>
         <Field label="Unit"><Input value={form.unit} onChange={(e) => set('unit', e.target.value)} /></Field>
         <Field label="Curing days"><Input type="number" value={form.default_curing_days} onChange={(e) => set('default_curing_days', e.target.value)} /></Field>
-        <Field label="Sale rate (Rs)"><Input type="number" step="0.01" value={form.sale_price} onChange={(e) => set('sale_price', e.target.value)} required /></Field>
+        <Field label="Sale rate (Rs)"><MoneyInput value={form.sale_price} onChange={(v) => set('sale_price', v)} required /></Field>
         <Field label="Low stock alert (pcs)"><Input type="number" value={form.low_stock_threshold} onChange={(e) => set('low_stock_threshold', e.target.value)} /></Field>
       </div>
       <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--text)' }}>

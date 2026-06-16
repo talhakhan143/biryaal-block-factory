@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Button, Field, Input, Modal, PageHeader, Spinner, Table } from '../components/ui'
+import { Button, Field, Input, Modal, MoneyInput, PageHeader, Spinner, Table } from '../components/ui'
 
 interface Vehicle {
   id: string
@@ -64,7 +64,7 @@ function VehicleForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, u
         <Field label="Plate"><Input value={form.plate} onChange={(e) => set('plate', e.target.value)} /></Field>
         <Field label="Type"><Input value={form.type} onChange={(e) => set('type', e.target.value)} placeholder="truck / mazda" /></Field>
       </div>
-      <Field label="Default trip rate (Rs)"><Input type="number" value={form.default_trip_rate} onChange={(e) => set('default_trip_rate', e.target.value)} /></Field>
+      <Field label="Default trip rate (Rs)"><MoneyInput value={form.default_trip_rate} onChange={(v) => set('default_trip_rate', v)} /></Field>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Save'}</Button>
     </form>

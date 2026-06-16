@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
-import { Button, Card, Field, Input, MethodField, OutstandingNote, Select } from '../components/ui'
+import { Button, Card, Field, Input, MethodField, MoneyInput, OutstandingNote, Select } from '../components/ui'
 
 interface Product {
   id: string
@@ -140,11 +140,11 @@ export default function POS() {
           )}
           {type === 'credit' && (
             <Field label="Paid now (Rs) — abhi kitna diya">
-              <Input type="number" value={paid} onChange={(e) => setPaid(e.target.value)} />
+              <MoneyInput value={paid} onChange={setPaid} />
             </Field>
           )}
           <Field label="Discount (Rs)">
-            <Input type="number" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+            <MoneyInput value={discount} onChange={setDiscount} />
           </Field>
 
           {(type === 'cash' || Number(paid) > 0) && (

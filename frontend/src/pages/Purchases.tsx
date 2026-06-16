@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, PageHeader, Select, Spinner, Table } from '../components/ui'
 
 interface Purchase {
   id: string
@@ -107,11 +107,11 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Date"><Input type="date" value={form.purchase_date} onChange={(e) => set('purchase_date', e.target.value)} required /></Field>
         <Field label="Quantity"><Input type="number" step="0.001" value={form.quantity} onChange={(e) => set('quantity', e.target.value)} required /></Field>
-        <Field label="Unit cost (Rs)"><Input type="number" step="0.01" value={form.unit_cost} onChange={(e) => set('unit_cost', e.target.value)} required /></Field>
-        <Field label="Transport (Rs)"><Input type="number" step="0.01" value={form.transport_cost} onChange={(e) => set('transport_cost', e.target.value)} /></Field>
-        <Field label="Loading (Rs)"><Input type="number" step="0.01" value={form.loading_cost} onChange={(e) => set('loading_cost', e.target.value)} /></Field>
-        <Field label="Unloading (Rs)"><Input type="number" step="0.01" value={form.unloading_cost} onChange={(e) => set('unloading_cost', e.target.value)} /></Field>
-        <Field label="Paid now (Rs)"><Input type="number" step="0.01" value={form.paid_amount} onChange={(e) => set('paid_amount', e.target.value)} /></Field>
+        <Field label="Unit cost (Rs)"><MoneyInput value={form.unit_cost} onChange={(v) => set('unit_cost', v)} required /></Field>
+        <Field label="Transport (Rs, total)"><MoneyInput value={form.transport_cost} onChange={(v) => set('transport_cost', v)} /></Field>
+        <Field label="Loading (Rs, total)"><MoneyInput value={form.loading_cost} onChange={(v) => set('loading_cost', v)} /></Field>
+        <Field label="Unloading (Rs, total)"><MoneyInput value={form.unloading_cost} onChange={(v) => set('unloading_cost', v)} /></Field>
+        <Field label="Paid now (Rs)"><MoneyInput value={form.paid_amount} onChange={(v) => set('paid_amount', v)} /></Field>
       </div>
       <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
       {error && <p className="text-sm text-red-600">{error}</p>}

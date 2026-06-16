@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, OutstandingNote, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Select, Spinner, Table } from '../components/ui'
 
 interface Staff {
   id: string
@@ -112,7 +112,7 @@ function StaffForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, unk
         <Field label="Role"><Input value={form.role} onChange={(e) => set('role', e.target.value)} placeholder="Supervisor" /></Field>
         <Field label="Phone"><Input value={form.phone} onChange={(e) => set('phone', e.target.value)} /></Field>
       </div>
-      <Field label="Monthly salary (Rs)"><Input type="number" value={form.monthly_salary} onChange={(e) => set('monthly_salary', e.target.value)} required /></Field>
+      <Field label="Monthly salary (Rs)"><MoneyInput value={form.monthly_salary} onChange={(v) => set('monthly_salary', v)} required /></Field>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Save'}</Button>
     </form>
@@ -140,7 +140,7 @@ function SalaryForm({ staff, onSubmit, busy, error }: { staff: Staff[]; onSubmit
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Month (YYYY-MM)"><Input value={form.month} onChange={(e) => set('month', e.target.value)} placeholder="2026-06" required /></Field>
-        <Field label="Amount (blank = default)"><Input type="number" value={form.amount} onChange={(e) => set('amount', e.target.value)} /></Field>
+        <Field label="Amount (blank = default)"><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} /></Field>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Generate'}</Button>
@@ -160,7 +160,7 @@ function PayForm({ outstanding, onSubmit, busy, error }: { outstanding: number; 
       ) : (
         <>
           <Field label="Date"><Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} required /></Field>
-          <Field label="Amount (Rs)"><Input type="number" value={form.amount} onChange={(e) => set('amount', e.target.value)} required /></Field>
+          <Field label="Amount (Rs)"><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} required /></Field>
           <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
         </>
       )}
