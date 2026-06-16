@@ -29,7 +29,7 @@ class ExpenseController extends Controller
     {
         $data = $request->validate([
             'expense_date' => ['required', 'date'],
-            'category' => ['required', 'in:electricity,diesel,maintenance,internet,misc'],
+            'category' => ['required', 'in:electricity,diesel,maintenance,internet,other'],
             'amount' => ['required', 'numeric', 'gt:0'],
             'method' => ['nullable', 'in:cash,bank'],
             'bank_ref' => ['nullable', 'string', 'max:255'],

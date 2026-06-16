@@ -16,7 +16,7 @@ interface Expense {
   method: string
 }
 
-const CATEGORIES = ['electricity', 'diesel', 'maintenance', 'internet', 'misc']
+const CATEGORIES = ['electricity', 'diesel', 'maintenance', 'internet', 'other']
 
 export default function Expenses() {
   const { can } = useAuth()
