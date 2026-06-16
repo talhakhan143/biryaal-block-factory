@@ -5,14 +5,16 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePurchaseRequest;
 use App\Http\Resources\MaterialPurchaseResource;
+use App\Http\Resources\PaymentResource;
 use App\Models\MaterialPurchase;
+use App\Services\Payments\PaymentService;
 use App\Services\Purchasing\PurchaseService;
 use App\Support\Money;
 use Illuminate\Http\Request;
 
 class MaterialPurchaseController extends Controller
 {
-    public function __construct(private PurchaseService $service) {}
+    public function __construct(private PurchaseService $service, private PaymentService $payments) {}
 
     public function index(Request $request)
     {
@@ -47,5 +49,19 @@ class MaterialPurchaseController extends Controller
     public function show(MaterialPurchase $materialPurchase)
     {
         return new MaterialPurchaseResource($materialPurchase->load(['supplier', 'rawMaterial']));
+    }
+
+    /** Pay (part of) this purchase bill to the supplier. */
+    public function pay(Request $request, MaterialPurchase $materialPurchase)
+    {
+        $data = $request->validate([
+            'payment_date' => ['required', 'date'],
+            'amount' => ['required', 'numeric', 'gt:0'],
+            'method' => ['nullable', 'in:cash,bank'],
+            'bank_ref' => ['nullable', 'string', 'max:255'],
+        ]);
+        $data['amount'] = Money::toPaisa($data['amount']);
+
+        return new PaymentResource($this->payments->payForPurchase($materialPurchase, $data));
     }
 }

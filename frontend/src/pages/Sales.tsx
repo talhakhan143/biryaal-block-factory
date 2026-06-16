@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { api } from '../lib/api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
-import { Badge, Button, Input, PageHeader, Spinner, Table } from '../components/ui'
+import { useAuth } from '../lib/auth'
+import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Spinner, Table } from '../components/ui'
 
 interface Sale {
   id: string
@@ -20,9 +21,20 @@ interface Sale {
 const statusColor: Record<string, string> = { paid: 'green', partial: 'amber', unpaid: 'red' }
 
 export default function Sales() {
+  const { can } = useAuth()
+  const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [viewId, setViewId] = useState<string | null>(null)
+  const [receiveFor, setReceiveFor] = useState<Sale | null>(null)
   const { data, isLoading } = useList<Sale>('sales', { search })
+
+  const receive = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/sales/${id}/receive`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sales'] })
+      setReceiveFor(null)
+    },
+  })
 
   return (
     <div>
@@ -44,7 +56,10 @@ export default function Sales() {
               <td className="px-4 py-3">{formatPaisa(s.paid)}</td>
               <td className="px-4 py-3">{formatPaisa(s.balance)}</td>
               <td className="px-4 py-3"><Badge color={statusColor[s.status]}>{s.status}</Badge></td>
-              <td className="px-4 py-3 text-right">
+              <td className="px-4 py-3 text-right space-x-3">
+                {can('payments.manage') && s.balance > 0 && (
+                  <button className="text-sm hover:underline" style={{ color: 'var(--green)' }} onClick={() => setReceiveFor(s)}>Receive</button>
+                )}
                 <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => setViewId(s.id)}>
                   View / Print
                 </button>
@@ -54,7 +69,32 @@ export default function Sales() {
         </Table>
       )}
       {viewId && <InvoiceModal id={viewId} onClose={() => setViewId(null)} />}
+      {receiveFor && (
+        <Modal title={`Receive — ${receiveFor.invoice_no}`} onClose={() => setReceiveFor(null)}>
+          <ReceiveForm
+            outstanding={receiveFor.balance}
+            onSubmit={(payload) => receive.mutate({ id: receiveFor.id, payload })}
+            busy={receive.isPending}
+            error={receive.error ? apiError(receive.error) : ''}
+          />
+        </Modal>
+      )}
     </div>
+  )
+}
+
+function ReceiveForm({ outstanding, onSubmit, busy, error }: { outstanding: number; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
+  const [form, setForm] = useState({ payment_date: new Date().toISOString().slice(0, 10), amount: '', method: 'cash', bank_ref: '' })
+  const set = (k: string, v: string) => setForm({ ...form, [k]: v })
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, amount: Number(form.amount) }) }} className="space-y-3">
+      <OutstandingNote label="Is invoice ka baqi (customer se lena)" amount={outstanding} onFill={(rs) => set('amount', String(rs))} />
+      <Field label="Date"><Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} required /></Field>
+      <Field label="Amount (Rs)"><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} required /></Field>
+      <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
+      {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
+      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Receive'}</Button>
+    </form>
   )
 }
 

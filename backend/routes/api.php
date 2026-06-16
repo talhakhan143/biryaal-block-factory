@@ -84,6 +84,7 @@ Route::prefix('v1')->group(function () {
         Route::get('purchases', [MaterialPurchaseController::class, 'index'])->middleware('permission:purchases.view');
         Route::get('purchases/{materialPurchase}', [MaterialPurchaseController::class, 'show'])->middleware('permission:purchases.view');
         Route::post('purchases', [MaterialPurchaseController::class, 'store'])->middleware('permission:purchases.manage');
+        Route::post('purchases/{materialPurchase}/pay', [MaterialPurchaseController::class, 'pay'])->middleware('permission:payments.manage');
 
         // Production
         Route::get('production', [ProductionController::class, 'index'])->middleware('permission:production.view');
@@ -106,6 +107,7 @@ Route::prefix('v1')->group(function () {
         Route::get('sales', [SaleController::class, 'index'])->middleware('permission:sales.view');
         Route::get('sales/{sale}', [SaleController::class, 'show'])->middleware('permission:sales.view');
         Route::post('sales', [SaleController::class, 'store'])->middleware('permission:sales.manage');
+        Route::post('sales/{sale}/receive', [SaleController::class, 'receive'])->middleware('permission:payments.manage');
 
         // Payments
         Route::get('payments', [PaymentController::class, 'index'])->middleware('permission:payments.view');

@@ -4,7 +4,9 @@ namespace App\Services\Payments;
 
 use App\Models\Account;
 use App\Models\Customer;
+use App\Models\MaterialPurchase;
 use App\Models\Payment;
+use App\Models\Sale;
 use App\Models\Supplier;
 use App\Services\Accounting\CashAccountResolver;
 use App\Services\Accounting\LedgerService;
@@ -94,6 +96,106 @@ class PaymentService
                 [
                     ['account' => Account::PAYABLE, 'debit' => $amount, 'memo' => $supplier->name],
                     ['account' => $cashAccount, 'credit' => $amount],
+                ],
+                $payment,
+            );
+
+            return $payment;
+        });
+    }
+
+    /**
+     * Pay against a specific purchase bill: settles the supplier and updates
+     * this purchase's paid_amount / payment_status. Dr Payable, Cr Cash/Bank.
+     *
+     * @param  array{amount:int,payment_date:string,method?:string,bank_ref?:string}  $data
+     */
+    public function payForPurchase(MaterialPurchase $purchase, array $data): Payment
+    {
+        return DB::transaction(function () use ($purchase, $data) {
+            $remaining = (int) $purchase->total_cost - (int) $purchase->paid_amount;
+            $amount = min((int) $data['amount'], $remaining);
+            $this->assertPositive($amount);
+
+            $supplier = $purchase->supplier;
+            $payment = Payment::create([
+                'reference' => Sequence::next('PAY'),
+                'direction' => Payment::PAYMENT,
+                'party_type' => $supplier->getMorphClass(),
+                'party_id' => $supplier->id,
+                'payment_date' => $data['payment_date'],
+                'amount' => $amount,
+                'method' => $data['method'] ?? 'cash',
+                'bank_ref' => $data['bank_ref'] ?? null,
+                'allocatable_type' => $purchase->getMorphClass(),
+                'allocatable_id' => $purchase->id,
+                'created_by' => Auth::id(),
+            ]);
+
+            $paid = (int) $purchase->paid_amount + $amount;
+            $purchase->update([
+                'paid_amount' => $paid,
+                'payment_status' => $paid >= (int) $purchase->total_cost ? 'paid' : 'partial',
+            ]);
+            $supplier->decrement('balance', $amount);
+
+            $cashAccount = CashAccountResolver::code($data['method'] ?? 'cash');
+            $this->ledger->post(
+                $data['payment_date'],
+                "Payment {$payment->reference} for {$purchase->reference}",
+                [
+                    ['account' => Account::PAYABLE, 'debit' => $amount, 'memo' => $supplier->name],
+                    ['account' => $cashAccount, 'credit' => $amount],
+                ],
+                $payment,
+            );
+
+            return $payment;
+        });
+    }
+
+    /**
+     * Receive payment against a specific sale invoice: updates the sale's
+     * paid/balance/status and the customer. Dr Cash/Bank, Cr Receivable.
+     *
+     * @param  array{amount:int,payment_date:string,method?:string,bank_ref?:string}  $data
+     */
+    public function receiveForSale(Sale $sale, array $data): Payment
+    {
+        return DB::transaction(function () use ($sale, $data) {
+            $amount = min((int) $data['amount'], (int) $sale->balance);
+            $this->assertPositive($amount);
+
+            $customer = $sale->customer;
+            $payment = Payment::create([
+                'reference' => Sequence::next('PAY'),
+                'direction' => Payment::RECEIPT,
+                'party_type' => $customer?->getMorphClass(),
+                'party_id' => $customer?->id,
+                'payment_date' => $data['payment_date'],
+                'amount' => $amount,
+                'method' => $data['method'] ?? 'cash',
+                'bank_ref' => $data['bank_ref'] ?? null,
+                'allocatable_type' => $sale->getMorphClass(),
+                'allocatable_id' => $sale->id,
+                'created_by' => Auth::id(),
+            ]);
+
+            $paid = (int) $sale->paid + $amount;
+            $sale->update([
+                'paid' => $paid,
+                'balance' => (int) $sale->total - $paid,
+                'status' => $paid >= (int) $sale->total ? 'paid' : 'partial',
+            ]);
+            $customer?->decrement('balance', $amount);
+
+            $cashAccount = CashAccountResolver::code($data['method'] ?? 'cash');
+            $this->ledger->post(
+                $data['payment_date'],
+                "Receipt {$payment->reference} for {$sale->invoice_no}",
+                [
+                    ['account' => $cashAccount, 'debit' => $amount],
+                    ['account' => Account::RECEIVABLE, 'credit' => $amount, 'memo' => $customer?->name],
                 ],
                 $payment,
             );

@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Select, Spinner, Table } from '../components/ui'
 
 interface Purchase {
   id: string
@@ -24,6 +24,7 @@ export default function Purchases() {
   const { can } = useAuth()
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
+  const [payFor, setPayFor] = useState<Purchase | null>(null)
   const { data, isLoading } = useList<Purchase>('purchases')
 
   const create = useMutation({
@@ -31,6 +32,14 @@ export default function Purchases() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['purchases'] })
       setCreating(false)
+    },
+  })
+
+  const pay = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/purchases/${id}/pay`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['purchases'] })
+      setPayFor(null)
     },
   })
 
@@ -44,7 +53,7 @@ export default function Purchases() {
       {isLoading ? (
         <Spinner />
       ) : (
-        <Table head={['Ref', 'Date', 'Supplier', 'Material', 'Qty', 'Total', 'Status']}>
+        <Table head={['Ref', 'Date', 'Supplier', 'Material', 'Qty', 'Total', 'Status', '']}>
           {data?.data.map((p) => (
             <tr key={p.id}>
               <td className="px-4 py-3 font-mono text-xs">{p.reference}</td>
@@ -54,9 +63,24 @@ export default function Purchases() {
               <td className="px-4 py-3">{p.quantity}</td>
               <td className="px-4 py-3">{formatPaisa(p.total_cost)}</td>
               <td className="px-4 py-3"><Badge color={statusColor[p.payment_status]}>{p.payment_status}</Badge></td>
+              <td className="px-4 py-3 text-right">
+                {can('payments.manage') && p.payment_status !== 'paid' && (
+                  <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => setPayFor(p)}>Pay</button>
+                )}
+              </td>
             </tr>
           ))}
         </Table>
+      )}
+      {payFor && (
+        <Modal title={`Pay — ${payFor.reference}`} onClose={() => setPayFor(null)}>
+          <PayBillForm
+            outstanding={payFor.total_cost - payFor.paid_amount}
+            onSubmit={(payload) => pay.mutate({ id: payFor.id, payload })}
+            busy={pay.isPending}
+            error={pay.error ? apiError(pay.error) : ''}
+          />
+        </Modal>
       )}
       {creating && (
         <Modal title="New Purchase" onClose={() => setCreating(false)}>
@@ -64,6 +88,21 @@ export default function Purchases() {
         </Modal>
       )}
     </div>
+  )
+}
+
+function PayBillForm({ outstanding, onSubmit, busy, error }: { outstanding: number; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
+  const [form, setForm] = useState({ payment_date: new Date().toISOString().slice(0, 10), amount: '', method: 'cash', bank_ref: '' })
+  const set = (k: string, v: string) => setForm({ ...form, [k]: v })
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, amount: Number(form.amount) }) }} className="space-y-3">
+      <OutstandingNote label="Is bill ka baqi (supplier ko dena)" amount={outstanding} onFill={(rs) => set('amount', String(rs))} />
+      <Field label="Date"><Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} required /></Field>
+      <Field label="Amount (Rs)"><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} required /></Field>
+      <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
+      {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
+      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Pay'}</Button>
+    </form>
   )
 }
 

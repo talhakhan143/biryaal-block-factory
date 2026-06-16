@@ -4,15 +4,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreSaleRequest;
+use App\Http\Resources\PaymentResource;
 use App\Http\Resources\SaleResource;
 use App\Models\Sale;
+use App\Services\Payments\PaymentService;
 use App\Services\Sales\SaleService;
 use App\Support\Money;
 use Illuminate\Http\Request;
 
 class SaleController extends Controller
 {
-    public function __construct(private SaleService $service) {}
+    public function __construct(private SaleService $service, private PaymentService $payments) {}
 
     public function index(Request $request)
     {
@@ -55,5 +57,19 @@ class SaleController extends Controller
     public function show(Sale $sale)
     {
         return new SaleResource($sale->load(['items.product', 'customer']));
+    }
+
+    /** Receive (part of) the outstanding balance on this invoice. */
+    public function receive(Request $request, Sale $sale)
+    {
+        $data = $request->validate([
+            'payment_date' => ['required', 'date'],
+            'amount' => ['required', 'numeric', 'gt:0'],
+            'method' => ['nullable', 'in:cash,bank'],
+            'bank_ref' => ['nullable', 'string', 'max:255'],
+        ]);
+        $data['amount'] = Money::toPaisa($data['amount']);
+
+        return new PaymentResource($this->payments->receiveForSale($sale, $data));
     }
 }
