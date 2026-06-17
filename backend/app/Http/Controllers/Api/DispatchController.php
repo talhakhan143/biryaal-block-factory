@@ -27,30 +27,51 @@ class DispatchController extends Controller
         return DispatchResource::collection($dispatches);
     }
 
-    /** Sales (POS orders) that have not been dispatched yet. */
+    /** Sales (POS orders) with blocks still left to deliver (partial allowed). */
     public function pending()
     {
-        $sales = Sale::with(['customer', 'items.product'])
-            ->whereDoesntHave('dispatches')
+        $sales = Sale::with(['customer', 'items.product', 'dispatches.items'])
             ->latest('sale_date')
-            ->limit(100)
-            ->get()
-            ->map(fn (Sale $s) => [
-                'sale_id' => $s->id,
-                'invoice_no' => $s->invoice_no,
-                'sale_date' => $s->sale_date->toDateString(),
-                'customer_id' => $s->customer_id,
-                'customer_name' => $s->customer?->name ?? 'Walk-in',
-                'total' => (int) $s->total,
-                'transport_fare' => (int) $s->transport_fare,
-                'items' => $s->items->map(fn ($i) => [
-                    'product_id' => $i->product_id,
-                    'product_name' => $i->product?->name,
-                    'quantity' => (int) $i->quantity,
-                ]),
-            ]);
+            ->limit(200)
+            ->get();
 
-        return response()->json(['data' => $sales]);
+        $orders = [];
+        foreach ($sales as $s) {
+            // how much of each product already dispatched for this sale
+            $dispatched = [];
+            foreach ($s->dispatches as $disp) {
+                foreach ($disp->items as $di) {
+                    $dispatched[$di->product_id] = ($dispatched[$di->product_id] ?? 0) + (int) $di->quantity;
+                }
+            }
+
+            $remainingItems = [];
+            foreach ($s->items as $i) {
+                $left = (int) $i->quantity - ($dispatched[$i->product_id] ?? 0);
+                if ($left > 0) {
+                    $remainingItems[] = [
+                        'product_id' => $i->product_id,
+                        'product_name' => $i->product?->name,
+                        'quantity' => $left,   // remaining to deliver
+                    ];
+                }
+            }
+
+            if (! empty($remainingItems)) {
+                $orders[] = [
+                    'sale_id' => $s->id,
+                    'invoice_no' => $s->invoice_no,
+                    'sale_date' => $s->sale_date->toDateString(),
+                    'customer_id' => $s->customer_id,
+                    'customer_name' => $s->customer?->name ?? 'Walk-in',
+                    'total' => (int) $s->total,
+                    'transport_fare' => (int) $s->transport_fare,
+                    'items' => $remainingItems,
+                ];
+            }
+        }
+
+        return response()->json(['data' => $orders]);
     }
 
     public function store(Request $request)

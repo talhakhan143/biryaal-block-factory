@@ -149,7 +149,7 @@ function DispatchForm({ prefill, onSubmit, busy, error }: { prefill: Prefill | n
     method: 'cash',
     bank_ref: '',
   })
-  const [items] = useState<{ product_id: string; quantity: string }[]>(
+  const [items, setItems] = useState<{ product_id: string; quantity: string }[]>(
     prefill?.items.length ? prefill.items : [{ product_id: '', quantity: '' }],
   )
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
@@ -181,13 +181,23 @@ function DispatchForm({ prefill, onSubmit, busy, error }: { prefill: Prefill | n
       </Field>
 
       <div>
-        <span className="mb-1 block text-xs font-medium" style={{ color: 'var(--muted)' }}>Order ke items</span>
-        <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)' }}>
-          {items.map((it, idx) => {
-            const p = products.data?.data.find((x) => x.id === it.product_id)
-            return <div key={idx} className="flex justify-between py-0.5"><span>{p?.name ?? '—'}</span><span>×{it.quantity}</span></div>
-          })}
-        </div>
+        <span className="mb-1 block text-xs font-medium" style={{ color: 'var(--muted)' }}>Kitne blocks bhej rahe (qty adjust karo)</span>
+        {items.map((it, idx) => {
+          const p = products.data?.data.find((x) => x.id === it.product_id)
+          const max = prefill?.items.find((x) => x.product_id === it.product_id)?.quantity ?? it.quantity
+          return (
+            <div key={idx} className="mb-2 flex items-center gap-2">
+              <span className="flex-1 text-sm" style={{ color: 'var(--text)' }}>{p?.name ?? '—'}</span>
+              <Input
+                type="number" min={1} max={Number(max)} value={it.quantity}
+                onChange={(e) => setItems(items.map((x, i) => (i === idx ? { ...x, quantity: e.target.value } : x)))}
+                className="w-24"
+              />
+              <span className="text-xs" style={{ color: 'var(--muted)' }}>/ {max} baqi</span>
+            </div>
+          )
+        })}
+        <p className="text-xs" style={{ color: 'var(--muted)' }}>Aik gaari me jitne jayen wo qty rakho — baqi order pending list me rahega.</p>
       </div>
 
       <Field label="Driver (gaari saath aati hai)">
