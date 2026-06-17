@@ -3,7 +3,7 @@ import {
   LayoutDashboard, ShoppingCart, ReceiptText, Users, HandCoins, Factory, Boxes,
   Package, Truck, ClipboardList, Car, UserRound, HardHat, Wallet, BookText,
   FileSpreadsheet, FileBarChart, Tag, BookOpenText, UsersRound, History,
-  LogOut, Moon, Sun, Languages, type LucideIcon,
+  Undo2, LogOut, Moon, Sun, Languages, type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { useTheme } from '../lib/theme'
@@ -34,6 +34,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: '/pos', en: 'New Sale', ur: 'نئی فروخت', permission: 'sales.manage', icon: ShoppingCart },
       { to: '/sales', en: 'Sales', ur: 'سیلز اور آرڈرز', permission: 'sales.view', icon: ReceiptText },
+      { to: '/returns', en: 'Block Return', ur: 'بلاک واپسی', permission: 'sales.view', icon: Undo2 },
       { to: '/customers', en: 'Customers', ur: 'کسٹمر', permission: 'customers.view', icon: Users },
       { to: '/payments', en: 'Payments', ur: 'لین دین', permission: 'payments.view', icon: HandCoins },
     ],

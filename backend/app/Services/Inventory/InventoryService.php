@@ -53,6 +53,15 @@ class InventoryService
         $this->log($product, 'sold', 'ready', -$qty, $reference);
     }
 
+    /** Returned blocks come back into ready stock. */
+    public function recordReturn(Product $product, int $qty, ?Model $reference = null, ?string $note = null): void
+    {
+        $stock = $this->stockFor($product);
+        $stock->increment('ready_qty', $qty);
+
+        $this->log($product, 'returned', 'ready', $qty, $reference, $note ?? 'Sales return');
+    }
+
     /** Manual stock adjustment on a bucket (+/-). */
     public function adjust(Product $product, string $bucket, int $delta, ?string $note = null): void
     {

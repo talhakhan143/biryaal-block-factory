@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\RawMaterialController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SalaryController;
 use App\Http\Controllers\Api\SaleController;
+use App\Http\Controllers\Api\SalesReturnController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\TransportController;
@@ -110,6 +111,11 @@ Route::prefix('v1')->group(function () {
         Route::get('sales/{sale}', [SaleController::class, 'show'])->middleware('permission:sales.view');
         Route::post('sales', [SaleController::class, 'store'])->middleware('permission:sales.manage');
         Route::post('sales/{sale}/receive', [SaleController::class, 'receive'])->middleware('permission:payments.manage');
+
+        // Block returns (wapsi)
+        Route::get('sales-returns', [SalesReturnController::class, 'index'])->middleware('permission:sales.view');
+        Route::get('sales-returns/{salesReturn}', [SalesReturnController::class, 'show'])->middleware('permission:sales.view');
+        Route::post('sales-returns', [SalesReturnController::class, 'store'])->middleware('permission:sales.manage');
 
         // Payments
         Route::get('payments', [PaymentController::class, 'index'])->middleware('permission:payments.view');
