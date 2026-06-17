@@ -43,6 +43,13 @@ class LabourerController extends Controller
         return new LabourerResource($labourer);
     }
 
+    public function destroy(Labourer $labourer)
+    {
+        $labourer->delete(); // attendances cascade
+
+        return response()->noContent();
+    }
+
     /** Pay outstanding wages to a labourer. */
     public function pay(Request $request, Labourer $labourer)
     {

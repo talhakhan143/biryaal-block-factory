@@ -39,6 +39,17 @@ class RawMaterialController extends Controller
         return new RawMaterialResource($rawMaterial);
     }
 
+    public function destroy(RawMaterial $rawMaterial)
+    {
+        try {
+            $rawMaterial->delete();
+        } catch (\Illuminate\Database\QueryException) {
+            return response()->json(['message' => 'Ye material purchases me use hua — delete nahi ho sakta. "Active" off karein.'], 422);
+        }
+
+        return response()->noContent();
+    }
+
     private function rules(): array
     {
         return [

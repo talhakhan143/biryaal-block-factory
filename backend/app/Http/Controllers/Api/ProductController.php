@@ -49,6 +49,18 @@ class ProductController extends Controller
         return new ProductResource($product->load('stock'));
     }
 
+    public function destroy(Product $product)
+    {
+        try {
+            $product->stock()->delete();
+            $product->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            return response()->json(['message' => 'Ye product use me hai (sale/production) — delete nahi ho sakta. "Active" off kar dein.'], 422);
+        }
+
+        return response()->noContent();
+    }
+
     private function rules(?string $id = null): array
     {
         return [

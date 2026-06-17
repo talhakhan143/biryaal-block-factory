@@ -58,7 +58,6 @@ export default function DispatchPage() {
       setChallanId(res.data.data.id)
     },
   })
-  const openBlank = () => { setPrefill(null); setFormOpen(true) }
   const openFromOrder = (o: PendingOrder) => {
     setPrefill({
       sale_id: o.sale_id,
@@ -103,8 +102,7 @@ export default function DispatchPage() {
       <div>
         <PageHeader
           title="Dispatch / Challan"
-          subtitle="Delivery ka record aur challan print"
-          actions={can('dispatch.manage') && <Button variant="ghost" onClick={openBlank}>+ Manual Dispatch</Button>}
+          subtitle="POS order ko 'Dispatch' karein — yahan challan ka record"
         />
         {isLoading ? (
           <Spinner />
@@ -151,7 +149,7 @@ function DispatchForm({ prefill, onSubmit, busy, error }: { prefill: Prefill | n
     method: 'cash',
     bank_ref: '',
   })
-  const [items, setItems] = useState<{ product_id: string; quantity: string }[]>(
+  const [items] = useState<{ product_id: string; quantity: string }[]>(
     prefill?.items.length ? prefill.items : [{ product_id: '', quantity: '' }],
   )
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
@@ -183,18 +181,13 @@ function DispatchForm({ prefill, onSubmit, busy, error }: { prefill: Prefill | n
       </Field>
 
       <div>
-        <span className="mb-1 block text-xs font-medium" style={{ color: 'var(--muted)' }}>Items (maal)</span>
-        {items.map((it, idx) => (
-          <div key={idx} className="mb-2 flex gap-2">
-            <Select value={it.product_id} onChange={(e) => setItems(items.map((x, i) => (i === idx ? { ...x, product_id: e.target.value } : x)))}>
-              <option value="">Product…</option>
-              {products.data?.data.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </Select>
-            <Input type="number" placeholder="Qty" value={it.quantity} onChange={(e) => setItems(items.map((x, i) => (i === idx ? { ...x, quantity: e.target.value } : x)))} className="w-24" />
-            {items.length > 1 && <button type="button" onClick={() => setItems(items.filter((_, i) => i !== idx))} style={{ color: 'var(--red)' }}>✕</button>}
-          </div>
-        ))}
-        <button type="button" className="text-sm" style={{ color: 'var(--primary)' }} onClick={() => setItems([...items, { product_id: '', quantity: '' }])}>+ Add item</button>
+        <span className="mb-1 block text-xs font-medium" style={{ color: 'var(--muted)' }}>Order ke items</span>
+        <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)' }}>
+          {items.map((it, idx) => {
+            const p = products.data?.data.find((x) => x.id === it.product_id)
+            return <div key={idx} className="flex justify-between py-0.5"><span>{p?.name ?? '—'}</span><span>×{it.quantity}</span></div>
+          })}
+        </div>
       </div>
 
       <Field label="Driver (gaari saath aati hai)">

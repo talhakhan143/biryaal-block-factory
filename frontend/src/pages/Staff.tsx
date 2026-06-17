@@ -36,6 +36,7 @@ export default function StaffPage() {
   const refresh = () => { qc.invalidateQueries({ queryKey: ['staff'] }); qc.invalidateQueries({ queryKey: ['salaries'] }) }
 
   const createStaff = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/staff', p), onSuccess: () => { refresh(); setAddStaff(false) } })
+  const delStaff = useMutation({ mutationFn: (id: string) => api.delete(`/staff/${id}`), onSuccess: refresh, onError: (e) => alert(apiError(e)) })
   const generate = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/salaries', p), onSuccess: () => { refresh(); setGenSalary(false) } })
   const pay = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/salaries/${id}/pay`, payload), onSuccess: () => { refresh(); setPayId(null) } })
 
@@ -44,12 +45,15 @@ export default function StaffPage() {
       <div>
         <PageHeader title="Staff" subtitle="Mahine wale mulazim aur unki tankha" actions={can('hr.manage') && <Button onClick={() => setAddStaff(true)}>+ Staff</Button>} />
         {staff.isLoading ? <Spinner /> : (
-          <Table head={['Name', 'Role', 'Monthly Salary']}>
+          <Table head={['Name', 'Role', 'Monthly Salary', '']}>
             {staff.data?.data.map((s) => (
               <tr key={s.id}>
                 <td className="px-4 py-3 font-medium">{s.name}</td>
                 <td className="px-4 py-3">{s.role ?? '—'}</td>
                 <td className="px-4 py-3">{formatPaisa(s.monthly_salary)}</td>
+                <td className="px-4 py-3 text-right">
+                  {can('hr.manage') && <button className="text-sm hover:underline" style={{ color: 'var(--red)' }} onClick={() => { if (confirm(`Delete ${s.name}?`)) delStaff.mutate(s.id) }}>Delete</button>}
+                </td>
               </tr>
             ))}
           </Table>

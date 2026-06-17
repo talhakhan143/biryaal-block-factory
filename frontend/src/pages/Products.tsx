@@ -36,6 +36,13 @@ export default function Products() {
     },
   })
 
+  const del = useMutation({
+    mutationFn: (id: string) => api.delete(`/products/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+    onError: (e) => alert(apiError(e)),
+  })
+  const remove = (id: string, name: string) => { if (confirm(`Delete "${name}"? Wapas nahi aayega.`)) del.mutate(id) }
+
   return (
     <div>
       <PageHeader
@@ -55,8 +62,9 @@ export default function Products() {
               <td className="px-4 py-3">{p.default_curing_days} din</td>
               <td className="px-4 py-3">{formatPaisa(p.sale_price)}</td>
               <td className="px-4 py-3">{p.is_active ? <Badge color="green">Active</Badge> : <Badge color="slate">Off</Badge>}</td>
-              <td className="px-4 py-3 text-right">
-                {manage && <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => setEditing(p)}>Edit / Rename</button>}
+              <td className="px-4 py-3 text-right space-x-3">
+                {manage && <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => setEditing(p)}>Edit</button>}
+                {manage && <button className="text-sm hover:underline" style={{ color: 'var(--red)' }} onClick={() => remove(p.id, p.name)}>Delete</button>}
               </td>
             </tr>
           ))}

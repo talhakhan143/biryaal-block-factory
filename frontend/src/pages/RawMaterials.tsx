@@ -33,6 +33,13 @@ export default function RawMaterials() {
     },
   })
 
+  const del = useMutation({
+    mutationFn: (id: string) => api.delete(`/raw-materials/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['raw-materials'] }),
+    onError: (e) => alert(apiError(e)),
+  })
+  const remove = (id: string, name: string) => { if (confirm(`Delete "${name}"?`)) del.mutate(id) }
+
   return (
     <div>
       <PageHeader
@@ -53,8 +60,9 @@ export default function RawMaterials() {
               <td className="px-4 py-3">
                 {!m.is_active ? <Badge color="slate">Off</Badge> : m.is_low ? <Badge color="red">Low</Badge> : <Badge color="green">OK</Badge>}
               </td>
-              <td className="px-4 py-3 text-right">
-                {manage && <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => setEditing(m)}>Edit / Rename</button>}
+              <td className="px-4 py-3 text-right space-x-3">
+                {manage && <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => setEditing(m)}>Edit</button>}
+                {manage && <button className="text-sm hover:underline" style={{ color: 'var(--red)' }} onClick={() => remove(m.id, m.name)}>Delete</button>}
               </td>
             </tr>
           ))}

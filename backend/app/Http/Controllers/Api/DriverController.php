@@ -55,6 +55,17 @@ class DriverController extends Controller
         return new PaymentResource($payment);
     }
 
+    public function destroy(Driver $driver)
+    {
+        try {
+            $driver->delete();
+        } catch (\Illuminate\Database\QueryException) {
+            return response()->json(['message' => 'Driver ka record use me hai — delete nahi ho sakta. Inactive karein.'], 422);
+        }
+
+        return response()->noContent();
+    }
+
     public function ledger(Driver $driver)
     {
         $trips = TransportTrip::where('driver_id', $driver->id)->get()->map(fn (TransportTrip $t) => [

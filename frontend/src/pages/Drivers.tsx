@@ -34,6 +34,11 @@ export default function Drivers() {
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/drivers/${id}/pay`, payload),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['drivers'] }); setPayId(null) },
   })
+  const del = useMutation({
+    mutationFn: (id: string) => api.delete(`/drivers/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['drivers'] }),
+    onError: (e) => alert(apiError(e)),
+  })
 
   return (
     <div>
@@ -54,6 +59,7 @@ export default function Drivers() {
               <td className="px-4 py-3 text-right space-x-3">
                 <button className="text-sm text-blue-600 hover:underline" onClick={() => setLedgerId(d.id)}>Ledger</button>
                 {can('payments.manage') && <button className="text-sm text-blue-600 hover:underline" onClick={() => setPayId(d.id)}>Pay</button>}
+                {can('transport.manage') && <button className="text-sm hover:underline" style={{ color: 'var(--red)' }} onClick={() => { if (confirm(`Delete ${d.name}?`)) del.mutate(d.id) }}>Delete</button>}
               </td>
             </tr>
           ))}

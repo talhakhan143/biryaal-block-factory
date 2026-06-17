@@ -73,6 +73,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:materials.manage')->group(function () {
             Route::post('raw-materials', [RawMaterialController::class, 'store']);
             Route::put('raw-materials/{rawMaterial}', [RawMaterialController::class, 'update']);
+            Route::delete('raw-materials/{rawMaterial}', [RawMaterialController::class, 'destroy']);
         });
 
         // Products
@@ -81,6 +82,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:inventory.manage')->group(function () {
             Route::post('products', [ProductController::class, 'store']);
             Route::put('products/{product}', [ProductController::class, 'update']);
+            Route::delete('products/{product}', [ProductController::class, 'destroy']);
         });
 
         // Material purchases
@@ -142,6 +144,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:transport.manage')->group(function () {
             Route::post('drivers', [DriverController::class, 'store']);
             Route::put('drivers/{driver}', [DriverController::class, 'update']);
+            Route::delete('drivers/{driver}', [DriverController::class, 'destroy']);
         });
         Route::post('drivers/{driver}/pay', [DriverController::class, 'pay'])->middleware('permission:payments.manage');
 
@@ -166,6 +169,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:labour.manage')->group(function () {
             Route::post('labourers', [LabourerController::class, 'store']);
             Route::put('labourers/{labourer}', [LabourerController::class, 'update']);
+            Route::delete('labourers/{labourer}', [LabourerController::class, 'destroy']);
             Route::get('attendances', [AttendanceController::class, 'index']);
             Route::post('attendances', [AttendanceController::class, 'store']);
         });
@@ -179,6 +183,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:hr.manage')->group(function () {
             Route::post('staff', [StaffController::class, 'store']);
             Route::put('staff/{staff}', [StaffController::class, 'update']);
+            Route::delete('staff/{staff}', [StaffController::class, 'destroy']);
             Route::post('salaries', [SalaryController::class, 'store']);
             Route::post('salaries/{salary}/pay', [SalaryController::class, 'pay']);
         });

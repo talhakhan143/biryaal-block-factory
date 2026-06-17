@@ -39,6 +39,13 @@ class StaffController extends Controller
         return new StaffResource($staff);
     }
 
+    public function destroy(Staff $staff)
+    {
+        $staff->delete(); // salaries cascade
+
+        return response()->noContent();
+    }
+
     private function validateData(Request $request): array
     {
         return $request->validate([

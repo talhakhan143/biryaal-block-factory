@@ -28,6 +28,7 @@ export default function Labour() {
   const create = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/labourers', p), onSuccess: () => { invalidate(); setCreating(false) } })
   const mark = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/attendances', p), onSuccess: () => { invalidate(); setMarking(false) } })
   const pay = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/labourers/${id}/pay`, payload), onSuccess: () => { invalidate(); setPayId(null) } })
+  const del = useMutation({ mutationFn: (id: string) => api.delete(`/labourers/${id}`), onSuccess: invalidate, onError: (e) => alert(apiError(e)) })
 
   return (
     <div>
@@ -54,8 +55,9 @@ export default function Labour() {
               <td className="px-4 py-3">{l.phone ?? '—'}</td>
               <td className="px-4 py-3">{formatPaisa(l.daily_wage)}</td>
               <td className="px-4 py-3">{l.balance > 0 ? <Badge color="red">{formatPaisa(l.balance)}</Badge> : <Badge color="green">Settled</Badge>}</td>
-              <td className="px-4 py-3 text-right">
+              <td className="px-4 py-3 text-right space-x-3">
                 {can('payments.manage') && <button className="text-sm text-blue-600 hover:underline" onClick={() => setPayId(l.id)}>Pay</button>}
+                {can('labour.manage') && <button className="text-sm hover:underline" style={{ color: 'var(--red)' }} onClick={() => { if (confirm(`Delete ${l.name}?`)) del.mutate(l.id) }}>Delete</button>}
               </td>
             </tr>
           ))}
