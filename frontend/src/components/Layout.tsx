@@ -24,65 +24,65 @@ const GROUPS: NavGroup[] = [
   {
     title: 'Overview',
     items: [
-      { to: '/', label: 'Dashboard', hint: 'Aaj ka hisaab', permission: 'dashboard.view', icon: LayoutDashboard },
+      { to: '/', label: 'Dashboard', hint: 'ڈیش بورڈ (آج کا حساب)', permission: 'dashboard.view', icon: LayoutDashboard },
     ],
   },
   {
-    title: 'Sales (Bikri)',
+    title: 'Sales (فروخت)',
     items: [
-      { to: '/pos', label: 'New Sale', hint: 'Nayi bikri / POS', permission: 'sales.manage', icon: ShoppingCart },
-      { to: '/sales', label: 'Sales', hint: 'Bikri record', permission: 'sales.view', icon: ReceiptText },
-      { to: '/customers', label: 'Customers', hint: 'Grahak', permission: 'customers.view', icon: Users },
-      { to: '/payments', label: 'Payments', hint: 'Len-den', permission: 'payments.view', icon: HandCoins },
+      { to: '/pos', label: 'New Sale', hint: 'نئی فروخت / POS', permission: 'sales.manage', icon: ShoppingCart },
+      { to: '/sales', label: 'Sales', hint: 'سیلز اور آرڈرز', permission: 'sales.view', icon: ReceiptText },
+      { to: '/customers', label: 'Customers', hint: 'کسٹمر (گاہک)', permission: 'customers.view', icon: Users },
+      { to: '/payments', label: 'Payments', hint: 'لین دین', permission: 'payments.view', icon: HandCoins },
     ],
   },
   {
-    title: 'Production & Stock (Maal)',
+    title: 'Production & Stock (مال)',
     items: [
-      { to: '/production', label: 'Production', hint: 'Block banana', permission: 'production.view', icon: Factory },
-      { to: '/inventory', label: 'Finished Goods', hint: 'Tayar maal', permission: 'inventory.view', icon: Boxes },
-      { to: '/materials', label: 'Raw Materials', hint: 'Kacha maal', permission: 'materials.view', icon: Package },
-      { to: '/products', label: 'Products / Rates', hint: 'Block rate set karo', permission: 'inventory.view', icon: Tag },
+      { to: '/production', label: 'Production', hint: 'روزانہ پروڈکشن', permission: 'production.view', icon: Factory },
+      { to: '/inventory', label: 'Finished Goods', hint: 'تیار بلاک اسٹاک', permission: 'inventory.view', icon: Boxes },
+      { to: '/materials', label: 'Raw Materials', hint: 'خام مال (سیمنٹ، بجری، ریت)', permission: 'materials.view', icon: Package },
+      { to: '/products', label: 'Products / Rates', hint: 'پروڈکٹس اور ریٹ', permission: 'inventory.view', icon: Tag },
     ],
   },
   {
-    title: 'Purchases (Kharidari)',
+    title: 'Purchases (خریداری)',
     items: [
-      { to: '/purchases', label: 'Purchases', hint: 'Maal khareedna', permission: 'purchases.view', icon: ClipboardList },
-      { to: '/suppliers', label: 'Suppliers', hint: 'Maal walay', permission: 'suppliers.view', icon: Users },
+      { to: '/purchases', label: 'Purchases', hint: 'مال خریدنا', permission: 'purchases.view', icon: ClipboardList },
+      { to: '/suppliers', label: 'Suppliers', hint: 'سپلائر', permission: 'suppliers.view', icon: Users },
     ],
   },
   {
-    title: 'Delivery (Dispatch)',
+    title: 'Delivery (ڈسپیچ)',
     items: [
-      { to: '/dispatch', label: 'Dispatch', hint: 'Challan / delivery', permission: 'dispatch.view', icon: Truck },
-      { to: '/transport', label: 'Transport', hint: 'Gaari kiraya', permission: 'transport.view', icon: Car },
-      { to: '/drivers', label: 'Drivers', hint: 'Driver hisaab', permission: 'transport.view', icon: UserRound },
-      { to: '/vehicles', label: 'Vehicles', hint: 'Gaariyan', permission: 'transport.view', icon: Car },
+      { to: '/dispatch', label: 'Dispatch', hint: 'چالان / ڈلیوری', permission: 'dispatch.view', icon: Truck },
+      { to: '/transport', label: 'Transport', hint: 'ٹرانسپورٹ (گاڑی کرایہ)', permission: 'transport.view', icon: Car },
+      { to: '/drivers', label: 'Drivers', hint: 'ڈرائیور حساب', permission: 'transport.view', icon: UserRound },
+      { to: '/vehicles', label: 'Vehicles', hint: 'گاڑیاں', permission: 'transport.view', icon: Car },
     ],
   },
   {
-    title: 'Staff (Mulazim)',
+    title: 'Staff (عملہ)',
     items: [
-      { to: '/labour', label: 'Labour', hint: 'Dihari mazdoor', permission: 'labour.view', icon: HardHat },
-      { to: '/staff', label: 'Staff & Salary', hint: 'Tankha', permission: 'hr.view', icon: UserRound },
+      { to: '/labour', label: 'Labour', hint: 'مزدور (حاضری و مزدوری)', permission: 'labour.view', icon: HardHat },
+      { to: '/staff', label: 'Staff & Salary', hint: 'عملہ اور تنخواہ', permission: 'hr.view', icon: UserRound },
     ],
   },
   {
-    title: 'Accounts (Hisaab)',
+    title: 'Accounts (حساب)',
     items: [
-      { to: '/cash-book', label: 'Cash Book', hint: 'Rozana cash', permission: 'accounting.view', icon: Wallet },
-      { to: '/expenses', label: 'Expenses', hint: 'Kharchay', permission: 'expenses.view', icon: BookText },
-      { to: '/trial-balance', label: 'Accounts Summary', hint: 'Trial balance', permission: 'accounting.view', icon: FileSpreadsheet },
-      { to: '/accounts', label: 'Accounts Ledger', hint: 'Har account ka hisaab', permission: 'accounting.view', icon: BookOpenText },
-      { to: '/reports', label: 'Reports', hint: 'PDF / Excel report', permission: 'reports.view', icon: FileBarChart },
+      { to: '/cash-book', label: 'Cash Book', hint: 'روزانہ کیش', permission: 'accounting.view', icon: Wallet },
+      { to: '/expenses', label: 'Expenses', hint: 'اخراجات', permission: 'expenses.view', icon: BookText },
+      { to: '/trial-balance', label: 'Accounts Summary', hint: 'اکاؤنٹس خلاصہ', permission: 'accounting.view', icon: FileSpreadsheet },
+      { to: '/accounts', label: 'Accounts Ledger', hint: 'اکاؤنٹ لیجر', permission: 'accounting.view', icon: BookOpenText },
+      { to: '/reports', label: 'Reports', hint: 'رپورٹس (PDF/Excel)', permission: 'reports.view', icon: FileBarChart },
     ],
   },
   {
-    title: 'Settings (Admin)',
+    title: 'Settings (سیٹنگز)',
     items: [
-      { to: '/users', label: 'Users', hint: 'Staff logins & roles', permission: 'users.manage', icon: UsersRound },
-      { to: '/audit-logs', label: 'Audit Logs', hint: 'Kisne kya badla', permission: 'audit.view', icon: History },
+      { to: '/users', label: 'Users', hint: 'یوزرز اور رولز', permission: 'users.manage', icon: UsersRound },
+      { to: '/audit-logs', label: 'Audit Logs', hint: 'ریکارڈ تبدیلیاں', permission: 'audit.view', icon: History },
     ],
   },
 ]
@@ -107,7 +107,7 @@ export default function Layout() {
           </div>
           <div>
             <div className="text-sm font-bold leading-tight" style={{ color: 'var(--text)' }}>Biryaal Block Factory</div>
-            <div className="text-[11px]" style={{ color: 'var(--muted)' }}>Cement Hollow Blocks</div>
+            <div dir="rtl" className="text-[12px]" style={{ color: 'var(--muted)' }}>بلاک فیکٹری مینجمنٹ</div>
           </div>
         </div>
 
@@ -137,9 +137,13 @@ export default function Layout() {
                       {({ isActive }) => (
                         <>
                           <Icon size={17} style={{ opacity: isActive ? 1 : 0.7 }} />
-                          <span className="flex flex-col leading-tight">
+                          <span className="flex min-w-0 flex-col leading-tight">
                             <span className="font-medium">{item.label}</span>
-                            <span className="text-[10px]" style={{ color: isActive ? 'var(--primary-fg)' : 'var(--muted)', opacity: isActive ? 0.85 : 1 }}>
+                            <span
+                              dir="rtl"
+                              className="text-[13px] leading-snug"
+                              style={{ color: isActive ? 'var(--primary-fg)' : 'var(--muted)', opacity: isActive ? 0.9 : 1 }}
+                            >
                               {item.hint}
                             </span>
                           </span>
