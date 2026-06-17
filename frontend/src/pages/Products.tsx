@@ -118,8 +118,8 @@ function ProductForm({ product, onSubmit, busy, error }: { product: Product | nu
       <div className="grid grid-cols-2 gap-3">
         <Field label="SKU (code)"><Input value={form.sku} onChange={(e) => set('sku', e.target.value)} required /></Field>
         <Field label="Size"><Input value={form.size} onChange={(e) => set('size', e.target.value)} placeholder="4 inch" /></Field>
-        <Field label="Unit"><Input value={form.unit} onChange={(e) => set('unit', e.target.value)} /></Field>
-        <Field label="Curing days"><Input type="number" value={form.default_curing_days} onChange={(e) => set('default_curing_days', e.target.value)} /></Field>
+        <Field label="Unit"><Input value={form.unit} onChange={(e) => set('unit', e.target.value)} required /></Field>
+        <Field label="Curing days"><Input type="number" min={0} value={form.default_curing_days} onChange={(e) => set('default_curing_days', e.target.value)} required /></Field>
         <Field label="Sale rate (Rs)"><MoneyInput value={form.sale_price} onChange={(v) => set('sale_price', v)} required /></Field>
         <Field label="Low stock alert (pcs)"><Input type="number" value={form.low_stock_threshold} onChange={(e) => set('low_stock_threshold', e.target.value)} /></Field>
       </div>

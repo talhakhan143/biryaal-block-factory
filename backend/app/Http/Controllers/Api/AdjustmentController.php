@@ -42,8 +42,11 @@ class AdjustmentController extends Controller
             'adjustment_date' => ['required', 'date'],
             'amount' => ['required', 'numeric', 'gt:0'],
             'method' => ['nullable', 'in:cash,bank'],
-            'bank_ref' => ['nullable', 'string', 'max:255'],
+            'bank_ref' => ['nullable', 'string', 'max:255', 'required_if:method,bank'],
             'reason' => ['required', 'string', 'max:255'],
+        ], [
+            'party_id.required_unless' => 'Is adjustment ke liye party (customer/supplier) chunna zaroori hai.',
+            'bank_ref.required_if' => 'Bank par bank/reference likhna zaroori hai.',
         ]);
         $data['amount'] = Money::toPaisa($data['amount']);
 

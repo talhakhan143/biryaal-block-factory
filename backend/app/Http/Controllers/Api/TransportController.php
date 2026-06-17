@@ -39,7 +39,10 @@ class TransportController extends Controller
             'rate' => ['required', 'numeric', 'gt:0'],
             'paid' => ['nullable', 'numeric', 'min:0', 'lte:rate'],
             'method' => ['nullable', 'in:cash,bank'],
+            'bank_ref' => ['nullable', 'string', 'max:255', 'required_if:method,bank'],
             'notes' => ['nullable', 'string'],
+        ], [
+            'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
         ]);
         $data['rate'] = Money::toPaisa($data['rate']);
         if (isset($data['paid'])) {
@@ -56,7 +59,9 @@ class TransportController extends Controller
             'payment_date' => ['required', 'date'],
             'amount' => ['required', 'numeric', 'gt:0'],
             'method' => ['nullable', 'in:cash,bank'],
-            'bank_ref' => ['nullable', 'string', 'max:255'],
+            'bank_ref' => ['nullable', 'string', 'max:255', 'required_if:method,bank'],
+        ], [
+            'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
         ]);
         $data['amount'] = Money::toPaisa($data['amount']);
 

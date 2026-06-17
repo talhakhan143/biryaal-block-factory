@@ -52,7 +52,7 @@ class StaffController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'role' => ['nullable', 'string', 'max:100'],
             'phone' => ['nullable', 'string', 'max:50'],
-            'monthly_salary' => ['required', 'numeric', 'min:0'],
+            'monthly_salary' => ['required', 'numeric', 'gt:0'],
             'is_active' => ['boolean'],
         ]);
     }

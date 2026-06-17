@@ -75,18 +75,23 @@ function ReturnForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, un
 
   const returnValue = items.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unit_price) || 0), 0)
   const refund = Math.max(0, returnValue - Number(form.deduction || 0))
+  const validItems = items.filter((i) => i.product_id && Number(i.quantity) > 0 && Number(i.unit_price) > 0)
+  const accountNoCustomer = form.refund_mode === 'account' && !form.customer_id
+  const bankNoRef = form.refund_mode === 'bank' && !form.bank_ref.trim()
+  const blockSubmit = validItems.length === 0 || accountNoCustomer || bankNoRef
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault()
+        if (blockSubmit) return
         onSubmit({
           customer_id: form.customer_id || null,
           return_date: form.return_date,
           deduction: Number(form.deduction || 0),
           refund_mode: form.refund_mode,
           bank_ref: form.refund_mode === 'bank' ? form.bank_ref : undefined,
-          items: items.filter((i) => i.product_id && i.quantity && i.unit_price).map((i) => ({
+          items: validItems.map((i) => ({
             product_id: i.product_id, quantity: Number(i.quantity), unit_price: Number(i.unit_price),
           })),
         })
@@ -136,8 +141,11 @@ function ReturnForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, un
         <div className="flex justify-between font-bold"><span>Refund</span><span>{formatPaisa(refund * 100)}</span></div>
       </div>
 
+      {validItems.length === 0 && <p className="text-sm" style={{ color: 'var(--red)' }}>Kam az kam aik block (product + qty + rate) daalein.</p>}
+      {accountNoCustomer && <p className="text-sm" style={{ color: 'var(--red)' }}>Khaate (account) me refund ke liye customer chunna zaroori hai.</p>}
+      {bankNoRef && <p className="text-sm" style={{ color: 'var(--red)' }}>Bank refund par bank/reference likhna zaroori hai.</p>}
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
-      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Save Return'}</Button>
+      <Button type="submit" disabled={busy || blockSubmit} className="w-full">{busy ? 'Saving…' : 'Save Return'}</Button>
     </form>
   )
 }

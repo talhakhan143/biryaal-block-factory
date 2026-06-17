@@ -208,8 +208,8 @@ export function MethodField({ method, bankRef, onChange }: { method: string; ban
         </Select>
       </Field>
       {method === 'bank' && (
-        <Field label="Bank / reference (kaunsa bank, cheque/transfer #)">
-          <Input value={bankRef} onChange={(e) => onChange(method, e.target.value)} placeholder="e.g. Meezan — cheque 123" />
+        <Field label="Bank / reference (kaunsa bank, cheque/transfer #) — zaroori">
+          <Input value={bankRef} onChange={(e) => onChange(method, e.target.value)} placeholder="e.g. Meezan — cheque 123" required />
         </Field>
       )}
     </>

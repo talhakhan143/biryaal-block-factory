@@ -69,7 +69,7 @@ class ProductController extends Controller
             'size' => ['nullable', 'string', 'max:50'],
             'unit' => ['required', 'string', 'max:50'],
             'default_curing_days' => ['required', 'integer', 'min:0', 'max:60'],
-            'sale_price' => ['required', 'numeric', 'min:0'],
+            'sale_price' => ['required', 'numeric', 'gt:0'],
             'low_stock_threshold' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['boolean'],
         ];

@@ -48,11 +48,12 @@ class TransportService
                 Driver::whereKey($data['driver_id'])->increment('balance', $balance);
             }
 
-            $cashAccount = ($data['method'] ?? 'cash') === 'bank' ? Account::BANK : Account::CASH;
+            $isBank = ($data['method'] ?? 'cash') === 'bank';
+            $cashAccount = $isBank ? Account::BANK : Account::CASH;
             // Freight is paid from what the customer paid (clearing), not a factory expense.
             $lines = [['account' => Account::TRANSPORT_CLEARING, 'debit' => $rate, 'memo' => 'Driver freight']];
             if ($paid > 0) {
-                $lines[] = ['account' => $cashAccount, 'credit' => $paid];
+                $lines[] = ['account' => $cashAccount, 'credit' => $paid, 'memo' => $isBank ? ($data['bank_ref'] ?? null) : null];
             }
             if ($balance > 0) {
                 $lines[] = ['account' => Account::PAYABLE, 'credit' => $balance, 'memo' => 'Driver dues'];

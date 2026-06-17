@@ -57,7 +57,7 @@ class LabourerController extends Controller
             'payment_date' => ['required', 'date'],
             'amount' => ['required', 'numeric', 'gt:0'],
             'method' => ['nullable', 'in:cash,bank'],
-            'bank_ref' => ['nullable', 'string', 'max:255'],
+            'bank_ref' => ['nullable', 'string', 'max:255', 'required_if:method,bank'],
             'notes' => ['nullable', 'string'],
         ]);
         $data['amount'] = Money::toPaisa($data['amount']);
@@ -70,7 +70,7 @@ class LabourerController extends Controller
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
-            'daily_wage' => ['required', 'numeric', 'min:0'],
+            'daily_wage' => ['required', 'numeric', 'gt:0'],
             'is_active' => ['boolean'],
         ]);
     }

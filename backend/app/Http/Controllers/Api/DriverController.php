@@ -45,8 +45,10 @@ class DriverController extends Controller
             'payment_date' => ['required', 'date'],
             'amount' => ['required', 'numeric', 'gt:0'],
             'method' => ['nullable', 'in:cash,bank'],
-            'bank_ref' => ['nullable', 'string', 'max:255'],
+            'bank_ref' => ['nullable', 'string', 'max:255', 'required_if:method,bank'],
             'notes' => ['nullable', 'string'],
+        ], [
+            'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
         ]);
         $data['amount'] = Money::toPaisa($data['amount']);
 
@@ -96,11 +98,14 @@ class DriverController extends Controller
     {
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'phone' => ['required', 'string', 'max:50'],
             'license_no' => ['nullable', 'string', 'max:50'],
-            'vehicle_name' => ['nullable', 'string', 'max:255'],
+            'vehicle_name' => ['required', 'string', 'max:255'],
             'vehicle_plate' => ['nullable', 'string', 'max:50'],
             'is_active' => ['boolean'],
+        ], [
+            'phone.required' => 'Driver ka phone number zaroori hai.',
+            'vehicle_name.required' => 'Gaadi ka naam zaroori hai.',
         ]);
     }
 }

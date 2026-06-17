@@ -154,24 +154,26 @@ function DispatchForm({ prefill, onSubmit, busy, error }: { prefill: Prefill | n
   )
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
   const driverVehicle = drivers.data?.data.find((d) => d.id === form.driver_id)?.vehicle_name
-  const driverNoFare = !!form.driver_id && !(Number(form.trip_rate) > 0)
-  const fareNoDriver = Number(form.trip_rate) > 0 && !form.driver_id
-  const blockSubmit = driverNoFare || fareNoDriver
+  const validItems = items.filter((i) => i.product_id && Number(i.quantity) > 0)
+  const noDriver = !form.driver_id
+  const noFare = !(Number(form.trip_rate) > 0)
+  const blockSubmit = noDriver || noFare || validItems.length === 0
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault()
+        if (blockSubmit) return
         onSubmit({
           customer_id: form.customer_id || null,
-          driver_id: form.driver_id || null,
+          driver_id: form.driver_id,
           dispatch_date: form.dispatch_date,
           sale_id: prefill?.sale_id ?? null,
-          trip_rate: form.trip_rate ? Number(form.trip_rate) : undefined,
-          trip_paid: form.trip_rate ? Number(form.trip_paid) : undefined,
+          trip_rate: Number(form.trip_rate),
+          trip_paid: Number(form.trip_paid),
           method: form.method,
           bank_ref: form.method === 'bank' ? form.bank_ref : undefined,
-          items: items.filter((i) => i.product_id && i.quantity).map((i) => ({ product_id: i.product_id, quantity: Number(i.quantity) })),
+          items: validItems.map((i) => ({ product_id: i.product_id, quantity: Number(i.quantity) })),
         })
       }}
       className="space-y-3"
@@ -203,24 +205,25 @@ function DispatchForm({ prefill, onSubmit, busy, error }: { prefill: Prefill | n
         <p className="text-xs" style={{ color: 'var(--muted)' }}>Aik gaari me jitne jayen wo qty rakho — baqi order pending list me rahega.</p>
       </div>
 
-      <Field label="Driver (gaari saath aati hai)">
-        <Select value={form.driver_id} onChange={(e) => set('driver_id', e.target.value)}>
-          <option value="">— koi nahi —</option>
+      <Field label="Driver (gaari saath aati hai) — zaroori">
+        <Select value={form.driver_id} onChange={(e) => set('driver_id', e.target.value)} required>
+          <option value="">Select driver…</option>
           {drivers.data?.data.map((d) => <option key={d.id} value={d.id}>{d.name}{d.vehicle_name ? ` — ${d.vehicle_name}` : ''}</option>)}
         </Select>
       </Field>
       {driverVehicle && <p className="text-xs" style={{ color: 'var(--muted)' }}>Gaari: {driverVehicle}</p>}
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label={form.driver_id ? 'Trip kiraya (Rs) — zaroori' : 'Trip kiraya (Rs) — optional'}><MoneyInput value={form.trip_rate} onChange={(v) => set('trip_rate', v)} /></Field>
-        {form.trip_rate ? <Field label="Driver ko abhi diya (Rs)"><MoneyInput value={form.trip_paid} onChange={(v) => set('trip_paid', v)} /></Field> : <div />}
+        <Field label="Trip kiraya (Rs) — zaroori"><MoneyInput value={form.trip_rate} onChange={(v) => set('trip_rate', v)} /></Field>
+        <Field label="Driver ko abhi diya (Rs)"><MoneyInput value={form.trip_paid} onChange={(v) => set('trip_paid', v)} /></Field>
       </div>
-      {form.trip_rate ? <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} /> : null}
+      <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
 
       <Field label="Date"><Input type="date" value={form.dispatch_date} onChange={(e) => set('dispatch_date', e.target.value)} required /></Field>
 
-      {driverNoFare && <p className="text-sm" style={{ color: 'var(--red)' }}>Driver chuna hai to kiraya likhna zaroori hai (warna trip transport me darj nahi hoga).</p>}
-      {fareNoDriver && <p className="text-sm" style={{ color: 'var(--red)' }}>Kiraya diya hai to driver chunna zaroori hai.</p>}
+      {noDriver && <p className="text-sm" style={{ color: 'var(--red)' }}>Driver chunna zaroori hai — challan gaadi par jata hai.</p>}
+      {!noDriver && noFare && <p className="text-sm" style={{ color: 'var(--red)' }}>Kiraya (trip rate) likhna zaroori hai.</p>}
+      {validItems.length === 0 && <p className="text-sm" style={{ color: 'var(--red)' }}>Kam az kam aik block ki qty daalein.</p>}
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
       <Button type="submit" disabled={busy || blockSubmit} className="w-full">{busy ? 'Saving…' : 'Deliver & Print Challan'}</Button>
     </form>
@@ -245,7 +248,7 @@ function Challan({ id, onClose }: { id: string; onClose: () => void }) {
             <div className="my-3 text-sm">
               <div>Date: {data.dispatch_date}</div>
               <div>Customer: {data.customer?.name ?? '—'}</div>
-              <div>Vehicle: {data.vehicle?.name ?? '—'} · Driver: {data.driver?.name ?? '—'}</div>
+              <div>Driver: {data.driver?.name ?? '—'} · Gaari: {data.driver?.vehicle_name ?? data.vehicle?.name ?? '—'}{data.driver?.vehicle_plate ? ` (${data.driver.vehicle_plate})` : ''}</div>
             </div>
             <Table head={['Product', 'Qty']}>
               {data.items?.map((it: { id: string; product_name: string; quantity: number }) => (

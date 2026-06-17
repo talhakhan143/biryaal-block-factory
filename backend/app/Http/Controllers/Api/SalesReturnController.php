@@ -28,17 +28,22 @@ class SalesReturnController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'sale_id' => ['nullable', 'uuid', 'exists:sales,id'],
-            'customer_id' => ['nullable', 'uuid', 'exists:customers,id'],
+            'sale_id' => ['nullable', 'uuid', 'exists:sales,id', 'required_without:customer_id'],
+            'customer_id' => ['nullable', 'uuid', 'exists:customers,id', 'required_without:sale_id', 'required_if:refund_mode,account'],
             'return_date' => ['required', 'date'],
             'deduction' => ['nullable', 'numeric', 'min:0'],
             'refund_mode' => ['required', 'in:cash,bank,account'],
-            'bank_ref' => ['nullable', 'string', 'max:255'],
+            'bank_ref' => ['nullable', 'string', 'max:255', 'required_if:refund_mode,bank'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'uuid', 'exists:products,id'],
             'items.*.quantity' => ['required', 'integer', 'gt:0'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.unit_price' => ['required', 'numeric', 'gt:0'],
+        ], [
+            'sale_id.required_without' => 'Return ke liye asal invoice ya customer me se aik chunna zaroori hai.',
+            'customer_id.required_without' => 'Return ke liye customer ya asal invoice me se aik chunna zaroori hai.',
+            'customer_id.required_if' => 'Account (balance) me refund ke liye customer chunna zaroori hai.',
+            'bank_ref.required_if' => 'Bank refund par bank/reference likhna zaroori hai.',
         ]);
 
         if (isset($data['deduction'])) {

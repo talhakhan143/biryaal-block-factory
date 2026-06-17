@@ -89,17 +89,18 @@ export default function Drivers() {
 function DriverForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, string>) => void; busy: boolean; error: string }) {
   const [form, setForm] = useState({ name: '', phone: '', license_no: '', vehicle_name: '', vehicle_plate: '' })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
+  const blockSubmit = !form.name.trim() || !form.phone.trim() || !form.vehicle_name.trim()
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit(form) }} className="space-y-3">
-      <Field label="Name"><Input value={form.name} onChange={(e) => set('name', e.target.value)} required /></Field>
-      <Field label="Phone"><Input value={form.phone} onChange={(e) => set('phone', e.target.value)} /></Field>
-      <Field label="License No"><Input value={form.license_no} onChange={(e) => set('license_no', e.target.value)} /></Field>
+    <form onSubmit={(e) => { e.preventDefault(); if (blockSubmit) return; onSubmit(form) }} className="space-y-3">
+      <Field label="Name — zaroori"><Input value={form.name} onChange={(e) => set('name', e.target.value)} required /></Field>
+      <Field label="Phone — zaroori"><Input value={form.phone} onChange={(e) => set('phone', e.target.value)} required /></Field>
+      <Field label="License No (optional)"><Input value={form.license_no} onChange={(e) => set('license_no', e.target.value)} /></Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Vehicle (gaari ka naam)"><Input value={form.vehicle_name} onChange={(e) => set('vehicle_name', e.target.value)} placeholder="Mazda" /></Field>
-        <Field label="Plate no"><Input value={form.vehicle_plate} onChange={(e) => set('vehicle_plate', e.target.value)} placeholder="LEX-123" /></Field>
+        <Field label="Vehicle (gaari ka naam) — zaroori"><Input value={form.vehicle_name} onChange={(e) => set('vehicle_name', e.target.value)} placeholder="Mazda" required /></Field>
+        <Field label="Plate no (optional)"><Input value={form.vehicle_plate} onChange={(e) => set('vehicle_plate', e.target.value)} placeholder="LEX-123" /></Field>
       </div>
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
-      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Save'}</Button>
+      <Button type="submit" disabled={busy || blockSubmit} className="w-full">{busy ? 'Saving…' : 'Save'}</Button>
     </form>
   )
 }

@@ -32,9 +32,11 @@ class SalaryController extends Controller
     {
         $data = $request->validate([
             'staff_id' => ['required', 'uuid', 'exists:staff,id'],
-            'month' => ['required', 'string', 'regex:/^\d{4}-\d{2}$/'],
-            'amount' => ['nullable', 'numeric', 'min:0'],
+            'month' => ['required', 'string', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
+            'amount' => ['nullable', 'numeric', 'gt:0'],
             'notes' => ['nullable', 'string'],
+        ], [
+            'month.regex' => 'Month "YYYY-MM" format me hona chahiye (month 01-12).',
         ]);
         if (isset($data['amount'])) {
             $data['amount'] = Money::toPaisa($data['amount']);
@@ -49,7 +51,9 @@ class SalaryController extends Controller
             'payment_date' => ['required', 'date'],
             'amount' => ['required', 'numeric', 'gt:0'],
             'method' => ['nullable', 'in:cash,bank'],
-            'bank_ref' => ['nullable', 'string', 'max:255'],
+            'bank_ref' => ['nullable', 'string', 'max:255', 'required_if:method,bank'],
+        ], [
+            'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
         ]);
         $data['amount'] = Money::toPaisa($data['amount']);
 
