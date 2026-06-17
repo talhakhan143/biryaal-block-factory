@@ -12,6 +12,7 @@ interface Labourer {
   phone?: string
   daily_wage: number
   balance: number
+  is_active: boolean
 }
 
 export default function Labour() {
@@ -29,6 +30,7 @@ export default function Labour() {
   const mark = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/attendances', p), onSuccess: () => { invalidate(); setMarking(false) } })
   const pay = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/labourers/${id}/pay`, payload), onSuccess: () => { invalidate(); setPayId(null) } })
   const del = useMutation({ mutationFn: (id: string) => api.delete(`/labourers/${id}`), onSuccess: invalidate, onError: (e) => alert(apiError(e)) })
+  const toggle = useMutation({ mutationFn: (l: Labourer) => api.put(`/labourers/${l.id}`, { name: l.name, phone: l.phone ?? '', daily_wage: l.daily_wage / 100, is_active: !l.is_active }), onSuccess: invalidate, onError: (e) => alert(apiError(e)) })
 
   return (
     <div>
@@ -48,15 +50,17 @@ export default function Labour() {
       {isLoading ? (
         <Spinner />
       ) : (
-        <Table head={['Name', 'Phone', 'Daily Wage', 'Dues', '']}>
+        <Table head={['Name', 'Phone', 'Daily Wage', 'Dues', 'Status', '']}>
           {data?.data.map((l) => (
-            <tr key={l.id}>
+            <tr key={l.id} style={{ opacity: l.is_active ? 1 : 0.55 }}>
               <td className="px-4 py-3 font-medium">{l.name}</td>
               <td className="px-4 py-3">{l.phone ?? '—'}</td>
               <td className="px-4 py-3">{formatPaisa(l.daily_wage)}</td>
               <td className="px-4 py-3">{l.balance > 0 ? <Badge color="red">{formatPaisa(l.balance)}</Badge> : <Badge color="green">Settled</Badge>}</td>
+              <td className="px-4 py-3">{l.is_active ? <Badge color="green">Active</Badge> : <Badge color="amber">Off</Badge>}</td>
               <td className="px-4 py-3 text-right space-x-3">
                 {can('payments.manage') && <button className="text-sm text-blue-600 hover:underline" onClick={() => setPayId(l.id)}>Pay</button>}
+                {can('labour.manage') && <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => toggle.mutate(l)}>{l.is_active ? 'Deactivate' : 'Activate'}</button>}
                 {can('labour.manage') && <button className="text-sm hover:underline" style={{ color: 'var(--red)' }} onClick={() => { if (confirm(`Delete ${l.name}?`)) del.mutate(l.id) }}>Delete</button>}
               </td>
             </tr>

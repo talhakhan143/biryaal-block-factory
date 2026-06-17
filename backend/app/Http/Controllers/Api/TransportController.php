@@ -31,13 +31,13 @@ class TransportController extends Controller
     {
         $data = $request->validate([
             'vehicle_id' => ['nullable', 'uuid', 'exists:vehicles,id'],
-            'driver_id' => ['nullable', 'uuid', 'exists:drivers,id'],
+            'driver_id' => ['required', 'uuid', 'exists:drivers,id'],
             'dispatch_id' => ['nullable', 'uuid', 'exists:dispatches,id'],
             'trip_date' => ['required', 'date'],
             'from_location' => ['nullable', 'string', 'max:255'],
             'to_location' => ['nullable', 'string', 'max:255'],
             'rate' => ['required', 'numeric', 'gt:0'],
-            'paid' => ['nullable', 'numeric', 'min:0'],
+            'paid' => ['nullable', 'numeric', 'min:0', 'lte:rate'],
             'method' => ['nullable', 'in:cash,bank'],
             'notes' => ['nullable', 'string'],
         ]);

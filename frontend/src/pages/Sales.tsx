@@ -37,6 +37,15 @@ export default function Sales() {
     },
   })
 
+  const del = useMutation({
+    mutationFn: (id: string) => api.delete(`/sales/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sales'] })
+      qc.invalidateQueries({ queryKey: ['dispatches-pending'] })
+    },
+    onError: (e) => alert(apiError(e)),
+  })
+
   return (
     <div>
       <PageHeader title="Sales" subtitle="Saari bikri — cash aur udhaar" />
@@ -64,6 +73,15 @@ export default function Sales() {
                 <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => setViewId(s.id)}>
                   View / Print
                 </button>
+                {can('sales.manage') && (
+                  <button
+                    className="text-sm hover:underline"
+                    style={{ color: 'var(--red)' }}
+                    onClick={() => { if (confirm(`Invoice ${s.invoice_no} delete karein? Stock wapas ready me chala jayega.`)) del.mutate(s.id) }}
+                  >
+                    Delete
+                  </button>
+                )}
               </td>
             </tr>
           ))}

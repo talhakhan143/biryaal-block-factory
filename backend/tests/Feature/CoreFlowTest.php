@@ -141,4 +141,35 @@ class CoreFlowTest extends TestCase
         Sanctum::actingAs($this->owner);
         $this->postJson('/api/v1/production', $payload)->assertSuccessful();
     }
+
+    public function test_voiding_a_sale_restores_stock_receivable_and_keeps_books_balanced(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $product = $this->readyProduct(1000);
+        $customer = Customer::create(['name' => 'Test Customer']);
+
+        $sale = app(SaleService::class)->create([
+            'customer_id' => $customer->id,
+            'sale_date' => '2026-06-16',
+            'type' => 'credit',
+            'paid' => 0,
+            'items' => [['product_id' => $product->id, 'quantity' => 600, 'unit_price' => 3500]],
+        ]);
+
+        $this->assertSame(400, (int) $product->fresh()->stock->ready_qty);
+        $this->assertSame(600 * 3500, (int) $customer->fresh()->balance);
+
+        app(SaleService::class)->void($sale);
+
+        // blocks back to ready, receivable reversed, sale gone
+        $this->assertSame(1000, (int) $product->fresh()->stock->ready_qty);
+        $this->assertSame(0, (int) $customer->fresh()->balance);
+        $this->assertDatabaseMissing('sales', ['id' => $sale->id]);
+
+        // ledger nets to zero and still balances
+        $debit = (int) JournalLine::sum('debit');
+        $credit = (int) JournalLine::sum('credit');
+        $this->assertSame($debit, $credit);
+        $this->assertSame(0, $debit);
+    }
 }

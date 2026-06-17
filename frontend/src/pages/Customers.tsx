@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, Modal, PageHeader, Pagination, Spinner, Table } from '../components/ui'
+import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, Spinner, Table } from '../components/ui'
 
 interface Customer {
   id: string
@@ -20,6 +20,7 @@ export default function Customers() {
   const [page, setPage] = useState(1)
   const [creating, setCreating] = useState(false)
   const [ledgerId, setLedgerId] = useState<string | null>(null)
+  const [receiveFor, setReceiveFor] = useState<Customer | null>(null)
   const { data, isLoading } = useList<Customer>('customers', { search, page })
 
   const create = useMutation({
@@ -27,6 +28,14 @@ export default function Customers() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['customers'] })
       setCreating(false)
+    },
+  })
+
+  const receive = useMutation({
+    mutationFn: (payload: Record<string, unknown>) => api.post('/payments/receipt', payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['customers'] })
+      setReceiveFor(null)
     },
   })
 
@@ -53,7 +62,12 @@ export default function Customers() {
               <td className="px-4 py-3">
                 {c.balance > 0 ? <Badge color="amber">{formatPaisa(c.balance)}</Badge> : <Badge color="green">Settled</Badge>}
               </td>
-              <td className="px-4 py-3 text-right">
+              <td className="px-4 py-3 text-right space-x-3">
+                {can('payments.manage') && c.balance > 0 && (
+                  <button className="text-sm hover:underline" style={{ color: 'var(--green)' }} onClick={() => setReceiveFor(c)}>
+                    Receive
+                  </button>
+                )}
                 <button className="text-sm text-blue-600 hover:underline" onClick={() => setLedgerId(c.id)}>
                   Ledger
                 </button>
@@ -76,7 +90,33 @@ export default function Customers() {
       )}
 
       {ledgerId && <LedgerModal id={ledgerId} onClose={() => setLedgerId(null)} />}
+
+      {receiveFor && (
+        <Modal title={`Receive — ${receiveFor.name}`} onClose={() => setReceiveFor(null)}>
+          <ReceiveForm
+            outstanding={receiveFor.balance}
+            onSubmit={(payload) => receive.mutate({ ...payload, customer_id: receiveFor.id })}
+            busy={receive.isPending}
+            error={receive.error ? apiError(receive.error) : ''}
+          />
+        </Modal>
+      )}
     </div>
+  )
+}
+
+function ReceiveForm({ outstanding, onSubmit, busy, error }: { outstanding: number; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
+  const [form, setForm] = useState({ payment_date: new Date().toISOString().slice(0, 10), amount: '', method: 'cash', bank_ref: '' })
+  const set = (k: string, v: string) => setForm({ ...form, [k]: v })
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, amount: Number(form.amount) }) }} className="space-y-3">
+      <OutstandingNote label="Customer se lena (total baqi)" amount={outstanding} onFill={(rs) => set('amount', String(rs))} />
+      <Field label="Date"><Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} required /></Field>
+      <Field label="Amount (Rs)"><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} required /></Field>
+      <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
+      {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
+      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Receive'}</Button>
+    </form>
   )
 }
 

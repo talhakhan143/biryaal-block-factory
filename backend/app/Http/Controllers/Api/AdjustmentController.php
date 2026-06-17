@@ -37,7 +37,8 @@ class AdjustmentController extends Controller
     {
         $data = $request->validate([
             'mode' => ['required', 'in:customer_discount,customer_charge,supplier_discount,supplier_charge,cash_in,cash_out'],
-            'party_id' => ['nullable', 'uuid'],
+            // party-linked modes must name the party; cash_in/cash_out don't
+            'party_id' => ['nullable', 'uuid', 'required_unless:mode,cash_in,cash_out'],
             'adjustment_date' => ['required', 'date'],
             'amount' => ['required', 'numeric', 'gt:0'],
             'method' => ['nullable', 'in:cash,bank'],

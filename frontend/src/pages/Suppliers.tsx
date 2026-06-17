@@ -12,6 +12,7 @@ interface Supplier {
   phone?: string
   address?: string
   balance: number
+  is_active: boolean
 }
 
 export default function Suppliers() {
@@ -23,12 +24,26 @@ export default function Suppliers() {
   const [ledgerId, setLedgerId] = useState<string | null>(null)
   const { data, isLoading } = useList<Supplier>('suppliers', { search, page })
 
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['suppliers'] })
+
   const create = useMutation({
     mutationFn: (payload: Record<string, string>) => api.post('/suppliers', payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['suppliers'] })
+      invalidate()
       setCreating(false)
     },
+  })
+
+  const toggle = useMutation({
+    mutationFn: (s: Supplier) => api.put(`/suppliers/${s.id}`, { name: s.name, phone: s.phone ?? '', address: s.address ?? '', is_active: !s.is_active }),
+    onSuccess: invalidate,
+    onError: (e) => alert(apiError(e)),
+  })
+
+  const del = useMutation({
+    mutationFn: (id: string) => api.delete(`/suppliers/${id}`),
+    onSuccess: invalidate,
+    onError: (e) => alert(apiError(e)),
   })
 
   return (
@@ -46,24 +61,37 @@ export default function Suppliers() {
       {isLoading ? (
         <Spinner />
       ) : (
-        <Table head={['Name', 'Phone', 'Balance (we owe)', '']}>
+        <Table head={['Name', 'Phone', 'Balance (we owe)', 'Status', '']}>
           {data?.data.map((s) => (
-            <tr key={s.id}>
+            <tr key={s.id} style={{ opacity: s.is_active ? 1 : 0.55 }}>
               <td className="px-4 py-3 font-medium">{s.name}</td>
               <td className="px-4 py-3">{s.phone ?? '—'}</td>
               <td className="px-4 py-3">
                 {s.balance > 0 ? <Badge color="red">{formatPaisa(s.balance)}</Badge> : <Badge color="green">Settled</Badge>}
               </td>
-              <td className="px-4 py-3 text-right">
+              <td className="px-4 py-3">
+                {s.is_active ? <Badge color="green">Active</Badge> : <Badge color="amber">Off</Badge>}
+              </td>
+              <td className="px-4 py-3 text-right space-x-3">
                 <button className="text-sm text-blue-600 hover:underline" onClick={() => setLedgerId(s.id)}>
                   Ledger
                 </button>
+                {can('suppliers.manage') && (
+                  <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => toggle.mutate(s)}>
+                    {s.is_active ? 'Deactivate' : 'Activate'}
+                  </button>
+                )}
+                {can('suppliers.manage') && (
+                  <button className="text-sm hover:underline" style={{ color: 'var(--red)' }} onClick={() => { if (confirm(`Delete supplier ${s.name}?`)) del.mutate(s.id) }}>
+                    Delete
+                  </button>
+                )}
               </td>
             </tr>
           ))}
           {data?.data.length === 0 && (
             <tr>
-              <td colSpan={4} className="px-4 py-6 text-center text-slate-400">No suppliers yet.</td>
+              <td colSpan={5} className="px-4 py-6 text-center text-slate-400">No suppliers yet.</td>
             </tr>
           )}
         </Table>

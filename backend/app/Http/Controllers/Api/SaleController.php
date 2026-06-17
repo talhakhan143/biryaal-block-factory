@@ -62,6 +62,14 @@ class SaleController extends Controller
         return new SaleResource($sale->load(['items.product', 'customer']));
     }
 
+    /** Delete a wrongly-entered sale (reverses stock, receivable and ledger). */
+    public function destroy(Sale $sale)
+    {
+        $this->service->void($sale);
+
+        return response()->noContent();
+    }
+
     /** Receive (part of) the outstanding balance on this invoice. */
     public function receive(Request $request, Sale $sale)
     {

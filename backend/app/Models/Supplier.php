@@ -14,7 +14,11 @@ class Supplier extends Model implements AuditableContract
 {
     use Auditable, HasUuids, SoftDeletes;
 
-    protected $fillable = ['name', 'phone', 'address', 'notes'];
+    protected $fillable = ['name', 'phone', 'address', 'notes', 'is_active'];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
 
     public function purchases(): HasMany
     {

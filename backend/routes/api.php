@@ -113,6 +113,7 @@ Route::prefix('v1')->group(function () {
         Route::get('sales', [SaleController::class, 'index'])->middleware('permission:sales.view');
         Route::get('sales/{sale}', [SaleController::class, 'show'])->middleware('permission:sales.view');
         Route::post('sales', [SaleController::class, 'store'])->middleware('permission:sales.manage');
+        Route::delete('sales/{sale}', [SaleController::class, 'destroy'])->middleware('permission:sales.manage');
         Route::post('sales/{sale}/receive', [SaleController::class, 'receive'])->middleware('permission:payments.manage');
 
         // Block returns (wapsi)

@@ -154,6 +154,9 @@ function DispatchForm({ prefill, onSubmit, busy, error }: { prefill: Prefill | n
   )
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
   const driverVehicle = drivers.data?.data.find((d) => d.id === form.driver_id)?.vehicle_name
+  const driverNoFare = !!form.driver_id && !(Number(form.trip_rate) > 0)
+  const fareNoDriver = Number(form.trip_rate) > 0 && !form.driver_id
+  const blockSubmit = driverNoFare || fareNoDriver
 
   return (
     <form
@@ -209,15 +212,17 @@ function DispatchForm({ prefill, onSubmit, busy, error }: { prefill: Prefill | n
       {driverVehicle && <p className="text-xs" style={{ color: 'var(--muted)' }}>Gaari: {driverVehicle}</p>}
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Trip kiraya (Rs) — optional"><MoneyInput value={form.trip_rate} onChange={(v) => set('trip_rate', v)} /></Field>
+        <Field label={form.driver_id ? 'Trip kiraya (Rs) — zaroori' : 'Trip kiraya (Rs) — optional'}><MoneyInput value={form.trip_rate} onChange={(v) => set('trip_rate', v)} /></Field>
         {form.trip_rate ? <Field label="Driver ko abhi diya (Rs)"><MoneyInput value={form.trip_paid} onChange={(v) => set('trip_paid', v)} /></Field> : <div />}
       </div>
       {form.trip_rate ? <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} /> : null}
 
       <Field label="Date"><Input type="date" value={form.dispatch_date} onChange={(e) => set('dispatch_date', e.target.value)} required /></Field>
 
+      {driverNoFare && <p className="text-sm" style={{ color: 'var(--red)' }}>Driver chuna hai to kiraya likhna zaroori hai (warna trip transport me darj nahi hoga).</p>}
+      {fareNoDriver && <p className="text-sm" style={{ color: 'var(--red)' }}>Kiraya diya hai to driver chunna zaroori hai.</p>}
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
-      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Deliver & Print Challan'}</Button>
+      <Button type="submit" disabled={busy || blockSubmit} className="w-full">{busy ? 'Saving…' : 'Deliver & Print Challan'}</Button>
     </form>
   )
 }

@@ -53,6 +53,15 @@ class InventoryService
         $this->log($product, 'sold', 'ready', -$qty, $reference);
     }
 
+    /** A voided/deleted sale puts its blocks back into ready stock. */
+    public function reverseSale(Product $product, int $qty, ?Model $reference = null): void
+    {
+        $stock = $this->stockFor($product);
+        $stock->increment('ready_qty', $qty);
+
+        $this->log($product, 'void', 'ready', $qty, $reference, 'Sale deleted');
+    }
+
     /** Returned blocks come back into ready stock. */
     public function recordReturn(Product $product, int $qty, ?Model $reference = null, ?string $note = null): void
     {

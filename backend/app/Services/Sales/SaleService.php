@@ -4,8 +4,10 @@ namespace App\Services\Sales;
 
 use App\Models\Account;
 use App\Models\Customer;
+use App\Models\JournalEntry;
 use App\Models\Product;
 use App\Models\Sale;
+use App\Models\SalesReturn;
 use App\Services\Accounting\CashAccountResolver;
 use App\Services\Accounting\LedgerService;
 use App\Services\Inventory\InventoryService;
@@ -122,6 +124,53 @@ class SaleService
             );
 
             return $sale->load('items.product', 'customer');
+        });
+    }
+
+    /**
+     * Delete a wrongly-entered sale and unwind everything it touched:
+     * blocks return to ready stock, the customer's receivable is reversed,
+     * and the sale's balanced journal entry is removed (trial balance stays
+     * balanced). Blocked once the goods are out or money has moved against it.
+     */
+    public function void(Sale $sale): void
+    {
+        DB::transaction(function () use ($sale) {
+            if ($sale->dispatches()->exists()) {
+                throw new InvalidArgumentException('Is order ki delivery (challan) ho chuki — pehle wo handle karein, phir delete.');
+            }
+            if (SalesReturn::where('sale_id', $sale->id)->exists()) {
+                throw new InvalidArgumentException('Is invoice par block return mojood hai — delete nahi ho sakta.');
+            }
+            if ($sale->allocatedPayments()->exists()) {
+                throw new InvalidArgumentException('Is invoice par alag se payment receive ho chuki — pehle wo reverse karein, phir delete.');
+            }
+
+            $sale->load('items.product', 'customer');
+
+            // blocks back into ready stock
+            foreach ($sale->items as $item) {
+                if ($item->product) {
+                    $this->inventory->reverseSale($item->product, (int) $item->quantity, $sale);
+                }
+            }
+
+            // reverse the receivable that was added to the customer at sale time
+            if ((int) $sale->balance > 0 && $sale->customer) {
+                $sale->customer->decrement('balance', (int) $sale->balance);
+            }
+
+            // remove the sale's journal entry (+ lines) so the books net to zero
+            JournalEntry::where('source_type', $sale->getMorphClass())
+                ->where('source_id', $sale->id)
+                ->get()
+                ->each(function (JournalEntry $entry) {
+                    $entry->lines()->delete();
+                    $entry->delete();
+                });
+
+            $sale->items()->delete();
+            $sale->delete();
         });
     }
 

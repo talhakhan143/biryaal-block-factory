@@ -16,6 +16,7 @@ class SupplierController extends Controller
         $suppliers = Supplier::query()
             ->when($request->search, fn ($q, $s) => $q->where('name', 'like', "%{$s}%")->orWhere('phone', 'like', "%{$s}%"))
             ->when($request->boolean('has_dues'), fn ($q) => $q->where('balance', '>', 0)->orderByDesc('balance'))
+            ->when($request->boolean('active_only'), fn ($q) => $q->where('is_active', true))
             ->orderBy('name')
             ->paginate($request->integer('per_page', 15));
 
@@ -86,6 +87,7 @@ class SupplierController extends Controller
             'phone' => ['nullable', 'string', 'max:50'],
             'address' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
+            'is_active' => ['boolean'],
         ];
     }
 }
