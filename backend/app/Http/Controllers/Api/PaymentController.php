@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PaymentResource;
+use App\Models\Driver;
+use App\Models\Labourer;
 use App\Models\Payment;
+use App\Models\Salary;
+use App\Models\Supplier;
 use App\Services\Payments\PaymentService;
 use App\Support\Money;
 use Illuminate\Http\Request;
@@ -32,6 +36,34 @@ class PaymentController extends Controller
             ->paginate($request->integer('per_page', 15));
 
         return PaymentResource::collection($payments);
+    }
+
+    /**
+     * Every party we owe money to, in one list — suppliers, drivers, labourers
+     * and unpaid staff salaries. So no single person is left out of payables.
+     */
+    public function payables()
+    {
+        $rows = collect();
+
+        Supplier::where('balance', '>', 0)->get(['id', 'name', 'balance'])
+            ->each(fn ($s) => $rows->push(['type' => 'supplier', 'id' => $s->id, 'name' => $s->name, 'balance' => (int) $s->balance]));
+
+        Driver::where('balance', '>', 0)->get(['id', 'name', 'balance'])
+            ->each(fn ($d) => $rows->push(['type' => 'driver', 'id' => $d->id, 'name' => $d->name, 'balance' => (int) $d->balance]));
+
+        Labourer::where('balance', '>', 0)->get(['id', 'name', 'balance'])
+            ->each(fn ($l) => $rows->push(['type' => 'labourer', 'id' => $l->id, 'name' => $l->name, 'balance' => (int) $l->balance]));
+
+        Salary::with('staff:id,name')->where('balance', '>', 0)->get()
+            ->each(fn ($sal) => $rows->push([
+                'type' => 'salary',
+                'id' => $sal->id,
+                'name' => ($sal->staff?->name ?? 'Staff').' — '.$sal->month,
+                'balance' => (int) $sal->balance,
+            ]));
+
+        return response()->json(['data' => $rows->sortByDesc('balance')->values()]);
     }
 
     public function receipt(Request $request)

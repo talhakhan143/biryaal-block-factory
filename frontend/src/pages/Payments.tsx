@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
@@ -18,30 +18,48 @@ interface Payment {
 }
 
 interface Party { id: string; name: string; balance: number }
+type PayableType = 'supplier' | 'driver' | 'labourer' | 'salary'
+interface Payable { type: PayableType; id: string; name: string; balance: number }
+
+const payUrl = (row: Payable) =>
+  row.type === 'driver' ? `/drivers/${row.id}/pay`
+    : row.type === 'labourer' ? `/labourers/${row.id}/pay`
+    : row.type === 'salary' ? `/salaries/${row.id}/pay`
+    : '/payments/supplier'
+
+const typeLabel: Record<PayableType, string> = { supplier: 'Supplier', driver: 'Driver', labourer: 'Mazdoor', salary: 'Staff' }
 
 export default function Payments() {
   const { can } = useAuth()
   const qc = useQueryClient()
   const [modal, setModal] = useState<'receipt' | 'supplier' | null>(null)
   const [preset, setPreset] = useState<string>('')
+  const [settle, setSettle] = useState<Payable | null>(null)
   const [page, setPage] = useState(1)
   const [recvPage, setRecvPage] = useState(1)
-  const [payPage, setPayPage] = useState(1)
   const [search, setSearch] = useState('')
   const { data, isLoading } = useList<Payment>('payments', { page, search })
   const recv = useList<Party>('customers', { has_dues: 1, page: recvPage })
-  const pay = useList<Party>('suppliers', { has_dues: 1, page: payPage })
+  const payables = useQuery({
+    queryKey: ['payables'],
+    queryFn: async () => (await api.get<{ data: Payable[] }>('/payments/payables')).data.data,
+  })
+
+  const invalidateAll = () => {
+    ['payments', 'payables', 'customers', 'suppliers', 'drivers', 'labourers', 'salaries', 'dashboard'].forEach((k) =>
+      qc.invalidateQueries({ queryKey: [k] }))
+  }
 
   const mutate = useMutation({
     mutationFn: ({ kind, payload }: { kind: string; payload: Record<string, unknown> }) =>
       api.post(kind === 'receipt' ? '/payments/receipt' : '/payments/supplier', payload),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['payments'] })
-      qc.invalidateQueries({ queryKey: ['customers'] })
-      qc.invalidateQueries({ queryKey: ['suppliers'] })
-      setModal(null)
-      setPreset('')
-    },
+    onSuccess: () => { invalidateAll(); setModal(null); setPreset('') },
+  })
+
+  const settleMut = useMutation({
+    mutationFn: ({ row, payload }: { row: Payable; payload: Record<string, unknown> }) =>
+      api.post(payUrl(row), row.type === 'supplier' ? { supplier_id: row.id, ...payload } : payload),
+    onSuccess: () => { invalidateAll(); setSettle(null) },
   })
 
   const open = (kind: 'receipt' | 'supplier', partyId = '') => { setPreset(partyId); setModal(kind) }
@@ -79,22 +97,24 @@ export default function Payments() {
         <Pagination meta={recv.data?.meta} page={recvPage} onPage={setRecvPage} />
       </div>
 
-      {/* Suppliers we owe — pay here */}
+      {/* Everyone we owe — suppliers, drivers, labourers, staff */}
       <div>
-        <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Dene baqi (Suppliers ko) <span className="font-normal" style={{ color: 'var(--muted)' }}>— payables</span></h2>
-        <Table head={['Supplier', 'Baqi (dene hain)', '']}>
-          {pay.data?.data.map((s) => (
-            <tr key={s.id}>
-              <td className="px-4 py-3 font-medium">{s.name}</td>
-              <td className="px-4 py-3"><Badge color="red">{formatPaisa(s.balance)}</Badge></td>
-              <td className="px-4 py-3 text-right">
-                {can('payments.manage') && <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => open('supplier', s.id)}>Pay</button>}
-              </td>
-            </tr>
-          ))}
-          {pay.data?.data.length === 0 && <tr><td colSpan={3} className="px-4 py-4 text-center text-sm" style={{ color: 'var(--muted)' }}>Sab clear — kisi ko dena baqi nahi.</td></tr>}
-        </Table>
-        <Pagination meta={pay.data?.meta} page={payPage} onPage={setPayPage} />
+        <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Dene baqi (sab ko) <span className="font-normal" style={{ color: 'var(--muted)' }}>— payables: suppliers, drivers, mazdoor, staff</span></h2>
+        {payables.isLoading ? <Spinner /> : (
+          <Table head={['Kis ko', 'Type', 'Baqi (dene hain)', '']}>
+            {payables.data?.map((p) => (
+              <tr key={`${p.type}-${p.id}`}>
+                <td className="px-4 py-3 font-medium">{p.name}</td>
+                <td className="px-4 py-3"><Badge color="slate">{typeLabel[p.type]}</Badge></td>
+                <td className="px-4 py-3"><Badge color="red">{formatPaisa(p.balance)}</Badge></td>
+                <td className="px-4 py-3 text-right">
+                  {can('payments.manage') && <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => setSettle(p)}>Pay</button>}
+                </td>
+              </tr>
+            ))}
+            {payables.data?.length === 0 && <tr><td colSpan={4} className="px-4 py-4 text-center text-sm" style={{ color: 'var(--muted)' }}>Sab clear — kisi ko dena baqi nahi.</td></tr>}
+          </Table>
+        )}
       </div>
 
       {/* All payments history */}
@@ -136,7 +156,36 @@ export default function Payments() {
           />
         </Modal>
       )}
+
+      {settle && (
+        <Modal title={`Pay — ${settle.name}`} onClose={() => setSettle(null)}>
+          <SettleForm
+            outstanding={settle.balance}
+            onSubmit={(payload) => settleMut.mutate({ row: settle, payload })}
+            busy={settleMut.isPending}
+            error={settleMut.error ? apiError(settleMut.error) : ''}
+          />
+        </Modal>
+      )}
     </div>
+  )
+}
+
+function SettleForm({ outstanding, onSubmit, busy, error }: { outstanding: number; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
+  const [form, setForm] = useState({ payment_date: new Date().toISOString().slice(0, 10), amount: '', method: 'cash', bank_ref: '' })
+  const set = (k: string, v: string) => setForm({ ...form, [k]: v })
+  return (
+    <form
+      onSubmit={(e) => { e.preventDefault(); onSubmit({ payment_date: form.payment_date, amount: Number(form.amount), method: form.method, bank_ref: form.method === 'bank' ? form.bank_ref : undefined }) }}
+      className="space-y-3"
+    >
+      <OutstandingNote label="Inko dene hain (baqi)" amount={outstanding} onFill={(rs) => set('amount', String(rs))} />
+      <Field label="Date"><Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} required /></Field>
+      <Field label="Amount (Rs)"><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} required /></Field>
+      <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
+      {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
+      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Pay'}</Button>
+    </form>
   )
 }
 
