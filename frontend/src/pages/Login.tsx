@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { apiError } from '../lib/api'
+import { useTheme } from '../lib/theme'
 import { Button, Card, Field, Input } from '../components/ui'
 
 export default function Login() {
   const { login } = useAuth()
+  const { theme } = useTheme()
   const navigate = useNavigate()
   const [email, setEmail] = useState('owner@blockfactory.test')
   const [password, setPassword] = useState('password')
@@ -30,13 +32,13 @@ export default function Login() {
     <div className="flex h-full flex-col items-center justify-center px-4" style={{ background: 'var(--bg)' }}>
       <Card className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center text-center">
-          <div
-            className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl text-xl font-black"
-            style={{ background: 'var(--primary)', color: 'var(--primary-fg)' }}
-          >
-            B
-          </div>
-          <h1 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Biryaal Block Factory</h1>
+          <img
+            src={theme === 'dark' ? '/logo-red.png' : '/logo-navy.png'}
+            alt="Barval Block Factory"
+            className="mb-3 max-h-24 w-auto object-contain"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'block' }}
+          />
+          <h1 className="hidden text-lg font-bold" style={{ color: 'var(--text)' }}>Barval Block Factory</h1>
           <p className="text-sm" style={{ color: 'var(--muted)' }}>Login karein (sign in)</p>
         </div>
         <form onSubmit={submit} className="space-y-4">

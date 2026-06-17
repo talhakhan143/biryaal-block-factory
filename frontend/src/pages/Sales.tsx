@@ -115,7 +115,7 @@ function InvoiceModal({ id, onClose }: { id: string; onClose: () => void }) {
         ) : (
           <>
             <div className="text-center">
-              <h2 className="text-lg font-bold">Biryaal Block Factory</h2>
+              <h2 className="text-lg font-bold">Barval Block Factory</h2>
               <p className="text-xs text-slate-500">Sales Invoice</p>
               <p className="mt-1 font-mono text-sm">{String(data.invoice_no)}</p>
               <p className="text-xs text-slate-500">{data.sale_date} · {data.customer?.name ?? 'Walk-in'} · {String(data.type).toUpperCase()}</p>

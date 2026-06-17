@@ -22,7 +22,7 @@
 </head>
 <body>
     <div class="head">
-        <div class="brand">Biryaal Block Factory</div>
+        <div class="brand">Barval Block Factory</div>
         <div class="period">Cement Hollow Blocks</div>
         <div class="title">{{ $report['title'] }}</div>
         <div class="period">{{ $report['period'] }} &middot; Generated {{ $generatedAt }}</div>
@@ -63,6 +63,6 @@
         </table>
     @endif
 
-    <div class="footer">Biryaal Block Factory ERP &middot; Software by Talha Khan (WhatsApp 92-336-8469404)</div>
+    <div class="footer">Barval Block Factory ERP &middot; Software by Talha Khan (WhatsApp 92-336-8469404)</div>
 </body>
 </html>

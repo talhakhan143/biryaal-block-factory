@@ -233,7 +233,7 @@ function Challan({ id, onClose }: { id: string; onClose: () => void }) {
         {isLoading || !data ? <Spinner /> : (
           <>
             <div className="text-center">
-              <h2 className="text-lg font-bold">Biryaal Block Factory</h2>
+              <h2 className="text-lg font-bold">Barval Block Factory</h2>
               <p className="text-xs text-slate-500">Dispatch Challan</p>
               <p className="mt-1 font-mono">{data.reference}</p>
             </div>
