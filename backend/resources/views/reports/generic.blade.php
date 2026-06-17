@@ -22,6 +22,9 @@
 </head>
 <body>
     <div class="head">
+        @if (file_exists(public_path('logo.png')))
+            <img src="{{ public_path('logo.png') }}" style="height:70px;" alt="Barval">
+        @endif
         <div class="brand">Barval Block Factory</div>
         <div class="period">Cement Hollow Blocks</div>
         <div class="title">{{ $report['title'] }}</div>

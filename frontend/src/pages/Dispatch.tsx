@@ -223,7 +223,7 @@ function Challan({ id, onClose }: { id: string; onClose: () => void }) {
         {isLoading || !data ? <Spinner /> : (
           <>
             <div className="text-center">
-              <h2 className="text-lg font-bold">Barval Block Factory</h2>
+              <img src="/logo.png" alt="Barval" className="mx-auto mb-2 h-16 w-auto object-contain" />
               <p className="text-xs text-slate-500">Dispatch Challan</p>
               <p className="mt-1 font-mono">{data.reference}</p>
             </div>

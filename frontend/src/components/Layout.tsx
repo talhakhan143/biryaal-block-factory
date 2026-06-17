@@ -104,18 +104,8 @@ export default function Layout() {
         style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
       >
         <div className="flex items-center justify-center border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}>
-          <img
-            src={theme === 'dark' ? '/logo-red.png' : '/logo-navy.png'}
-            alt="Barval Block Factory"
-            className="max-h-20 w-auto object-contain"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex' }}
-          />
-          <div className="hidden items-center gap-2" style={{ display: 'none' }}>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg font-black" style={{ background: 'var(--primary)', color: 'var(--primary-fg)' }}>B</div>
-            <div>
-              <div className="text-sm font-bold leading-tight" style={{ color: 'var(--text)' }}>Barval Block Factory</div>
-              <div dir="rtl" className="text-[12px]" style={{ color: 'var(--muted)' }}>بلاک فیکٹری</div>
-            </div>
+          <div className="rounded-xl bg-white p-2">
+            <img src="/logo.png" alt="Barval Block Factory" className="mx-auto h-24 w-auto object-contain" />
           </div>
         </div>
 
