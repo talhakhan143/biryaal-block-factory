@@ -66,6 +66,6 @@
         </table>
     @endif
 
-    <div class="footer">Barval Block Factory ERP &middot; Software by Talha Khan (WhatsApp 92-336-8469404)</div>
+    <div class="footer">Barval Block Factory ERP &middot; Developer: Talha Khan &middot; Phone: 0336-8469404</div>
 </body>
 </html>

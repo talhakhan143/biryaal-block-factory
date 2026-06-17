@@ -137,7 +137,7 @@ function InvoiceModal({ id, onClose }: { id: string; onClose: () => void }) {
               <div className="flex justify-between"><span>Paid</span><span>{formatPaisa(Number(data.paid))}</span></div>
               <div className="flex justify-between"><span>Balance</span><span>{formatPaisa(Number(data.balance))}</span></div>
             </div>
-            <p className="mt-4 text-center text-[10px] text-slate-400">Software by Talha Khan · WhatsApp 92-336-8469404</p>
+            <p className="mt-4 text-center text-[10px] text-slate-400">Developer: Talha Khan · Phone: 0336-8469404</p>
             <div className="no-print mt-5 flex gap-2">
               <Button variant="ghost" className="flex-1" onClick={onClose}>Close</Button>
               <Button className="flex-1" onClick={() => window.print()}>Print</Button>

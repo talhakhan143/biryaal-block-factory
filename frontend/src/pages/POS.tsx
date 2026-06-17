@@ -201,6 +201,7 @@ function Receipt({ sale, onClose }: { sale: Record<string, unknown>; onClose: ()
           <div className="flex justify-between"><span>Paid</span><span>{formatPaisa(Number(sale.paid))}</span></div>
           <div className="flex justify-between"><span>Balance</span><span>{formatPaisa(Number(sale.balance))}</span></div>
         </div>
+        <p className="mt-4 text-center text-[10px] text-slate-400">Developer: Talha Khan · Phone: 0336-8469404</p>
         <div className="no-print mt-5 flex gap-2">
           <Button variant="ghost" className="flex-1" onClick={onClose}>Close</Button>
           <Button className="flex-1" onClick={() => window.print()}>Print</Button>
