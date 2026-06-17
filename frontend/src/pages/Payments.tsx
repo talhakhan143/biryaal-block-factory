@@ -17,66 +17,119 @@ interface Payment {
   bank_ref?: string
 }
 
+interface Party { id: string; name: string; balance: number }
+
 export default function Payments() {
   const { can } = useAuth()
   const qc = useQueryClient()
   const [modal, setModal] = useState<'receipt' | 'supplier' | null>(null)
+  const [preset, setPreset] = useState<string>('')
   const [page, setPage] = useState(1)
+  const [recvPage, setRecvPage] = useState(1)
+  const [payPage, setPayPage] = useState(1)
   const [search, setSearch] = useState('')
   const { data, isLoading } = useList<Payment>('payments', { page, search })
+  const recv = useList<Party>('customers', { has_dues: 1, page: recvPage })
+  const pay = useList<Party>('suppliers', { has_dues: 1, page: payPage })
 
   const mutate = useMutation({
     mutationFn: ({ kind, payload }: { kind: string; payload: Record<string, unknown> }) =>
       api.post(kind === 'receipt' ? '/payments/receipt' : '/payments/supplier', payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['payments'] })
+      qc.invalidateQueries({ queryKey: ['customers'] })
+      qc.invalidateQueries({ queryKey: ['suppliers'] })
       setModal(null)
+      setPreset('')
     },
   })
 
+  const open = (kind: 'receipt' | 'supplier', partyId = '') => { setPreset(partyId); setModal(kind) }
+
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Payments"
         subtitle="Paisa aana (receipt) aur paisa jana (payment)"
         actions={
           can('payments.manage') && (
             <>
-              <Button variant="ghost" onClick={() => setModal('supplier')}>Pay Supplier</Button>
-              <Button onClick={() => setModal('receipt')}>Receive Payment</Button>
+              <Button variant="ghost" onClick={() => open('supplier')}>Pay Supplier</Button>
+              <Button onClick={() => open('receipt')}>Receive Payment</Button>
             </>
           )
         }
       />
-      <div className="mb-4">
-        <Input placeholder="Search ref or party name…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs" />
-      </div>
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Table head={['Ref', 'Date', 'Direction', 'Party', 'Amount', 'Method', 'Bank / ref']}>
-          {data?.data.map((p) => (
-            <tr key={p.id}>
-              <td className="px-4 py-3 font-mono text-xs">{p.reference}</td>
-              <td className="px-4 py-3">{p.payment_date}</td>
-              <td className="px-4 py-3">
-                <Badge color={p.direction === 'receipt' ? 'green' : 'red'}>{p.direction === 'receipt' ? 'IN' : 'OUT'}</Badge>
+
+      {/* Customers who owe us — collect here */}
+      <div>
+        <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Lene baqi (Customers se) <span className="font-normal" style={{ color: 'var(--muted)' }}>— receivables</span></h2>
+        <Table head={['Customer', 'Baqi (dene hain)', '']}>
+          {recv.data?.data.map((c) => (
+            <tr key={c.id}>
+              <td className="px-4 py-3 font-medium">{c.name}</td>
+              <td className="px-4 py-3"><Badge color="amber">{formatPaisa(c.balance)}</Badge></td>
+              <td className="px-4 py-3 text-right">
+                {can('payments.manage') && <button className="text-sm hover:underline" style={{ color: 'var(--green)' }} onClick={() => open('receipt', c.id)}>Receive</button>}
               </td>
-              <td className="px-4 py-3">{p.party_name}</td>
-              <td className="px-4 py-3">{formatPaisa(p.amount)}</td>
-              <td className="px-4 py-3">
-                <Badge color={p.method === 'bank' ? 'blue' : 'slate'}>{p.method}</Badge>
-              </td>
-              <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)' }}>{p.bank_ref ?? '—'}</td>
             </tr>
           ))}
+          {recv.data?.data.length === 0 && <tr><td colSpan={3} className="px-4 py-4 text-center text-sm" style={{ color: 'var(--muted)' }}>Sab clear — kisi se lena baqi nahi.</td></tr>}
         </Table>
-      )}
-      <Pagination meta={data?.meta} page={page} onPage={setPage} />
+        <Pagination meta={recv.data?.meta} page={recvPage} onPage={setRecvPage} />
+      </div>
+
+      {/* Suppliers we owe — pay here */}
+      <div>
+        <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Dene baqi (Suppliers ko) <span className="font-normal" style={{ color: 'var(--muted)' }}>— payables</span></h2>
+        <Table head={['Supplier', 'Baqi (dene hain)', '']}>
+          {pay.data?.data.map((s) => (
+            <tr key={s.id}>
+              <td className="px-4 py-3 font-medium">{s.name}</td>
+              <td className="px-4 py-3"><Badge color="red">{formatPaisa(s.balance)}</Badge></td>
+              <td className="px-4 py-3 text-right">
+                {can('payments.manage') && <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => open('supplier', s.id)}>Pay</button>}
+              </td>
+            </tr>
+          ))}
+          {pay.data?.data.length === 0 && <tr><td colSpan={3} className="px-4 py-4 text-center text-sm" style={{ color: 'var(--muted)' }}>Sab clear — kisi ko dena baqi nahi.</td></tr>}
+        </Table>
+        <Pagination meta={pay.data?.meta} page={payPage} onPage={setPayPage} />
+      </div>
+
+      {/* All payments history */}
+      <div>
+        <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Saari payments (history)</h2>
+        <div className="mb-3">
+          <Input placeholder="Search ref or party name…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs" />
+        </div>
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <Table head={['Ref', 'Date', 'Direction', 'Party', 'Amount', 'Method', 'Bank / ref']}>
+            {data?.data.map((p) => (
+              <tr key={p.id}>
+                <td className="px-4 py-3 font-mono text-xs">{p.reference}</td>
+                <td className="px-4 py-3">{p.payment_date}</td>
+                <td className="px-4 py-3">
+                  <Badge color={p.direction === 'receipt' ? 'green' : 'red'}>{p.direction === 'receipt' ? 'IN' : 'OUT'}</Badge>
+                </td>
+                <td className="px-4 py-3">{p.party_name}</td>
+                <td className="px-4 py-3">{formatPaisa(p.amount)}</td>
+                <td className="px-4 py-3"><Badge color={p.method === 'bank' ? 'blue' : 'slate'}>{p.method}</Badge></td>
+                <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)' }}>{p.bank_ref ?? '—'}</td>
+              </tr>
+            ))}
+          </Table>
+        )}
+        <Pagination meta={data?.meta} page={page} onPage={setPage} />
+      </div>
+
       {modal && (
-        <Modal title={modal === 'receipt' ? 'Receive from Customer' : 'Pay Supplier'} onClose={() => setModal(null)}>
+        <Modal title={modal === 'receipt' ? 'Receive from Customer' : 'Pay Supplier'} onClose={() => { setModal(null); setPreset('') }}>
           <PaymentForm
             kind={modal}
+            initialParty={preset}
             onSubmit={(payload) => mutate.mutate({ kind: modal, payload })}
             busy={mutate.isPending}
             error={mutate.error ? apiError(mutate.error) : ''}
@@ -87,10 +140,10 @@ export default function Payments() {
   )
 }
 
-function PaymentForm({ kind, onSubmit, busy, error }: { kind: string; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
+function PaymentForm({ kind, initialParty = '', onSubmit, busy, error }: { kind: string; initialParty?: string; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
   const partyResource = kind === 'receipt' ? 'customers' : 'suppliers'
   const parties = useList<{ id: string; name: string; balance: number }>(partyResource, { per_page: 100 })
-  const [form, setForm] = useState({ party: '', payment_date: new Date().toISOString().slice(0, 10), amount: '', method: 'cash', bank_ref: '' })
+  const [form, setForm] = useState({ party: initialParty, payment_date: new Date().toISOString().slice(0, 10), amount: '', method: 'cash', bank_ref: '' })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
 
   const selected = parties.data?.data.find((p) => p.id === form.party)

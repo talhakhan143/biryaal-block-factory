@@ -15,6 +15,7 @@ class SupplierController extends Controller
     {
         $suppliers = Supplier::query()
             ->when($request->search, fn ($q, $s) => $q->where('name', 'like', "%{$s}%")->orWhere('phone', 'like', "%{$s}%"))
+            ->when($request->boolean('has_dues'), fn ($q) => $q->where('balance', '>', 0)->orderByDesc('balance'))
             ->orderBy('name')
             ->paginate($request->integer('per_page', 15));
 
