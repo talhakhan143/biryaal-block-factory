@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Card, Field, Input, Modal, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Card, Field, Input, MethodField, Modal, MoneyInput, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
 
 interface Dispatch {
   id: string
@@ -56,11 +56,6 @@ export default function DispatchPage() {
       setChallanId(res.data.data.id)
     },
   })
-  const deliver = useMutation({
-    mutationFn: (id: string) => api.post(`/dispatches/${id}/deliver`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['dispatches'] }),
-  })
-
   const openBlank = () => { setPrefill(null); setFormOpen(true) }
   const openFromOrder = (o: PendingOrder) => {
     setPrefill({
@@ -120,11 +115,8 @@ export default function DispatchPage() {
                 <td className="px-4 py-3">{d.vehicle?.name ?? '—'}</td>
                 <td className="px-4 py-3">{d.driver?.name ?? '—'}</td>
                 <td className="px-4 py-3"><Badge color={d.status === 'delivered' ? 'green' : 'amber'}>{d.status}</Badge></td>
-                <td className="px-4 py-3 text-right space-x-3">
+                <td className="px-4 py-3 text-right">
                   <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => setChallanId(d.id)}>Challan</button>
-                  {can('dispatch.manage') && d.status !== 'delivered' && (
-                    <button className="text-sm hover:underline" style={{ color: 'var(--green)' }} onClick={() => deliver.mutate(d.id)}>Deliver</button>
-                  )}
                 </td>
               </tr>
             ))}
@@ -145,64 +137,50 @@ export default function DispatchPage() {
 
 function DispatchForm({ prefill, onSubmit, busy, error }: { prefill: Prefill | null; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
   const customers = useList<{ id: string; name: string }>('customers', { per_page: 100 })
-  const vehicles = useList<{ id: string; name: string }>('vehicles', { per_page: 100 })
-  const drivers = useList<{ id: string; name: string }>('drivers', { per_page: 100 })
+  const drivers = useList<{ id: string; name: string; vehicle_name?: string }>('drivers', { per_page: 100 })
   const products = useList<{ id: string; name: string }>('products', { per_page: 100 })
   const [form, setForm] = useState({
     customer_id: prefill?.customer_id ?? '',
-    vehicle_id: '',
     driver_id: '',
     dispatch_date: new Date().toISOString().slice(0, 10),
+    trip_rate: '',
+    trip_paid: '0',
+    method: 'cash',
+    bank_ref: '',
   })
   const [items, setItems] = useState<{ product_id: string; quantity: string }[]>(
     prefill?.items.length ? prefill.items : [{ product_id: '', quantity: '' }],
   )
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
+  const driverVehicle = drivers.data?.data.find((d) => d.id === form.driver_id)?.vehicle_name
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault()
         onSubmit({
-          ...form,
           customer_id: form.customer_id || null,
-          vehicle_id: form.vehicle_id || null,
           driver_id: form.driver_id || null,
+          dispatch_date: form.dispatch_date,
           sale_id: prefill?.sale_id ?? null,
+          trip_rate: form.trip_rate ? Number(form.trip_rate) : undefined,
+          trip_paid: form.trip_rate ? Number(form.trip_paid) : undefined,
+          method: form.method,
+          bank_ref: form.method === 'bank' ? form.bank_ref : undefined,
           items: items.filter((i) => i.product_id && i.quantity).map((i) => ({ product_id: i.product_id, quantity: Number(i.quantity) })),
         })
       }}
       className="space-y-3"
     >
-      {prefill?.sale_id && (
-        <p className="rounded-lg px-3 py-2 text-xs" style={{ background: 'var(--surface-2)', color: 'var(--muted)' }}>
-          POS order se bhara gaya — items edit kar sakte ho, gaari/driver chuno.
-        </p>
-      )}
-      <Field label="Customer">
+      <Field label="Customer (Grahak)">
         <Select value={form.customer_id} onChange={(e) => set('customer_id', e.target.value)}>
-          <option value="">Walk-in / none</option>
+          <option value="">Walk-in</option>
           {customers.data?.data.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </Select>
       </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Vehicle (gaari)">
-          <Select value={form.vehicle_id} onChange={(e) => set('vehicle_id', e.target.value)}>
-            <option value="">—</option>
-            {vehicles.data?.data.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="Driver">
-          <Select value={form.driver_id} onChange={(e) => set('driver_id', e.target.value)}>
-            <option value="">—</option>
-            {drivers.data?.data.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </Select>
-        </Field>
-      </div>
-      <Field label="Date"><Input type="date" value={form.dispatch_date} onChange={(e) => set('dispatch_date', e.target.value)} required /></Field>
 
       <div>
-        <span className="mb-1 block text-xs font-medium" style={{ color: 'var(--muted)' }}>Items</span>
+        <span className="mb-1 block text-xs font-medium" style={{ color: 'var(--muted)' }}>Items (maal)</span>
         {items.map((it, idx) => (
           <div key={idx} className="mb-2 flex gap-2">
             <Select value={it.product_id} onChange={(e) => setItems(items.map((x, i) => (i === idx ? { ...x, product_id: e.target.value } : x)))}>
@@ -216,8 +194,24 @@ function DispatchForm({ prefill, onSubmit, busy, error }: { prefill: Prefill | n
         <button type="button" className="text-sm" style={{ color: 'var(--primary)' }} onClick={() => setItems([...items, { product_id: '', quantity: '' }])}>+ Add item</button>
       </div>
 
+      <Field label="Driver (gaari saath aati hai)">
+        <Select value={form.driver_id} onChange={(e) => set('driver_id', e.target.value)}>
+          <option value="">— koi nahi —</option>
+          {drivers.data?.data.map((d) => <option key={d.id} value={d.id}>{d.name}{d.vehicle_name ? ` — ${d.vehicle_name}` : ''}</option>)}
+        </Select>
+      </Field>
+      {driverVehicle && <p className="text-xs" style={{ color: 'var(--muted)' }}>Gaari: {driverVehicle}</p>}
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Trip kiraya (Rs) — optional"><MoneyInput value={form.trip_rate} onChange={(v) => set('trip_rate', v)} /></Field>
+        {form.trip_rate ? <Field label="Driver ko abhi diya (Rs)"><MoneyInput value={form.trip_paid} onChange={(v) => set('trip_paid', v)} /></Field> : <div />}
+      </div>
+      {form.trip_rate ? <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} /> : null}
+
+      <Field label="Date"><Input type="date" value={form.dispatch_date} onChange={(e) => set('dispatch_date', e.target.value)} required /></Field>
+
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
-      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Create & View Challan'}</Button>
+      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Deliver & Print Challan'}</Button>
     </form>
   )
 }

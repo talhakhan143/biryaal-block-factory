@@ -7,6 +7,7 @@ use App\Http\Resources\DispatchResource;
 use App\Models\Dispatch;
 use App\Models\Sale;
 use App\Services\Dispatch\DispatchService;
+use App\Support\Money;
 use Illuminate\Http\Request;
 
 class DispatchController extends Controller
@@ -63,7 +64,19 @@ class DispatchController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'uuid', 'exists:products,id'],
             'items.*.quantity' => ['required', 'integer', 'gt:0'],
+            // optional transport trip created with the dispatch
+            'trip_rate' => ['nullable', 'numeric', 'min:0'],
+            'trip_paid' => ['nullable', 'numeric', 'min:0'],
+            'method' => ['nullable', 'in:cash,bank'],
+            'bank_ref' => ['nullable', 'string', 'max:255'],
         ]);
+
+        if (isset($data['trip_rate'])) {
+            $data['trip_rate'] = Money::toPaisa($data['trip_rate']);
+        }
+        if (isset($data['trip_paid'])) {
+            $data['trip_paid'] = Money::toPaisa($data['trip_paid']);
+        }
 
         return new DispatchResource($this->service->create($data));
     }

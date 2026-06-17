@@ -27,6 +27,10 @@ class DashboardController extends Controller
         // total block pieces sold today (across all today's invoices)
         $todayBlocksSold = (int) SaleItem::whereHas('sale', fn ($q) => $q->whereDate('sale_date', $today))->sum('quantity');
 
+        // lifetime totals
+        $totalProduction = (int) ProductionBatch::sum('quantity_produced');
+        $totalSold = (int) SaleItem::sum('quantity');
+
         $stock = FinishedGoodsStock::select(
             DB::raw('COALESCE(SUM(curing_qty),0) curing'),
             DB::raw('COALESCE(SUM(ready_qty),0) ready'),
@@ -44,6 +48,10 @@ class DashboardController extends Controller
                 'blocks_sold' => $todayBlocksSold,
                 'sales_total' => $todaySales,
                 'expenses_total' => $todayExpenses,
+            ],
+            'totals' => [
+                'production' => $totalProduction,
+                'sold' => $totalSold,
             ],
             'cash_balance' => $this->accountBalance(Account::CASH) + $this->accountBalance(Account::BANK),
             'receivables' => (int) Customer::sum('balance'),

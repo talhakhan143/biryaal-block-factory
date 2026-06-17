@@ -13,6 +13,7 @@ class TransportTripResource extends JsonResource
             'id' => $this->id,
             'reference' => $this->reference,
             'vehicle' => new VehicleResource($this->whenLoaded('vehicle')),
+            'vehicle_label' => $this->vehicle_label ?: $this->driver?->vehicle_name,
             'driver' => new DriverResource($this->whenLoaded('driver')),
             'trip_date' => $this->trip_date?->toDateString(),
             'from_location' => $this->from_location,

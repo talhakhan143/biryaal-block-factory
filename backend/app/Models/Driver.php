@@ -11,7 +11,7 @@ class Driver extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['name', 'phone', 'license_no', 'is_active'];
+    protected $fillable = ['name', 'phone', 'license_no', 'vehicle_name', 'vehicle_plate', 'is_active'];
 
     protected $casts = ['is_active' => 'boolean'];
 

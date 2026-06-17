@@ -5,6 +5,7 @@ import { Card, PageHeader, Spinner } from '../components/ui'
 
 interface DashboardData {
   today: { production_qty: number; blocks_sold: number; sales_total: number; expenses_total: number }
+  totals: { production: number; sold: number }
   cash_balance: number
   receivables: number
   payables: number
@@ -48,8 +49,16 @@ export default function Dashboard() {
         <Stat label="Cash Balance" hint="Cash mojood" value={formatPaisa(data.cash_balance)} tone={data.cash_balance < 0 ? 'red' : 'green'} />
         <Stat label="Receivables" hint="Customers ne dene hain" value={formatPaisa(data.receivables)} tone="primary" />
         <Stat label="Payables" hint="Humne dene hain" value={formatPaisa(data.payables)} tone="red" />
-        <Stat label="Ready Stock" hint="Tayar maal" value={`${data.stock.ready} pcs`} tone="green" />
+        <Stat label="Ready Stock" hint="Tayar maal (baqi)" value={`${data.stock.ready} pcs`} tone="green" />
         <Stat label="Curing Stock" hint="Curing me" value={`${data.stock.curing} pcs`} tone="amber" />
+      </div>
+
+      <h2 className="mb-3 mt-6 text-sm font-bold" style={{ color: 'var(--text)' }}>Overall (ab tak) <span className="font-normal" style={{ color: 'var(--muted)' }}>— total</span></h2>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Stat label="Total Production" hint="Ab tak banaye blocks" value={`${data.totals.production} pcs`} tone="primary" />
+        <Stat label="Total Sold" hint="Ab tak bik'e blocks" value={`${data.totals.sold} pcs`} tone="green" />
+        <Stat label="Remaining Ready" hint="Bechne ke liye baqi" value={`${data.stock.ready} pcs`} tone="green" />
+        <Stat label="Damaged" hint="Kharab maal" value={`${data.stock.damaged} pcs`} tone="red" />
       </div>
 
       <div className="mt-6">

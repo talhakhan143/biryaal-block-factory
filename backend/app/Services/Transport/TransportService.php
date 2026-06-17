@@ -30,6 +30,7 @@ class TransportService
             $trip = TransportTrip::create([
                 'reference' => Sequence::next('TRP'),
                 'vehicle_id' => $data['vehicle_id'] ?? null,
+                'vehicle_label' => $data['vehicle_label'] ?? null,
                 'driver_id' => $data['driver_id'] ?? null,
                 'dispatch_id' => $data['dispatch_id'] ?? null,
                 'trip_date' => $data['trip_date'],

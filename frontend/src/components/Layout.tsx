@@ -60,7 +60,6 @@ const GROUPS: NavGroup[] = [
       { to: '/dispatch', en: 'Dispatch', ur: 'چالان / ڈلیوری', permission: 'dispatch.view', icon: Truck },
       { to: '/transport', en: 'Transport', ur: 'ٹرانسپورٹ', permission: 'transport.view', icon: Car },
       { to: '/drivers', en: 'Drivers', ur: 'ڈرائیور', permission: 'transport.view', icon: UserRound },
-      { to: '/vehicles', en: 'Vehicles', ur: 'گاڑیاں', permission: 'transport.view', icon: Car },
     ],
   },
   {

@@ -87,6 +87,8 @@ class DriverController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'license_no' => ['nullable', 'string', 'max:50'],
+            'vehicle_name' => ['nullable', 'string', 'max:255'],
+            'vehicle_plate' => ['nullable', 'string', 'max:50'],
             'is_active' => ['boolean'],
         ]);
     }

@@ -11,6 +11,8 @@ interface Driver {
   name: string
   phone?: string
   license_no?: string
+  vehicle_name?: string
+  vehicle_plate?: string
   balance: number
 }
 
@@ -42,11 +44,12 @@ export default function Drivers() {
       {isLoading ? (
         <Spinner />
       ) : (
-        <Table head={['Name', 'Phone', 'Dues (we owe)', '']}>
+        <Table head={['Name', 'Phone', 'Vehicle (gaari)', 'Dues (we owe)', '']}>
           {data?.data.map((d) => (
             <tr key={d.id}>
               <td className="px-4 py-3 font-medium">{d.name}</td>
               <td className="px-4 py-3">{d.phone ?? '—'}</td>
+              <td className="px-4 py-3">{d.vehicle_name ? `${d.vehicle_name}${d.vehicle_plate ? ` (${d.vehicle_plate})` : ''}` : '—'}</td>
               <td className="px-4 py-3">{d.balance > 0 ? <Badge color="red">{formatPaisa(d.balance)}</Badge> : <Badge color="green">Settled</Badge>}</td>
               <td className="px-4 py-3 text-right space-x-3">
                 <button className="text-sm text-blue-600 hover:underline" onClick={() => setLedgerId(d.id)}>Ledger</button>
@@ -78,13 +81,18 @@ export default function Drivers() {
 }
 
 function DriverForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, string>) => void; busy: boolean; error: string }) {
-  const [form, setForm] = useState({ name: '', phone: '', license_no: '' })
+  const [form, setForm] = useState({ name: '', phone: '', license_no: '', vehicle_name: '', vehicle_plate: '' })
+  const set = (k: string, v: string) => setForm({ ...form, [k]: v })
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(form) }} className="space-y-3">
-      <Field label="Name"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></Field>
-      <Field label="Phone"><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
-      <Field label="License No"><Input value={form.license_no} onChange={(e) => setForm({ ...form, license_no: e.target.value })} /></Field>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <Field label="Name"><Input value={form.name} onChange={(e) => set('name', e.target.value)} required /></Field>
+      <Field label="Phone"><Input value={form.phone} onChange={(e) => set('phone', e.target.value)} /></Field>
+      <Field label="License No"><Input value={form.license_no} onChange={(e) => set('license_no', e.target.value)} /></Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Vehicle (gaari ka naam)"><Input value={form.vehicle_name} onChange={(e) => set('vehicle_name', e.target.value)} placeholder="Mazda" /></Field>
+        <Field label="Plate no"><Input value={form.vehicle_plate} onChange={(e) => set('vehicle_plate', e.target.value)} placeholder="LEX-123" /></Field>
+      </div>
+      {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
       <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Save'}</Button>
     </form>
   )
