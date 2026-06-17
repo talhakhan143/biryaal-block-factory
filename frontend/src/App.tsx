@@ -28,6 +28,7 @@ import Staff from './pages/Staff'
 import Reports from './pages/Reports'
 import Products from './pages/Products'
 import Accounts from './pages/Accounts'
+import Adjustments from './pages/Adjustments'
 import Users from './pages/Users'
 import AuditLogs from './pages/AuditLogs'
 
@@ -74,6 +75,7 @@ export default function App() {
         <Route path="/reports" element={<Reports />} />
         <Route path="/products" element={<Products />} />
         <Route path="/accounts" element={<Accounts />} />
+        <Route path="/adjustments" element={<Adjustments />} />
         <Route path="/users" element={<Users />} />
         <Route path="/audit-logs" element={<AuditLogs />} />
         <Route path="*" element={<Navigate to="/" replace />} />

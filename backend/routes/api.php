@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AccountingController;
+use App\Http\Controllers\Api\AdjustmentController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
@@ -205,6 +206,10 @@ Route::prefix('v1')->group(function () {
             Route::get('reports/{type}/pdf', [ReportController::class, 'pdf']);
             Route::get('reports/{type}/excel', [ReportController::class, 'excel']);
         });
+
+        // Adjustments (manual balance / cash corrections)
+        Route::get('adjustments', [AdjustmentController::class, 'index'])->middleware('permission:accounting.view');
+        Route::post('adjustments', [AdjustmentController::class, 'store'])->middleware('permission:payments.manage');
 
         // Cash book & accounting
         Route::get('cash-book', [CashBookController::class, 'index'])->middleware('permission:accounting.view');

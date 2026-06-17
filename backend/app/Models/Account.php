@@ -27,6 +27,7 @@ class Account extends Model
     public const TRANSPORT_CLEARING = '2100'; // freight collected from customer, paid to driver (pass-through)
     public const CAPITAL = '3000';
     public const SALES = '4000';
+    public const OTHER_INCOME = '4100';
     public const EXPENSE = '5000';
 
     public function lines(): HasMany

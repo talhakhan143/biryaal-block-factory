@@ -75,6 +75,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: '/cash-book', en: 'Cash Book', ur: 'روزانہ کیش', permission: 'accounting.view', icon: Wallet },
       { to: '/expenses', en: 'Expenses', ur: 'اخراجات', permission: 'expenses.view', icon: BookText },
+      { to: '/adjustments', en: 'Adjustments', ur: 'ایڈجسٹمنٹ', permission: 'accounting.view', icon: Undo2 },
       { to: '/trial-balance', en: 'Accounts Summary', ur: 'اکاؤنٹس خلاصہ', permission: 'accounting.view', icon: FileSpreadsheet },
       { to: '/accounts', en: 'Accounts Ledger', ur: 'اکاؤنٹ لیجر', permission: 'accounting.view', icon: BookOpenText },
       { to: '/reports', en: 'Reports', ur: 'رپورٹس', permission: 'reports.view', icon: FileBarChart },

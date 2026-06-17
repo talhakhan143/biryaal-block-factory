@@ -18,6 +18,7 @@ class ChartOfAccountsSeeder extends Seeder
             [Account::TRANSPORT_CLEARING, 'Transport Clearing (Freight)', 'liability', 'credit'],
             [Account::CAPITAL, 'Owner Capital', 'equity', 'credit'],
             [Account::SALES, 'Sales Revenue', 'income', 'credit'],
+            [Account::OTHER_INCOME, 'Other Income / Adjustments', 'income', 'credit'],
             [Account::EXPENSE, 'Operating Expenses', 'expense', 'debit'],
         ];
 
