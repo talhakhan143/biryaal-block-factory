@@ -53,10 +53,12 @@ class SaleService
             }
 
             $discount = (int) ($data['discount'] ?? 0);
-            $total = $subtotal - $discount;
-            if ($total < 0) {
+            $fare = (int) ($data['transport_fare'] ?? 0); // freight paid by customer (pass-through)
+            $goodsNet = $subtotal - $discount;
+            if ($goodsNet < 0) {
                 throw new InvalidArgumentException('Discount cannot exceed subtotal.');
             }
+            $total = $goodsNet + $fare;
 
             $type = $data['type'] ?? 'cash';
             $paid = $type === 'cash' ? $total : (int) ($data['paid'] ?? 0);
@@ -70,6 +72,7 @@ class SaleService
                 'type' => $type,
                 'subtotal' => $subtotal,
                 'discount' => $discount,
+                'transport_fare' => $fare,
                 'total' => $total,
                 'paid' => $paid,
                 'balance' => $balance,
@@ -105,7 +108,11 @@ class SaleService
             if ($balance > 0) {
                 $lines[] = ['account' => Account::RECEIVABLE, 'debit' => $balance, 'memo' => $customer?->name];
             }
-            $lines[] = ['account' => Account::SALES, 'credit' => $total, 'memo' => 'Block sale'];
+            $lines[] = ['account' => Account::SALES, 'credit' => $goodsNet, 'memo' => 'Block sale'];
+            if ($fare > 0) {
+                // freight collected on behalf of the driver — a liability, not revenue
+                $lines[] = ['account' => Account::TRANSPORT_CLEARING, 'credit' => $fare, 'memo' => 'Freight collected'];
+            }
 
             $this->ledger->post(
                 $data['sale_date'],

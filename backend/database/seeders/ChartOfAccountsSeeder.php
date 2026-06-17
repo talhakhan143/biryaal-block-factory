@@ -15,6 +15,7 @@ class ChartOfAccountsSeeder extends Seeder
             [Account::RECEIVABLE, 'Accounts Receivable', 'asset', 'debit'],
             [Account::INVENTORY, 'Inventory', 'asset', 'debit'],
             [Account::PAYABLE, 'Accounts Payable', 'liability', 'credit'],
+            [Account::TRANSPORT_CLEARING, 'Transport Clearing (Freight)', 'liability', 'credit'],
             [Account::CAPITAL, 'Owner Capital', 'equity', 'credit'],
             [Account::SALES, 'Sales Revenue', 'income', 'credit'],
             [Account::EXPENSE, 'Operating Expenses', 'expense', 'debit'],

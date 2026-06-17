@@ -18,6 +18,7 @@ class StoreSaleRequest extends FormRequest
             'sale_date' => ['required', 'date'],
             'type' => ['required', 'in:cash,credit'],
             'discount' => ['nullable', 'numeric', 'min:0'],     // rupees
+            'transport_fare' => ['nullable', 'numeric', 'min:0'], // rupees (customer pays freight)
             'paid' => ['nullable', 'numeric', 'min:0'],         // rupees (credit sales)
             'payment_method' => ['nullable', 'in:cash,bank'],
             'bank_ref' => ['nullable', 'string', 'max:255'],

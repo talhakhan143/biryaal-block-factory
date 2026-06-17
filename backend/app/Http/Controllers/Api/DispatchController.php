@@ -42,6 +42,7 @@ class DispatchController extends Controller
                 'customer_id' => $s->customer_id,
                 'customer_name' => $s->customer?->name ?? 'Walk-in',
                 'total' => (int) $s->total,
+                'transport_fare' => (int) $s->transport_fare,
                 'items' => $s->items->map(fn ($i) => [
                     'product_id' => $i->product_id,
                     'product_name' => $i->product?->name,

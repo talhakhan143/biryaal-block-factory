@@ -132,6 +132,7 @@ function InvoiceModal({ id, onClose }: { id: string; onClose: () => void }) {
               ))}
             </div>
             <div className="space-y-1 text-sm">
+              {Number(data.transport_fare) > 0 && <div className="flex justify-between"><span>Transport (kiraya)</span><span>{formatPaisa(Number(data.transport_fare))}</span></div>}
               <div className="flex justify-between font-bold"><span>Total</span><span>{formatPaisa(Number(data.total))}</span></div>
               <div className="flex justify-between"><span>Paid</span><span>{formatPaisa(Number(data.paid))}</span></div>
               <div className="flex justify-between"><span>Balance</span><span>{formatPaisa(Number(data.balance))}</span></div>

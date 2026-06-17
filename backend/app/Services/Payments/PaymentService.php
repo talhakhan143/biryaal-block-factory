@@ -8,6 +8,7 @@ use App\Models\MaterialPurchase;
 use App\Models\Payment;
 use App\Models\Sale;
 use App\Models\Supplier;
+use App\Models\TransportTrip;
 use App\Services\Accounting\CashAccountResolver;
 use App\Services\Accounting\LedgerService;
 use App\Support\Sequence;
@@ -196,6 +197,56 @@ class PaymentService
                 [
                     ['account' => $cashAccount, 'debit' => $amount],
                     ['account' => Account::RECEIVABLE, 'credit' => $amount, 'memo' => $customer?->name],
+                ],
+                $payment,
+            );
+
+            return $payment;
+        });
+    }
+
+    /**
+     * Pay a specific transport trip's fare to its driver: updates the trip's
+     * paid/balance and the driver's dues. Dr Payable, Cr Cash/Bank.
+     *
+     * @param  array{amount:int,payment_date:string,method?:string,bank_ref?:string}  $data
+     */
+    public function payForTrip(TransportTrip $trip, array $data): Payment
+    {
+        return DB::transaction(function () use ($trip, $data) {
+            $amount = min((int) $data['amount'], (int) $trip->balance);
+            $this->assertPositive($amount);
+
+            $driver = $trip->driver;
+            $payment = Payment::create([
+                'reference' => Sequence::next('PAY'),
+                'direction' => Payment::PAYMENT,
+                'party_type' => $driver?->getMorphClass(),
+                'party_id' => $driver?->id,
+                'payment_date' => $data['payment_date'],
+                'amount' => $amount,
+                'method' => $data['method'] ?? 'cash',
+                'bank_ref' => $data['bank_ref'] ?? null,
+                'allocatable_type' => $trip->getMorphClass(),
+                'allocatable_id' => $trip->id,
+                'created_by' => Auth::id(),
+            ]);
+
+            $paid = (int) $trip->paid + $amount;
+            $trip->update([
+                'paid' => $paid,
+                'balance' => (int) $trip->rate - $paid,
+                'status' => $paid >= (int) $trip->rate ? 'paid' : 'partial',
+            ]);
+            $driver?->decrement('balance', $amount);
+
+            $cashAccount = CashAccountResolver::code($data['method'] ?? 'cash');
+            $this->ledger->post(
+                $data['payment_date'],
+                "Payment {$payment->reference} for trip {$trip->reference}",
+                [
+                    ['account' => Account::PAYABLE, 'debit' => $amount, 'memo' => $driver?->name ?? 'Driver'],
+                    ['account' => $cashAccount, 'credit' => $amount],
                 ],
                 $payment,
             );

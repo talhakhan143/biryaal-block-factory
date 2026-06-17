@@ -49,7 +49,8 @@ class TransportService
             }
 
             $cashAccount = ($data['method'] ?? 'cash') === 'bank' ? Account::BANK : Account::CASH;
-            $lines = [['account' => Account::EXPENSE, 'debit' => $rate, 'memo' => 'Transport']];
+            // Freight is paid from what the customer paid (clearing), not a factory expense.
+            $lines = [['account' => Account::TRANSPORT_CLEARING, 'debit' => $rate, 'memo' => 'Driver freight']];
             if ($paid > 0) {
                 $lines[] = ['account' => $cashAccount, 'credit' => $paid];
             }

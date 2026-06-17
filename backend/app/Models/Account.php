@@ -24,6 +24,7 @@ class Account extends Model
     public const RECEIVABLE = '1100';
     public const INVENTORY = '1200';
     public const PAYABLE = '2000';
+    public const TRANSPORT_CLEARING = '2100'; // freight collected from customer, paid to driver (pass-through)
     public const CAPITAL = '3000';
     public const SALES = '4000';
     public const EXPENSE = '5000';

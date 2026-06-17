@@ -142,6 +142,7 @@ Route::prefix('v1')->group(function () {
         // Transport trips
         Route::get('transport-trips', [TransportController::class, 'index'])->middleware('permission:transport.view');
         Route::post('transport-trips', [TransportController::class, 'store'])->middleware('permission:transport.manage');
+        Route::post('transport-trips/{transportTrip}/pay', [TransportController::class, 'pay'])->middleware('permission:payments.manage');
 
         // Dispatch / Challan
         Route::middleware('permission:dispatch.view')->group(function () {

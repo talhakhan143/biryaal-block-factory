@@ -39,6 +39,9 @@ class SaleController extends Controller
         if (isset($data['discount'])) {
             $data['discount'] = Money::toPaisa($data['discount']);
         }
+        if (isset($data['transport_fare'])) {
+            $data['transport_fare'] = Money::toPaisa($data['transport_fare']);
+        }
         if (isset($data['paid'])) {
             $data['paid'] = Money::toPaisa($data['paid']);
         }

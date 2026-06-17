@@ -18,6 +18,7 @@ class SaleResource extends JsonResource
             'type' => $this->type,
             'subtotal' => (int) $this->subtotal,
             'discount' => (int) $this->discount,
+            'transport_fare' => (int) $this->transport_fare,
             'total' => (int) $this->total,
             'paid' => (int) $this->paid,
             'balance' => (int) $this->balance,

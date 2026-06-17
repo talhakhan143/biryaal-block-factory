@@ -24,12 +24,14 @@ interface PendingOrder {
   customer_id: string | null
   customer_name: string
   total: number
+  transport_fare: number
   items: PendingItem[]
 }
 
 interface Prefill {
   sale_id?: string
   customer_id?: string | null
+  trip_rate?: string
   items: { product_id: string; quantity: string }[]
 }
 
@@ -61,6 +63,7 @@ export default function DispatchPage() {
     setPrefill({
       sale_id: o.sale_id,
       customer_id: o.customer_id,
+      trip_rate: o.transport_fare ? String(o.transport_fare / 100) : '',
       items: o.items.map((i) => ({ product_id: i.product_id, quantity: String(i.quantity) })),
     })
     setFormOpen(true)
@@ -143,7 +146,7 @@ function DispatchForm({ prefill, onSubmit, busy, error }: { prefill: Prefill | n
     customer_id: prefill?.customer_id ?? '',
     driver_id: '',
     dispatch_date: new Date().toISOString().slice(0, 10),
-    trip_rate: '',
+    trip_rate: prefill?.trip_rate ?? '',
     trip_paid: '0',
     method: 'cash',
     bank_ref: '',

@@ -3,15 +3,17 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\PaymentResource;
 use App\Http\Resources\TransportTripResource;
 use App\Models\TransportTrip;
+use App\Services\Payments\PaymentService;
 use App\Services\Transport\TransportService;
 use App\Support\Money;
 use Illuminate\Http\Request;
 
 class TransportController extends Controller
 {
-    public function __construct(private TransportService $service) {}
+    public function __construct(private TransportService $service, private PaymentService $payments) {}
 
     public function index(Request $request)
     {
@@ -45,5 +47,19 @@ class TransportController extends Controller
         }
 
         return new TransportTripResource($this->service->recordTrip($data)->load(['vehicle', 'driver']));
+    }
+
+    /** Pay (part of) a trip's fare to its driver. */
+    public function pay(Request $request, TransportTrip $transportTrip)
+    {
+        $data = $request->validate([
+            'payment_date' => ['required', 'date'],
+            'amount' => ['required', 'numeric', 'gt:0'],
+            'method' => ['nullable', 'in:cash,bank'],
+            'bank_ref' => ['nullable', 'string', 'max:255'],
+        ]);
+        $data['amount'] = Money::toPaisa($data['amount']);
+
+        return new PaymentResource($this->payments->payForTrip($transportTrip, $data));
     }
 }

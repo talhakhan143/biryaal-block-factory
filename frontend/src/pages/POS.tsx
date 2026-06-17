@@ -23,13 +23,15 @@ export default function POS() {
   const [type, setType] = useState<'cash' | 'credit'>('cash')
   const [customerId, setCustomerId] = useState('')
   const [discount, setDiscount] = useState('0')
+  const [transport, setTransport] = useState('0')
   const [paid, setPaid] = useState('0')
   const [method, setMethod] = useState('cash')
   const [bankRef, setBankRef] = useState('')
   const [receipt, setReceipt] = useState<Record<string, unknown> | null>(null)
 
   const subtotal = useMemo(() => cart.reduce((s, l) => s + l.product.sale_price * l.qty, 0), [cart])
-  const total = Math.max(0, subtotal - Number(discount) * 100)
+  const goodsNet = Math.max(0, subtotal - Number(discount) * 100)
+  const total = goodsNet + Number(transport) * 100
 
   const addToCart = (p: Product) => {
     setCart((c) => {
@@ -48,6 +50,7 @@ export default function POS() {
       setReceipt(res.data.data)
       setCart([])
       setDiscount('0')
+      setTransport('0')
       setPaid('0')
       setMethod('cash')
       setBankRef('')
@@ -62,6 +65,7 @@ export default function POS() {
       sale_date: new Date().toISOString().slice(0, 10),
       type,
       discount: Number(discount),
+      transport_fare: Number(transport),
       paid: type === 'credit' ? Number(paid) : undefined,
       payment_method: method,
       bank_ref: method === 'bank' ? bankRef : undefined,
@@ -146,12 +150,16 @@ export default function POS() {
           <Field label="Discount (Rs)">
             <MoneyInput value={discount} onChange={setDiscount} />
           </Field>
+          <Field label="Transport / kiraya (Rs) — customer deta hai">
+            <MoneyInput value={transport} onChange={setTransport} />
+          </Field>
 
           {(type === 'cash' || Number(paid) > 0) && (
             <MethodField method={method} bankRef={bankRef} onChange={(m, b) => { setMethod(m); setBankRef(b) }} />
           )}
 
           <div className="flex justify-between text-sm"><span>Subtotal</span><span>{formatPaisa(subtotal)}</span></div>
+          {Number(transport) > 0 && <div className="flex justify-between text-sm"><span>Transport (kiraya)</span><span>{formatPaisa(Number(transport) * 100)}</span></div>}
           <div className="flex justify-between text-lg font-bold"><span>Total</span><span>{formatPaisa(total)}</span></div>
 
           {sale.error && <p className="text-sm text-red-600">{apiError(sale.error)}</p>}

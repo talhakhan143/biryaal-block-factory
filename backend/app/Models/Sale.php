@@ -16,7 +16,7 @@ class Sale extends Model implements AuditableContract
 
     protected $fillable = [
         'invoice_no', 'customer_id', 'sale_date', 'type', 'subtotal',
-        'discount', 'total', 'paid', 'balance', 'status', 'payment_method',
+        'discount', 'transport_fare', 'total', 'paid', 'balance', 'status', 'payment_method',
         'bank_ref', 'notes', 'created_by',
     ];
 
@@ -24,6 +24,7 @@ class Sale extends Model implements AuditableContract
         'sale_date' => 'date',
         'subtotal' => 'integer',
         'discount' => 'integer',
+        'transport_fare' => 'integer',
         'total' => 'integer',
         'paid' => 'integer',
         'balance' => 'integer',
