@@ -3,7 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Customer;
 use App\Models\Driver;
+use App\Models\MaterialPurchase;
+use App\Models\Sale;
+use App\Models\Supplier;
 use App\Models\TransportTrip;
 use App\Services\Admin\SystemResetService;
 use Illuminate\Http\Request;
@@ -43,50 +47,104 @@ class SystemController extends Controller
     }
 
     /**
-     * Re-sync each transport trip's paid/balance/status to its driver's actual
-     * balance. Fixes rows left inconsistent by driver payments that were made
-     * before per-trip allocation existed. Idempotent.
+     * Re-sync source documents (transport trips, sale invoices, purchase bills)
+     * to their party's actual balance. Fixes rows left inconsistent by lump
+     * party payments made before per-document allocation existed. Idempotent.
      */
     public function reconcileTransport(Request $request)
     {
         abort_unless($request->user()?->hasAnyRole(['Super Admin', 'Owner']), 403, 'Sirf Owner / Super Admin yeh kar sakta hai.');
 
+        $trips = $this->reconcileTrips();
+        $sales = $this->reconcileSales();
+        $purchases = $this->reconcilePurchases();
+
+        return response()->json([
+            'message' => "Reconcile ho gaya — {$trips} trip(s), {$sales} sale(s), {$purchases} purchase(s) update hue.",
+            'trips_fixed' => $trips,
+            'sales_fixed' => $sales,
+            'purchases_fixed' => $purchases,
+        ]);
+    }
+
+    private function reconcileTrips(): int
+    {
         $fixed = 0;
 
         Driver::query()->get()->each(function (Driver $driver) use (&$fixed) {
             $trips = TransportTrip::where('driver_id', $driver->getKey())
-                ->orderBy('trip_date')
-                ->orderBy('created_at')
-                ->get();
-
+                ->orderBy('trip_date')->orderBy('created_at')->get();
             if ($trips->isEmpty()) {
                 return;
             }
 
-            // Amount already paid = total fares minus what the driver is still owed.
-            $totalRate = (int) $trips->sum('rate');
-            $remaining = max(0, $totalRate - (int) $driver->balance);
+            $remaining = max(0, (int) $trips->sum('rate') - (int) $driver->balance);
 
             foreach ($trips as $trip) {
                 $apply = min($remaining, (int) $trip->rate);
                 $status = $apply <= 0 ? 'unpaid' : ($apply >= (int) $trip->rate ? 'paid' : 'partial');
-
                 if ((int) $trip->paid !== $apply || $trip->status !== $status) {
-                    $trip->update([
-                        'paid' => $apply,
-                        'balance' => (int) $trip->rate - $apply,
-                        'status' => $status,
-                    ]);
+                    $trip->update(['paid' => $apply, 'balance' => (int) $trip->rate - $apply, 'status' => $status]);
                     $fixed++;
                 }
-
                 $remaining -= $apply;
             }
         });
 
-        return response()->json([
-            'message' => "Transport reconcile ho gaya — {$fixed} trip(s) update hue.",
-            'trips_fixed' => $fixed,
-        ]);
+        return $fixed;
+    }
+
+    private function reconcileSales(): int
+    {
+        $fixed = 0;
+
+        Customer::query()->get()->each(function (Customer $customer) use (&$fixed) {
+            $sales = Sale::where('customer_id', $customer->getKey())
+                ->orderBy('sale_date')->orderBy('created_at')->get();
+            if ($sales->isEmpty()) {
+                return;
+            }
+
+            $remaining = max(0, (int) $sales->sum('total') - (int) $customer->balance);
+
+            foreach ($sales as $sale) {
+                $apply = min($remaining, (int) $sale->total);
+                $status = $apply <= 0 ? 'unpaid' : ($apply >= (int) $sale->total ? 'paid' : 'partial');
+                if ((int) $sale->paid !== $apply || $sale->status !== $status) {
+                    $sale->update(['paid' => $apply, 'balance' => (int) $sale->total - $apply, 'status' => $status]);
+                    $fixed++;
+                }
+                $remaining -= $apply;
+            }
+        });
+
+        return $fixed;
+    }
+
+    private function reconcilePurchases(): int
+    {
+        $fixed = 0;
+
+        Supplier::query()->get()->each(function (Supplier $supplier) use (&$fixed) {
+            $purchases = MaterialPurchase::where('supplier_id', $supplier->getKey())
+                ->orderBy('purchase_date')->orderBy('created_at')->get();
+            if ($purchases->isEmpty()) {
+                return;
+            }
+
+            $remaining = max(0, (int) $purchases->sum('total_cost') - (int) $supplier->balance);
+
+            foreach ($purchases as $purchase) {
+                $apply = min($remaining, (int) $purchase->total_cost);
+                $status = $apply <= 0 ? 'unpaid' : ($apply >= (int) $purchase->total_cost ? 'paid' : 'partial');
+                if ((int) $purchase->paid_amount !== $apply || $purchase->payment_status !== $status) {
+                    $purchase->update(['paid_amount' => $apply, 'payment_status' => $status]);
+                    $fixed++;
+                }
+                $remaining -= $apply;
+            }
+        });
+
+        return $fixed;
     }
 }

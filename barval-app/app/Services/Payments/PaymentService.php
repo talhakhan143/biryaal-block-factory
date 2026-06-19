@@ -49,6 +49,11 @@ class PaymentService
 
             $customer->decrement('balance', $amount);
 
+            // A customer's dues are the sum of their unpaid sale invoices. Spread
+            // this receipt across those invoices (oldest first) so the Sales tab
+            // stays in sync with the customer's balance.
+            $this->allocateToCustomerSales($customer, $amount);
+
             $cashAccount = CashAccountResolver::code($data['method'] ?? 'cash');
             $this->ledger->post(
                 $data['payment_date'],
@@ -90,6 +95,10 @@ class PaymentService
             ]);
 
             $supplier->decrement('balance', $amount);
+
+            // Spread this payment across the supplier's unpaid purchase bills
+            // (oldest first) so the Purchases tab stays in sync.
+            $this->allocateToSupplierPurchases($supplier, $amount);
 
             $cashAccount = CashAccountResolver::code($data['method'] ?? 'cash');
             $this->ledger->post(
@@ -330,6 +339,64 @@ class PaymentService
                 'paid' => $paid,
                 'balance' => (int) $trip->rate - $paid,
                 'status' => $paid >= (int) $trip->rate ? 'paid' : ($paid > 0 ? 'partial' : 'unpaid'),
+            ]);
+
+            $remaining -= $apply;
+        }
+    }
+
+    /** Apply a lump customer receipt to their open sale invoices (oldest first). */
+    private function allocateToCustomerSales(Customer $customer, int $amount): void
+    {
+        $remaining = $amount;
+
+        $sales = Sale::where('customer_id', $customer->getKey())
+            ->where('balance', '>', 0)
+            ->orderBy('sale_date')
+            ->orderBy('created_at')
+            ->get();
+
+        foreach ($sales as $sale) {
+            if ($remaining <= 0) {
+                break;
+            }
+
+            $apply = min($remaining, (int) $sale->balance);
+            $paid = (int) $sale->paid + $apply;
+
+            $sale->update([
+                'paid' => $paid,
+                'balance' => (int) $sale->total - $paid,
+                'status' => $paid >= (int) $sale->total ? 'paid' : ($paid > 0 ? 'partial' : 'unpaid'),
+            ]);
+
+            $remaining -= $apply;
+        }
+    }
+
+    /** Apply a lump supplier payment to their open purchase bills (oldest first). */
+    private function allocateToSupplierPurchases(Supplier $supplier, int $amount): void
+    {
+        $remaining = $amount;
+
+        $purchases = MaterialPurchase::where('supplier_id', $supplier->getKey())
+            ->whereColumn('paid_amount', '<', 'total_cost')
+            ->orderBy('purchase_date')
+            ->orderBy('created_at')
+            ->get();
+
+        foreach ($purchases as $purchase) {
+            if ($remaining <= 0) {
+                break;
+            }
+
+            $due = (int) $purchase->total_cost - (int) $purchase->paid_amount;
+            $apply = min($remaining, $due);
+            $paid = (int) $purchase->paid_amount + $apply;
+
+            $purchase->update([
+                'paid_amount' => $paid,
+                'payment_status' => $paid >= (int) $purchase->total_cost ? 'paid' : ($paid > 0 ? 'partial' : 'unpaid'),
             ]);
 
             $remaining -= $apply;
