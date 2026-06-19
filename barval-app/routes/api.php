@@ -205,6 +205,8 @@ Route::prefix('v1')->group(function () {
 
         // DANGER — Super Admin hard reset (role checked inside controller)
         Route::post('system/reset', [SystemController::class, 'reset']);
+        // Maintenance — re-sync transport trips to driver balances
+        Route::post('system/reconcile-transport', [SystemController::class, 'reconcileTransport']);
 
         // Reports (PDF / Excel export)
         Route::middleware('permission:reports.view')->group(function () {
