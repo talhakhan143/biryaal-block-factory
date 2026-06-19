@@ -23,4 +23,16 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );
+
+        // Business-rule guards across the app throw InvalidArgumentException with a
+        // human-readable message (e.g. "ready stock kam hai", "credit sale needs a
+        // customer"). Surface that message to the user as a 422 instead of a generic
+        // 500 "Server Error", so they understand what went wrong.
+        $exceptions->render(function (\InvalidArgumentException $e, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+
+            return null;
+        });
     })->create();
