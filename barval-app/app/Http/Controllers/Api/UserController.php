@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Models\User;
@@ -11,17 +12,18 @@ use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
+    use HasTableQuery;
+
     public function index(Request $request)
     {
-        $users = User::query()
+        $query = User::query()
             ->with('roles')
             // Hide Super Admin (developer) accounts from everyone except another Super Admin.
-            ->unless($this->isSuperAdmin($request), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'Super Admin')))
-            ->when($request->search, fn ($q, $s) => $q->where('name', 'like', "%{$s}%")->orWhere('email', 'like', "%{$s}%"))
-            ->orderBy('name')
-            ->paginate($request->integer('per_page', 20));
+            ->unless($this->isSuperAdmin($request), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'Super Admin')));
 
-        return UserResource::collection($users);
+        $this->applyTableQuery($query, $request, ['name', 'email'], ['name', 'email'], 'name');
+
+        return UserResource::collection($query->paginate($request->integer('per_page', 20)));
     }
 
     public function roles(Request $request)

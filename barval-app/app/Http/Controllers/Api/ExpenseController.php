@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ExpenseResource;
 use App\Models\Expense;
@@ -11,18 +12,20 @@ use Illuminate\Http\Request;
 
 class ExpenseController extends Controller
 {
+    use HasTableQuery;
+
     public function __construct(private ExpenseService $service) {}
 
     public function index(Request $request)
     {
-        $expenses = Expense::query()
+        $query = Expense::query()
             ->when($request->category, fn ($q, $c) => $q->where('category', $c))
             ->when($request->from, fn ($q, $d) => $q->whereDate('expense_date', '>=', $d))
-            ->when($request->to, fn ($q, $d) => $q->whereDate('expense_date', '<=', $d))
-            ->latest('expense_date')
-            ->paginate($request->integer('per_page', 15));
+            ->when($request->to, fn ($q, $d) => $q->whereDate('expense_date', '<=', $d));
 
-        return ExpenseResource::collection($expenses);
+        $this->applyTableQuery($query, $request, ['expense_date', 'amount', 'category'], ['category', 'title', 'reference'], 'expense_date');
+
+        return ExpenseResource::collection($query->paginate($request->integer('per_page', 15)));
     }
 
     public function store(Request $request)

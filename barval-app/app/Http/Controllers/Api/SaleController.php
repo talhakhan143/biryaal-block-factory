@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreSaleRequest;
 use App\Http\Resources\PaymentResource;
@@ -14,22 +15,30 @@ use Illuminate\Http\Request;
 
 class SaleController extends Controller
 {
+    use HasTableQuery;
+
     public function __construct(private SaleService $service, private PaymentService $payments) {}
 
     public function index(Request $request)
     {
-        $sales = Sale::query()
+        $query = Sale::query()
             ->with('customer')
             ->when($request->customer_id, fn ($q, $id) => $q->where('customer_id', $id))
             ->when($request->type, fn ($q, $t) => $q->where('type', $t))
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
-            ->when($request->search, fn ($q, $s) => $q->where('invoice_no', 'like', "%{$s}%"))
             ->when($request->from, fn ($q, $d) => $q->whereDate('sale_date', '>=', $d))
-            ->when($request->to, fn ($q, $d) => $q->whereDate('sale_date', '<=', $d))
-            ->latest('sale_date')
-            ->paginate($request->integer('per_page', 15));
+            ->when($request->to, fn ($q, $d) => $q->whereDate('sale_date', '<=', $d));
 
-        return SaleResource::collection($sales);
+        $this->applyTableQuery(
+            $query,
+            $request,
+            sortable: ['sale_date', 'invoice_no', 'type', 'total', 'paid', 'balance', 'status'],
+            searchable: ['invoice_no'],
+            defaultSort: 'sale_date',
+            searchRelations: ['customer' => ['name']],
+        );
+
+        return SaleResource::collection($query->paginate($request->integer('per_page', 15)));
     }
 
     public function store(StoreSaleRequest $request)

@@ -19,6 +19,10 @@ class PaymentController extends Controller
 
     public function index(Request $request)
     {
+        $sortable = ['payment_date', 'amount', 'direction', 'method', 'reference'];
+        $sort = in_array($request->sort, $sortable, true) ? $request->sort : 'payment_date';
+        $dir = $request->dir === 'asc' ? 'asc' : 'desc';
+
         $payments = Payment::query()
             ->with('party')
             ->when($request->search, function ($q, $s) {
@@ -32,7 +36,8 @@ class PaymentController extends Controller
             ->when($request->direction, fn ($q, $d) => $q->where('direction', $d))
             ->when($request->from, fn ($q, $d) => $q->whereDate('payment_date', '>=', $d))
             ->when($request->to, fn ($q, $d) => $q->whereDate('payment_date', '<=', $d))
-            ->latest('payment_date')
+            ->orderBy($sort, $dir)
+            ->orderBy('created_at', 'desc')
             ->paginate($request->integer('per_page', 15));
 
         return PaymentResource::collection($payments);

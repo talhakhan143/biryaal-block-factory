@@ -2,19 +2,24 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use OwenIt\Auditing\Models\Audit;
 
 class AuditController extends Controller
 {
+    use HasTableQuery;
+
     public function index(Request $request)
     {
-        $audits = Audit::query()
+        $query = Audit::query()
             ->with('user')
-            ->when($request->event, fn ($q, $e) => $q->where('event', $e))
-            ->latest()
-            ->paginate($request->integer('per_page', 30));
+            ->when($request->event, fn ($q, $e) => $q->where('event', $e));
+
+        $this->applyTableQuery($query, $request, ['created_at', 'event', 'auditable_type'], ['event', 'auditable_type'], 'created_at', ['user' => ['name']]);
+
+        $audits = $query->paginate($request->integer('per_page', 30));
 
         $audits->getCollection()->transform(fn (Audit $a) => [
             'id' => $a->id,
@@ -26,6 +31,13 @@ class AuditController extends Controller
             'created_at' => $a->created_at,
         ]);
 
-        return response()->json($audits);
+        return response()->json([
+            'data' => $audits->getCollection(),
+            'meta' => [
+                'current_page' => $audits->currentPage(),
+                'last_page' => $audits->lastPage(),
+                'total' => $audits->total(),
+            ],
+        ]);
     }
 }

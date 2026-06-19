@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
 use App\Models\FinishedGoodsStock;
@@ -11,14 +12,17 @@ use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
+    use HasTableQuery;
+
     public function index(Request $request)
     {
-        $products = Product::query()
+        $query = Product::query()
             ->with('stock')
-            ->when($request->search, fn ($q, $s) => $q->where('name', 'like', "%{$s}%")->orWhere('sku', 'like', "%{$s}%"))
-            ->when($request->boolean('active_only'), fn ($q) => $q->where('is_active', true))
-            ->orderBy('name')
-            ->paginate($request->integer('per_page', 50));
+            ->when($request->boolean('active_only'), fn ($q) => $q->where('is_active', true));
+
+        $this->applyTableQuery($query, $request, ['name', 'sale_price', 'unit'], ['name', 'sku'], 'name');
+
+        $products = $query->paginate($request->integer('per_page', 50));
 
         return ProductResource::collection($products);
     }
