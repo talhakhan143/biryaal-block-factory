@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SalesReturnController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\SupplierController;
+use App\Http\Controllers\Api\SystemController;
 use App\Http\Controllers\Api\TransportController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VehicleController;
@@ -201,6 +202,9 @@ Route::prefix('v1')->group(function () {
 
         // Audit logs
         Route::get('audits', [AuditController::class, 'index'])->middleware('permission:audit.view');
+
+        // DANGER — Super Admin hard reset (role checked inside controller)
+        Route::post('system/reset', [SystemController::class, 'reset']);
 
         // Reports (PDF / Excel export)
         Route::middleware('permission:reports.view')->group(function () {

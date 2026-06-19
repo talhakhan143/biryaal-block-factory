@@ -4,7 +4,8 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, Spinner, Table } from '../components/ui'
+import { BookText, Trash2, Wallet } from 'lucide-react'
+import { Badge, Button, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Spinner, Table, useConfirm } from '../components/ui'
 
 interface Driver {
   id: string
@@ -18,6 +19,7 @@ interface Driver {
 
 export default function Drivers() {
   const { can } = useAuth()
+  const confirm = useConfirm()
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
   const [search, setSearch] = useState('')
@@ -56,10 +58,16 @@ export default function Drivers() {
               <td className="px-4 py-3">{d.phone ?? '—'}</td>
               <td className="px-4 py-3">{d.vehicle_name ? `${d.vehicle_name}${d.vehicle_plate ? ` (${d.vehicle_plate})` : ''}` : '—'}</td>
               <td className="px-4 py-3">{d.balance > 0 ? <Badge color="red">{formatPaisa(d.balance)}</Badge> : <Badge color="green">Settled</Badge>}</td>
-              <td className="px-4 py-3 text-right space-x-3">
-                <button className="text-sm text-blue-600 hover:underline" onClick={() => setLedgerId(d.id)}>Ledger</button>
-                {can('payments.manage') && <button className="text-sm text-blue-600 hover:underline" onClick={() => setPayId(d.id)}>Pay</button>}
-                {can('transport.manage') && <button className="text-sm hover:underline" style={{ color: 'var(--red)' }} onClick={() => { if (confirm(`Delete ${d.name}?`)) del.mutate(d.id) }}>Delete</button>}
+              <td className="px-4 py-3">
+                <RowActions>
+                  <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(d.id)} />
+                  {can('payments.manage') && <IconButton icon={Wallet} label="Pay driver" tone="primary" onClick={() => setPayId(d.id)} />}
+                  {can('transport.manage') && (
+                    <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
+                      if (await confirm({ title: 'Driver delete karein?', message: `"${d.name}" delete ho jayega. Yeh wapas nahi aayega.`, confirmText: 'Delete' })) del.mutate(d.id)
+                    }} />
+                  )}
+                </RowActions>
               </td>
             </tr>
           ))}

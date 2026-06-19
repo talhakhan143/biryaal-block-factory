@@ -4,7 +4,8 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Trash2, Wallet } from 'lucide-react'
+import { Badge, Button, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select, Spinner, Table, useConfirm } from '../components/ui'
 
 interface Staff {
   id: string
@@ -27,6 +28,7 @@ const statusColor: Record<string, string> = { paid: 'green', partial: 'amber', u
 
 export default function StaffPage() {
   const { can } = useAuth()
+  const confirm = useConfirm()
   const qc = useQueryClient()
   const [addStaff, setAddStaff] = useState(false)
   const [genSalary, setGenSalary] = useState(false)
@@ -51,8 +53,14 @@ export default function StaffPage() {
                 <td className="px-4 py-3 font-medium">{s.name}</td>
                 <td className="px-4 py-3">{s.role ?? '—'}</td>
                 <td className="px-4 py-3">{formatPaisa(s.monthly_salary)}</td>
-                <td className="px-4 py-3 text-right">
-                  {can('hr.manage') && <button className="text-sm hover:underline" style={{ color: 'var(--red)' }} onClick={() => { if (confirm(`Delete ${s.name}?`)) delStaff.mutate(s.id) }}>Delete</button>}
+                <td className="px-4 py-3">
+                  {can('hr.manage') && (
+                    <RowActions>
+                      <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
+                        if (await confirm({ title: 'Staff delete karein?', message: `"${s.name}" delete ho jayega.`, confirmText: 'Delete' })) delStaff.mutate(s.id)
+                      }} />
+                    </RowActions>
+                  )}
                 </td>
               </tr>
             ))}
@@ -73,8 +81,12 @@ export default function StaffPage() {
                 <td className="px-4 py-3">{formatPaisa(s.paid)}</td>
                 <td className="px-4 py-3">{formatPaisa(s.balance)}</td>
                 <td className="px-4 py-3"><Badge color={statusColor[s.status]}>{s.status}</Badge></td>
-                <td className="px-4 py-3 text-right">
-                  {can('hr.manage') && s.status !== 'paid' && <button className="text-sm text-blue-600 hover:underline" onClick={() => setPayId(s.id)}>Pay</button>}
+                <td className="px-4 py-3">
+                  {can('hr.manage') && s.status !== 'paid' && (
+                    <RowActions>
+                      <IconButton icon={Wallet} label="Pay salary" tone="primary" onClick={() => setPayId(s.id)} />
+                    </RowActions>
+                  )}
                 </td>
               </tr>
             ))}

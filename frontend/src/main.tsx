@@ -7,6 +7,7 @@ import App from './App'
 import { AuthProvider } from './lib/auth'
 import { ThemeProvider } from './lib/theme'
 import { LangProvider } from './lib/lang'
+import { ConfirmProvider } from './components/ui'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -19,7 +20,9 @@ createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <AuthProvider>
-            <App />
+            <ConfirmProvider>
+              <App />
+            </ConfirmProvider>
           </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>

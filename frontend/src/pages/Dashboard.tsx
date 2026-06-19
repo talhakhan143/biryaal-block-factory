@@ -20,7 +20,9 @@ interface DashboardData {
   low_ready_alerts: { id: string; name: string; ready_qty: number; threshold: number }[]
 }
 
-function Stat({ label, hint, value, tone = 'text', to }: { label: string; hint: string; value: string; tone?: string; to?: string }) {
+type Tone = 'text' | 'green' | 'red' | 'primary' | 'amber'
+
+function Stat({ label, hint, value, tone = 'text', to }: { label: string; hint: string; value: string; tone?: Tone; to?: string }) {
   const navigate = useNavigate()
   const colorVar: Record<string, string> = {
     text: 'var(--text)',
@@ -29,20 +31,16 @@ function Stat({ label, hint, value, tone = 'text', to }: { label: string; hint: 
     primary: 'var(--primary)',
     amber: 'var(--amber)',
   }
+  const accent = tone === 'text' ? undefined : (tone as 'green' | 'red' | 'primary' | 'amber')
   return (
-    <div
-      onClick={to ? () => navigate(to) : undefined}
-      className={to ? 'cursor-pointer transition hover:-translate-y-0.5' : ''}
-    >
-      <Card>
-        <div className="flex items-center justify-between">
-          <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{label}</div>
-          {to && <span style={{ color: 'var(--muted)' }}>›</span>}
-        </div>
-        <div className="text-[10px]" style={{ color: 'var(--muted)' }}>{hint}</div>
-        <div className="mt-2 text-2xl font-bold" style={{ color: colorVar[tone] }}>{value}</div>
-      </Card>
-    </div>
+    <Card hover accent={accent} onClick={to ? () => navigate(to) : undefined} className="pl-6">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{label}</div>
+        {to && <span className="text-lg leading-none" style={{ color: 'var(--muted)' }}>›</span>}
+      </div>
+      <div className="text-[10px]" style={{ color: 'var(--muted)' }}>{hint}</div>
+      <div className="mt-2 text-2xl font-bold tracking-tight" style={{ color: colorVar[tone] }}>{value}</div>
+    </Card>
   )
 }
 
@@ -62,7 +60,6 @@ export default function Dashboard() {
 
   if (isLoading || !data) return <Spinner />
 
-  const b = data.payable_breakdown
   const d = data.due_counts
 
   return (
@@ -71,25 +68,16 @@ export default function Dashboard() {
 
       {/* Money position */}
       <SectionTitle title="Paisa" note="cash position" />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Cash in hand" hint="Cash mojood · click for cash book" value={formatPaisa(data.cash_in_hand)} tone={data.cash_in_hand < 0 ? 'red' : 'green'} to="/cash-book" />
         <Stat label="Bank balance" hint="Bank me · click for cash book" value={formatPaisa(data.bank_balance)} tone={data.bank_balance < 0 ? 'red' : 'primary'} to="/cash-book" />
-        <Stat label="Receivables" hint={`${d.customers} customers ne dene hain`} value={formatPaisa(data.receivables)} tone="primary" to="/payments" />
+        <Stat label="Receivables" hint={`${d.customers} customers se lene hain · click for list`} value={formatPaisa(data.receivables)} tone="primary" to="/payments" />
         <Stat label="Payables" hint={`${d.suppliers + d.drivers + d.labourers} ko dene hain · click for list`} value={formatPaisa(data.payables)} tone="red" to="/payments" />
-      </div>
-
-      {/* Payables breakdown */}
-      <SectionTitle title="Dene baqi (kis ko kitna)" note="payables breakdown" />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Suppliers" hint={`${d.suppliers} maal walay`} value={formatPaisa(b.suppliers)} tone="red" to="/payments" />
-        <Stat label="Drivers" hint={`${d.drivers} driver`} value={formatPaisa(b.drivers)} tone="red" to="/payments" />
-        <Stat label="Labourers" hint={`${d.labourers} mazdoor`} value={formatPaisa(b.labourers)} tone="red" to="/payments" />
-        <Stat label="Staff salaries" hint="Baqi tankhwah" value={formatPaisa(b.staff)} tone="red" to="/payments" />
       </div>
 
       {/* Today */}
       <SectionTitle title="Aaj" note="today" />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Today Sales" hint="Aaj ki bikri (Rs)" value={formatPaisa(data.today.sales_total)} tone="green" to="/sales" />
         <Stat label="Today Expenses" hint="Aaj ke kharchay" value={formatPaisa(data.today.expenses_total)} tone="red" to="/expenses" />
         <Stat label="Money In" hint="Aaj paisa aaya" value={formatPaisa(data.today.money_in)} tone="green" to="/payments" />
@@ -102,7 +90,7 @@ export default function Dashboard() {
 
       {/* This month */}
       <SectionTitle title={`Is mahine (${data.month.label})`} note="month P&L" />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Month Sales" hint="Is mahine bikri" value={formatPaisa(data.month.sales_total)} tone="green" to="/sales" />
         <Stat label="Month Expenses" hint="Is mahine kharch" value={formatPaisa(data.month.expenses_total)} tone="red" to="/expenses" />
         <Stat label="Net Profit" hint="Maal bikri − kharch" value={formatPaisa(data.month.net_profit)} tone={data.month.net_profit < 0 ? 'red' : 'green'} to="/reports" />
@@ -111,7 +99,7 @@ export default function Dashboard() {
 
       {/* Lifetime */}
       <SectionTitle title="Ab tak" note="lifetime totals" />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Total Production" hint="Ab tak banaye blocks" value={`${data.totals.production} pcs`} tone="primary" to="/production" />
         <Stat label="Total Sold" hint="Ab tak bik'e blocks" value={`${data.totals.sold} pcs`} tone="green" to="/sales" />
         <Stat label="Remaining Ready" hint="Bechne ke liye baqi" value={`${data.stock.ready} pcs`} tone="green" to="/inventory" />

@@ -4,7 +4,8 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, Modal, MoneyInput, PageHeader, Spinner, Table } from '../components/ui'
+import { SquarePen, Trash2 } from 'lucide-react'
+import { Badge, Button, Field, IconButton, Input, Modal, MoneyInput, PageHeader, RowActions, Spinner, Table, useConfirm } from '../components/ui'
 
 interface Product {
   id: string
@@ -20,6 +21,7 @@ interface Product {
 
 export default function Products() {
   const { can } = useAuth()
+  const confirm = useConfirm()
   const qc = useQueryClient()
   const [editing, setEditing] = useState<Product | null>(null)
   const [creating, setCreating] = useState(false)
@@ -41,7 +43,7 @@ export default function Products() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
     onError: (e) => alert(apiError(e)),
   })
-  const remove = (id: string, name: string) => { if (confirm(`Delete "${name}"? Wapas nahi aayega.`)) del.mutate(id) }
+  const remove = async (id: string, name: string) => { if (await confirm({ title: 'Product delete karein?', message: `"${name}" delete ho jayega. Wapas nahi aayega.`, confirmText: 'Delete' })) del.mutate(id) }
 
   return (
     <div>
@@ -62,9 +64,11 @@ export default function Products() {
               <td className="px-4 py-3">{p.default_curing_days} din</td>
               <td className="px-4 py-3">{formatPaisa(p.sale_price)}</td>
               <td className="px-4 py-3">{p.is_active ? <Badge color="green">Active</Badge> : <Badge color="slate">Off</Badge>}</td>
-              <td className="px-4 py-3 text-right space-x-3">
-                {manage && <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => setEditing(p)}>Edit</button>}
-                {manage && <button className="text-sm hover:underline" style={{ color: 'var(--red)' }} onClick={() => remove(p.id, p.name)}>Delete</button>}
+              <td className="px-4 py-3">
+                <RowActions>
+                  {manage && <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(p)} />}
+                  {manage && <IconButton icon={Trash2} label="Delete" tone="red" onClick={() => remove(p.id, p.name)} />}
+                </RowActions>
               </td>
             </tr>
           ))}

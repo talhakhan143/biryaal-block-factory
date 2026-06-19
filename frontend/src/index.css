@@ -60,6 +60,52 @@ body {
 table tbody tr { border-top: 1px solid var(--border); }
 table tbody tr:hover { background: var(--surface-hover); }
 
+/* ===== Animations (professional, subtle) ===== */
+@keyframes bf-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes bf-pop {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes bf-slide-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes bf-zoom-in {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes bf-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.bf-fade        { animation: bf-fade 0.18s ease-out both; }
+.bf-pop         { animation: bf-pop 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.bf-slide-up    { animation: bf-slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.bf-zoom        { animation: bf-zoom-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* stagger helper for grids of cards */
+.bf-stagger > * { animation: bf-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.bf-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.bf-stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.bf-stagger > *:nth-child(3) { animation-delay: 0.10s; }
+.bf-stagger > *:nth-child(4) { animation-delay: 0.14s; }
+.bf-stagger > *:nth-child(5) { animation-delay: 0.18s; }
+.bf-stagger > *:nth-child(6) { animation-delay: 0.22s; }
+.bf-stagger > *:nth-child(7) { animation-delay: 0.26s; }
+.bf-stagger > *:nth-child(8) { animation-delay: 0.30s; }
+
+/* card hover lift */
+.bf-lift { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
+.bf-lift:hover { transform: translateY(-3px); box-shadow: 0 12px 28px -12px rgba(0,0,0,0.45); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-fade, .bf-pop, .bf-slide-up, .bf-zoom, .bf-stagger > *, .bf-lift { animation: none !important; transition: none !important; }
+}
+
 @media print {
   .no-print { display: none !important; }
   body { background: #fff; color: #000; }

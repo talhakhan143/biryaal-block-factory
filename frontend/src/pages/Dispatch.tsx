@@ -4,7 +4,8 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Card, Field, Input, MethodField, Modal, MoneyInput, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
+import { FileText } from 'lucide-react'
+import { Badge, Button, Card, Field, IconButton, Input, MethodField, Modal, MoneyInput, PageHeader, Pagination, RowActions, Select, Spinner, Table } from '../components/ui'
 
 interface Dispatch {
   id: string
@@ -116,8 +117,10 @@ export default function DispatchPage() {
                 <td className="px-4 py-3">{d.vehicle?.name ?? '—'}</td>
                 <td className="px-4 py-3">{d.driver?.name ?? '—'}</td>
                 <td className="px-4 py-3"><Badge color={d.status === 'delivered' ? 'green' : 'amber'}>{d.status}</Badge></td>
-                <td className="px-4 py-3 text-right">
-                  <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => setChallanId(d.id)}>Challan</button>
+                <td className="px-4 py-3">
+                  <RowActions>
+                    <IconButton icon={FileText} label="Challan" tone="primary" onClick={() => setChallanId(d.id)} />
+                  </RowActions>
                 </td>
               </tr>
             ))}

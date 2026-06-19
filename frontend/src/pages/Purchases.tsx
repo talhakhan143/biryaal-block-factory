@@ -4,7 +4,8 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
+import { Wallet } from 'lucide-react'
+import { Badge, Button, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Select, Spinner, Table } from '../components/ui'
 
 interface Purchase {
   id: string
@@ -64,9 +65,11 @@ export default function Purchases() {
               <td className="px-4 py-3">{p.quantity}</td>
               <td className="px-4 py-3">{formatPaisa(p.total_cost)}</td>
               <td className="px-4 py-3"><Badge color={statusColor[p.payment_status]}>{p.payment_status}</Badge></td>
-              <td className="px-4 py-3 text-right">
+              <td className="px-4 py-3">
                 {can('payments.manage') && p.payment_status !== 'paid' && (
-                  <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => setPayFor(p)}>Pay</button>
+                  <RowActions>
+                    <IconButton icon={Wallet} label="Pay" tone="primary" onClick={() => setPayFor(p)} />
+                  </RowActions>
                 )}
               </td>
             </tr>

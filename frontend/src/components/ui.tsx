@@ -1,4 +1,5 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react'
+import { createContext, useCallback, useContext, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
+import { AlertTriangle, X, type LucideIcon } from 'lucide-react'
 
 export function Button({
   variant = 'primary',
@@ -24,12 +25,31 @@ export function Button({
   return <button className={`${base} ${styles[variant]} ${className}`} style={style} {...props} />
 }
 
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function Card({
+  children,
+  className = '',
+  hover = false,
+  accent,
+  onClick,
+}: {
+  children: ReactNode
+  className?: string
+  hover?: boolean
+  accent?: 'primary' | 'green' | 'red' | 'amber'
+  onClick?: () => void
+}) {
+  const accentColor = accent
+    ? { primary: 'var(--primary)', green: 'var(--green)', red: 'var(--red)', amber: 'var(--amber)' }[accent]
+    : undefined
   return (
     <div
-      className={`rounded-xl border p-5 shadow-sm ${className}`}
+      onClick={onClick}
+      className={`relative overflow-hidden rounded-xl border p-5 shadow-sm ${hover || onClick ? 'bf-lift cursor-pointer' : ''} ${className}`}
       style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
     >
+      {accentColor && (
+        <span className="absolute inset-y-0 left-0 w-1" style={{ background: accentColor }} aria-hidden />
+      )}
       {children}
     </div>
   )
@@ -144,16 +164,26 @@ export function Table({ head, children }: { head: string[]; children: ReactNode 
   )
 }
 
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Modal({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="bf-fade fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-xl border p-6 shadow-2xl"
+        className={`bf-pop w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-2xl border shadow-2xl`}
         style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-lg font-bold" style={{ color: 'var(--text)' }}>{title}</h2>
-        {children}
+        <div className="flex items-center justify-between border-b px-6 py-4" style={{ borderColor: 'var(--border)' }}>
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{title}</h2>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-[var(--surface-hover)]"
+            style={{ color: 'var(--muted)' }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="max-h-[75vh] overflow-y-auto p-6">{children}</div>
       </div>
     </div>
   )
@@ -248,4 +278,112 @@ export function OutstandingNote({ label, amount, onFill }: { label: string; amou
 /** Themed table row helpers reused across pages. */
 export function Row({ children }: { children: ReactNode }) {
   return <tr className="transition hover:bg-[var(--surface-hover)]" style={{ borderTop: '1px solid var(--border)' }}>{children}</tr>
+}
+
+/**
+ * Compact icon action button for table rows (Edit / Delete / Ledger / Pay).
+ * Tone tints the icon and gives a matching soft hover — looks VIP, no childish text links.
+ */
+export function IconButton({
+  icon: Icon,
+  label,
+  tone = 'default',
+  onClick,
+}: {
+  icon: LucideIcon
+  label: string
+  tone?: 'default' | 'primary' | 'green' | 'red' | 'amber'
+  onClick: () => void
+}) {
+  const color: Record<string, string> = {
+    default: 'var(--muted)',
+    primary: 'var(--primary)',
+    green: 'var(--green)',
+    red: 'var(--red)',
+    amber: 'var(--amber)',
+  }
+  const c = color[tone]
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition hover:-translate-y-0.5"
+      style={{ borderColor: 'var(--border)', color: c, background: 'var(--surface-2)' }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = `color-mix(in srgb, ${c} 16%, transparent)`; e.currentTarget.style.borderColor = c }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.borderColor = 'var(--border)' }}
+    >
+      <Icon size={14} />
+      <span>{label}</span>
+    </button>
+  )
+}
+
+/** Wrap row action icons so they sit together, right-aligned. */
+export function RowActions({ children }: { children: ReactNode }) {
+  return <div className="flex items-center justify-end gap-1.5">{children}</div>
+}
+
+// ===== Animated confirm dialog (replaces window.confirm everywhere) =====
+interface ConfirmOptions {
+  title?: string
+  message: ReactNode
+  confirmText?: string
+  cancelText?: string
+  tone?: 'danger' | 'primary'
+}
+type ConfirmFn = (opts: ConfirmOptions) => Promise<boolean>
+const ConfirmContext = createContext<ConfirmFn>(async () => false)
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useConfirm() {
+  return useContext(ConfirmContext)
+}
+
+export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<{ opts: ConfirmOptions; resolve: (v: boolean) => void } | null>(null)
+
+  const confirm = useCallback<ConfirmFn>((opts) => new Promise<boolean>((resolve) => setState({ opts, resolve })), [])
+
+  const close = (val: boolean) => {
+    state?.resolve(val)
+    setState(null)
+  }
+
+  const o = state?.opts
+  const danger = (o?.tone ?? 'danger') === 'danger'
+  const accent = danger ? 'var(--red)' : 'var(--primary)'
+
+  return (
+    <ConfirmContext.Provider value={confirm}>
+      {children}
+      {state && (
+        <div className="bf-fade fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => close(false)}>
+          <div
+            className="bf-pop w-full max-w-sm rounded-2xl border p-6 shadow-2xl"
+            style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-4">
+              <div
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+                style={{ background: `color-mix(in srgb, ${accent} 16%, transparent)`, color: accent }}
+              >
+                <AlertTriangle size={22} />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-base font-bold" style={{ color: 'var(--text)' }}>{o?.title ?? 'Confirm karein'}</h3>
+                <div className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>{o?.message}</div>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => close(false)}>{o?.cancelText ?? 'Cancel'}</Button>
+              <Button variant={danger ? 'danger' : 'primary'} onClick={() => close(true)}>{o?.confirmText ?? 'Confirm'}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </ConfirmContext.Provider>
+  )
 }

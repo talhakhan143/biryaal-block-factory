@@ -103,9 +103,9 @@ export default function Layout() {
         className="no-print flex w-64 shrink-0 flex-col border-r"
         style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
       >
-        <div className="flex items-center justify-center border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}>
-          <div className="w-full rounded-xl bg-white p-3">
-            <img src="/logo.png" alt="Barval Block Factory" className="mx-auto block max-h-28 w-full object-contain" />
+        <div className="border-b px-4 py-4" style={{ borderColor: 'var(--border)' }}>
+          <div className="flex items-center justify-center rounded-xl bg-white px-3 py-2 shadow-sm">
+            <img src="/logo.png" alt="Barval Block Factory" className="block h-28 w-auto max-w-full object-contain" />
           </div>
         </div>
 

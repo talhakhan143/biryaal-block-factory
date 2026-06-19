@@ -27,3 +27,5 @@ node_modules
 .idea
 .vscode
 *.swp
+# Added by code-review-graph
+.code-review-graph/

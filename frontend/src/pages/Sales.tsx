@@ -4,7 +4,8 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, Spinner, Table } from '../components/ui'
+import { Eye, HandCoins, Trash2 } from 'lucide-react'
+import { Badge, Button, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Spinner, Table, useConfirm } from '../components/ui'
 
 interface Sale {
   id: string
@@ -22,6 +23,7 @@ const statusColor: Record<string, string> = { paid: 'green', partial: 'amber', u
 
 export default function Sales() {
   const { can } = useAuth()
+  const confirm = useConfirm()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -66,22 +68,18 @@ export default function Sales() {
               <td className="px-4 py-3">{formatPaisa(s.paid)}</td>
               <td className="px-4 py-3">{formatPaisa(s.balance)}</td>
               <td className="px-4 py-3"><Badge color={statusColor[s.status]}>{s.status}</Badge></td>
-              <td className="px-4 py-3 text-right space-x-3">
-                {can('payments.manage') && s.balance > 0 && (
-                  <button className="text-sm hover:underline" style={{ color: 'var(--green)' }} onClick={() => setReceiveFor(s)}>Receive</button>
-                )}
-                <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => setViewId(s.id)}>
-                  View / Print
-                </button>
-                {can('sales.manage') && (
-                  <button
-                    className="text-sm hover:underline"
-                    style={{ color: 'var(--red)' }}
-                    onClick={() => { if (confirm(`Invoice ${s.invoice_no} delete karein? Stock wapas ready me chala jayega.`)) del.mutate(s.id) }}
-                  >
-                    Delete
-                  </button>
-                )}
+              <td className="px-4 py-3">
+                <RowActions>
+                  {can('payments.manage') && s.balance > 0 && (
+                    <IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => setReceiveFor(s)} />
+                  )}
+                  <IconButton icon={Eye} label="View" tone="primary" onClick={() => setViewId(s.id)} />
+                  {can('sales.manage') && (
+                    <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
+                      if (await confirm({ title: 'Invoice delete karein?', message: `Invoice ${s.invoice_no} delete ho jayega. Stock wapas ready me chala jayega.`, confirmText: 'Delete' })) del.mutate(s.id)
+                    }} />
+                  )}
+                </RowActions>
               </td>
             </tr>
           ))}

@@ -4,7 +4,8 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, Modal, PageHeader, Pagination, Spinner, Table } from '../components/ui'
+import { BookText, Power, PowerOff, Trash2 } from 'lucide-react'
+import { Badge, Button, Field, IconButton, Input, Modal, PageHeader, Pagination, RowActions, Spinner, Table, useConfirm } from '../components/ui'
 
 interface Supplier {
   id: string
@@ -17,6 +18,7 @@ interface Supplier {
 
 export default function Suppliers() {
   const { can } = useAuth()
+  const confirm = useConfirm()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -72,20 +74,18 @@ export default function Suppliers() {
               <td className="px-4 py-3">
                 {s.is_active ? <Badge color="green">Active</Badge> : <Badge color="amber">Off</Badge>}
               </td>
-              <td className="px-4 py-3 text-right space-x-3">
-                <button className="text-sm text-blue-600 hover:underline" onClick={() => setLedgerId(s.id)}>
-                  Ledger
-                </button>
-                {can('suppliers.manage') && (
-                  <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => toggle.mutate(s)}>
-                    {s.is_active ? 'Deactivate' : 'Activate'}
-                  </button>
-                )}
-                {can('suppliers.manage') && (
-                  <button className="text-sm hover:underline" style={{ color: 'var(--red)' }} onClick={() => { if (confirm(`Delete supplier ${s.name}?`)) del.mutate(s.id) }}>
-                    Delete
-                  </button>
-                )}
+              <td className="px-4 py-3">
+                <RowActions>
+                  <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(s.id)} />
+                  {can('suppliers.manage') && (
+                    <IconButton icon={s.is_active ? PowerOff : Power} label={s.is_active ? 'Deactivate' : 'Activate'} tone="amber" onClick={() => toggle.mutate(s)} />
+                  )}
+                  {can('suppliers.manage') && (
+                    <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
+                      if (await confirm({ title: 'Supplier delete karein?', message: `"${s.name}" delete ho jayega.`, confirmText: 'Delete' })) del.mutate(s.id)
+                    }} />
+                  )}
+                </RowActions>
               </td>
             </tr>
           ))}

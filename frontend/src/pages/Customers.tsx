@@ -4,7 +4,8 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, Spinner, Table } from '../components/ui'
+import { BookText, HandCoins } from 'lucide-react'
+import { Badge, Button, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Spinner, Table } from '../components/ui'
 
 interface Customer {
   id: string
@@ -62,15 +63,13 @@ export default function Customers() {
               <td className="px-4 py-3">
                 {c.balance > 0 ? <Badge color="amber">{formatPaisa(c.balance)}</Badge> : <Badge color="green">Settled</Badge>}
               </td>
-              <td className="px-4 py-3 text-right space-x-3">
-                {can('payments.manage') && c.balance > 0 && (
-                  <button className="text-sm hover:underline" style={{ color: 'var(--green)' }} onClick={() => setReceiveFor(c)}>
-                    Receive
-                  </button>
-                )}
-                <button className="text-sm text-blue-600 hover:underline" onClick={() => setLedgerId(c.id)}>
-                  Ledger
-                </button>
+              <td className="px-4 py-3">
+                <RowActions>
+                  {can('payments.manage') && c.balance > 0 && (
+                    <IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => setReceiveFor(c)} />
+                  )}
+                  <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(c.id)} />
+                </RowActions>
               </td>
             </tr>
           ))}

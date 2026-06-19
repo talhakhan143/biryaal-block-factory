@@ -4,7 +4,8 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
+import { HandCoins, Wallet } from 'lucide-react'
+import { Badge, Button, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Select, Spinner, Table } from '../components/ui'
 
 interface Payment {
   id: string
@@ -37,6 +38,7 @@ export default function Payments() {
   const [settle, setSettle] = useState<Payable | null>(null)
   const [page, setPage] = useState(1)
   const [recvPage, setRecvPage] = useState(1)
+  const [payPage, setPayPage] = useState(1)
   const [search, setSearch] = useState('')
   const { data, isLoading } = useList<Payment>('payments', { page, search })
   const recv = useList<Party>('customers', { has_dues: 1, page: recvPage })
@@ -64,6 +66,12 @@ export default function Payments() {
 
   const open = (kind: 'receipt' | 'supplier', partyId = '') => { setPreset(partyId); setModal(kind) }
 
+  // Payables come as one full list — paginate on the client so the page never grows endless.
+  const PAY_PER = 10
+  const payAll = payables.data ?? []
+  const payMeta = { current_page: payPage, last_page: Math.max(1, Math.ceil(payAll.length / PAY_PER)), total: payAll.length }
+  const payRows = payAll.slice((payPage - 1) * PAY_PER, payPage * PAY_PER)
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -72,8 +80,8 @@ export default function Payments() {
         actions={
           can('payments.manage') && (
             <>
-              <Button variant="ghost" onClick={() => open('supplier')}>Pay Supplier</Button>
-              <Button onClick={() => open('receipt')}>Receive Payment</Button>
+              <Button variant="ghost" onClick={() => open('supplier')}><Wallet size={16} /> Pay Supplier</Button>
+              <Button onClick={() => open('receipt')}><HandCoins size={16} /> Receive Payment</Button>
             </>
           )
         }
@@ -87,8 +95,12 @@ export default function Payments() {
             <tr key={c.id}>
               <td className="px-4 py-3 font-medium">{c.name}</td>
               <td className="px-4 py-3"><Badge color="amber">{formatPaisa(c.balance)}</Badge></td>
-              <td className="px-4 py-3 text-right">
-                {can('payments.manage') && <button className="text-sm hover:underline" style={{ color: 'var(--green)' }} onClick={() => open('receipt', c.id)}>Receive</button>}
+              <td className="px-4 py-3">
+                {can('payments.manage') && (
+                  <RowActions>
+                    <IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => open('receipt', c.id)} />
+                  </RowActions>
+                )}
               </td>
             </tr>
           ))}
@@ -101,19 +113,26 @@ export default function Payments() {
       <div>
         <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Dene baqi (sab ko) <span className="font-normal" style={{ color: 'var(--muted)' }}>— payables: suppliers, drivers, mazdoor, staff</span></h2>
         {payables.isLoading ? <Spinner /> : (
-          <Table head={['Kis ko', 'Type', 'Baqi (dene hain)', '']}>
-            {payables.data?.map((p) => (
-              <tr key={`${p.type}-${p.id}`}>
-                <td className="px-4 py-3 font-medium">{p.name}</td>
-                <td className="px-4 py-3"><Badge color="slate">{typeLabel[p.type]}</Badge></td>
-                <td className="px-4 py-3"><Badge color="red">{formatPaisa(p.balance)}</Badge></td>
-                <td className="px-4 py-3 text-right">
-                  {can('payments.manage') && <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => setSettle(p)}>Pay</button>}
-                </td>
-              </tr>
-            ))}
-            {payables.data?.length === 0 && <tr><td colSpan={4} className="px-4 py-4 text-center text-sm" style={{ color: 'var(--muted)' }}>Sab clear — kisi ko dena baqi nahi.</td></tr>}
-          </Table>
+          <>
+            <Table head={['Kis ko', 'Type', 'Baqi (dene hain)', '']}>
+              {payRows.map((p) => (
+                <tr key={`${p.type}-${p.id}`}>
+                  <td className="px-4 py-3 font-medium">{p.name}</td>
+                  <td className="px-4 py-3"><Badge color="slate">{typeLabel[p.type]}</Badge></td>
+                  <td className="px-4 py-3"><Badge color="red">{formatPaisa(p.balance)}</Badge></td>
+                  <td className="px-4 py-3">
+                    {can('payments.manage') && (
+                      <RowActions>
+                        <IconButton icon={Wallet} label="Pay" tone="primary" onClick={() => setSettle(p)} />
+                      </RowActions>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {payAll.length === 0 && <tr><td colSpan={4} className="px-4 py-4 text-center text-sm" style={{ color: 'var(--muted)' }}>Sab clear — kisi ko dena baqi nahi.</td></tr>}
+            </Table>
+            <Pagination meta={payMeta} page={payPage} onPage={setPayPage} />
+          </>
         )}
       </div>
 

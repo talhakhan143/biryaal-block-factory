@@ -4,7 +4,8 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
+import { Power, PowerOff, Trash2, Wallet } from 'lucide-react'
+import { Badge, Button, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Select, Spinner, Table, useConfirm } from '../components/ui'
 
 interface Labourer {
   id: string
@@ -17,6 +18,7 @@ interface Labourer {
 
 export default function Labour() {
   const { can } = useAuth()
+  const confirm = useConfirm()
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
   const [marking, setMarking] = useState(false)
@@ -58,10 +60,16 @@ export default function Labour() {
               <td className="px-4 py-3">{formatPaisa(l.daily_wage)}</td>
               <td className="px-4 py-3">{l.balance > 0 ? <Badge color="red">{formatPaisa(l.balance)}</Badge> : <Badge color="green">Settled</Badge>}</td>
               <td className="px-4 py-3">{l.is_active ? <Badge color="green">Active</Badge> : <Badge color="amber">Off</Badge>}</td>
-              <td className="px-4 py-3 text-right space-x-3">
-                {can('payments.manage') && <button className="text-sm text-blue-600 hover:underline" onClick={() => setPayId(l.id)}>Pay</button>}
-                {can('labour.manage') && <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => toggle.mutate(l)}>{l.is_active ? 'Deactivate' : 'Activate'}</button>}
-                {can('labour.manage') && <button className="text-sm hover:underline" style={{ color: 'var(--red)' }} onClick={() => { if (confirm(`Delete ${l.name}?`)) del.mutate(l.id) }}>Delete</button>}
+              <td className="px-4 py-3">
+                <RowActions>
+                  {can('payments.manage') && <IconButton icon={Wallet} label="Pay mazdoor" tone="primary" onClick={() => setPayId(l.id)} />}
+                  {can('labour.manage') && <IconButton icon={l.is_active ? PowerOff : Power} label={l.is_active ? 'Deactivate' : 'Activate'} tone="amber" onClick={() => toggle.mutate(l)} />}
+                  {can('labour.manage') && (
+                    <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
+                      if (await confirm({ title: 'Mazdoor delete karein?', message: `"${l.name}" delete ho jayega.`, confirmText: 'Delete' })) del.mutate(l.id)
+                    }} />
+                  )}
+                </RowActions>
               </td>
             </tr>
           ))}
