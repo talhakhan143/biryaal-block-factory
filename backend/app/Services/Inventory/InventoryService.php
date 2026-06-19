@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\StockMovement;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use InvalidArgumentException;
 use RuntimeException;
 
 /**
@@ -30,7 +31,7 @@ class InventoryService
         $stock = $this->stockFor($product);
 
         if ($stock->curing_qty < $qty) {
-            throw new RuntimeException("Insufficient curing stock for {$product->name}.");
+            throw new InvalidArgumentException("{$product->name} ka curing stock kam hai (sirf {$stock->curing_qty} available).");
         }
 
         $stock->decrement('curing_qty', $qty);
@@ -45,7 +46,7 @@ class InventoryService
         $stock = $this->stockFor($product);
 
         if ($stock->ready_qty < $qty) {
-            throw new RuntimeException("Insufficient ready stock for {$product->name}. Available: {$stock->ready_qty}.");
+            throw new InvalidArgumentException("{$product->name} ka ready stock kam hai (sirf {$stock->ready_qty} pcs available). Pehle Production karke maal tayar karein, phir bechein.");
         }
 
         $stock->decrement('ready_qty', $qty);
@@ -85,7 +86,7 @@ class InventoryService
         $newValue = $stock->{$column} + $delta;
 
         if ($newValue < 0) {
-            throw new RuntimeException("Adjustment would make {$bucket} stock negative.");
+            throw new InvalidArgumentException("Adjustment se {$bucket} stock negative ho jayega — itna stock mojood nahi.");
         }
 
         $stock->update([$column => $newValue]);
@@ -99,7 +100,7 @@ class InventoryService
         $stock = $this->stockFor($product);
 
         if ($stock->ready_qty < $qty) {
-            throw new RuntimeException("Insufficient ready stock to mark damaged for {$product->name}.");
+            throw new InvalidArgumentException("{$product->name} ka itna ready stock nahi ke damaged mark ho sake (sirf {$stock->ready_qty} pcs).");
         }
 
         $stock->decrement('ready_qty', $qty);
