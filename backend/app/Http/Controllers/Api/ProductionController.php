@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductionRequest;
 use App\Http\Resources\ProductionBatchResource;
@@ -11,20 +12,22 @@ use Illuminate\Http\Request;
 
 class ProductionController extends Controller
 {
+    use HasTableQuery;
+
     public function __construct(private ProductionService $service) {}
 
     public function index(Request $request)
     {
-        $batches = ProductionBatch::query()
+        $query = ProductionBatch::query()
             ->with(['product', 'supervisor'])
             ->when($request->product_id, fn ($q, $id) => $q->where('product_id', $id))
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
             ->when($request->from, fn ($q, $d) => $q->whereDate('production_date', '>=', $d))
-            ->when($request->to, fn ($q, $d) => $q->whereDate('production_date', '<=', $d))
-            ->latest('production_date')
-            ->paginate($request->integer('per_page', 15));
+            ->when($request->to, fn ($q, $d) => $q->whereDate('production_date', '<=', $d));
 
-        return ProductionBatchResource::collection($batches);
+        $this->applyTableQuery($query, $request, ['production_date', 'quantity_produced', 'status'], ['reference'], 'production_date', ['product' => ['name']]);
+
+        return ProductionBatchResource::collection($query->paginate($request->integer('per_page', 15)));
     }
 
     public function store(StoreProductionRequest $request)

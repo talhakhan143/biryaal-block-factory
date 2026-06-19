@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { useAuth } from '../lib/auth'
 import { SquarePen, Trash2 } from 'lucide-react'
-import { Badge, Button, Field, IconButton, Input, Modal, PageHeader, RowActions, Spinner, Table, useConfirm } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, Modal, PageHeader, RowActions, useConfirm } from '../components/ui'
 
 interface RawMaterial {
   id: string
@@ -22,8 +22,18 @@ export default function RawMaterials() {
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<RawMaterial | null>(null)
-  const { data, isLoading } = useList<RawMaterial>('raw-materials')
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('name')
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
+  const { data, isLoading } = useList<RawMaterial>('raw-materials', { page, search, sort, dir })
   const manage = can('materials.manage')
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('asc') }
+    setPage(1)
+  }
 
   const save = useMutation({
     mutationFn: ({ id, payload }: { id?: string; payload: Record<string, unknown> }) =>
@@ -42,6 +52,24 @@ export default function RawMaterials() {
   })
   const remove = async (id: string, name: string) => { if (await confirm({ title: 'Delete karein?', message: `"${name}" delete ho jayega. Wapas nahi aayega.`, confirmText: 'Delete' })) del.mutate(id) }
 
+  const columns: Column<RawMaterial>[] = [
+    { key: 'name', label: 'Material', sortable: true, render: (m) => <span className="font-medium">{m.name}</span> },
+    { key: 'unit', label: 'Unit', sortable: true, render: (m) => m.unit },
+    { key: 'current_qty', label: 'On Hand', sortable: true, align: 'right', render: (m) => m.current_qty },
+    { key: 'low_stock_threshold', label: 'Low Alert', align: 'right', render: (m) => m.low_stock_threshold },
+    { key: 'status', label: 'Status', render: (m) => (!m.is_active ? <Badge color="slate">Off</Badge> : m.is_low ? <Badge color="red">Low</Badge> : <Badge color="green">OK</Badge>) },
+    {
+      key: 'actions', label: '', align: 'right', render: (m) => (
+        manage ? (
+          <RowActions>
+            <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(m)} />
+            <IconButton icon={Trash2} label="Delete" tone="red" onClick={() => remove(m.id, m.name)} />
+          </RowActions>
+        ) : null
+      ),
+    },
+  ]
+
   return (
     <div>
       <PageHeader
@@ -49,29 +77,21 @@ export default function RawMaterials() {
         subtitle="Cement, Bajri, Rait, Pani waghera"
         actions={manage && <Button onClick={() => setCreating(true)}>+ Material</Button>}
       />
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Table head={['Material', 'Unit', 'On Hand', 'Low Alert', 'Status', '']}>
-          {data?.data.map((m) => (
-            <tr key={m.id}>
-              <td className="px-4 py-3 font-medium">{m.name}</td>
-              <td className="px-4 py-3">{m.unit}</td>
-              <td className="px-4 py-3">{m.current_qty}</td>
-              <td className="px-4 py-3">{m.low_stock_threshold}</td>
-              <td className="px-4 py-3">
-                {!m.is_active ? <Badge color="slate">Off</Badge> : m.is_low ? <Badge color="red">Low</Badge> : <Badge color="green">OK</Badge>}
-              </td>
-              <td className="px-4 py-3">
-                <RowActions>
-                  {manage && <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(m)} />}
-                  {manage && <IconButton icon={Trash2} label="Delete" tone="red" onClick={() => remove(m.id, m.name)} />}
-                </RowActions>
-              </td>
-            </tr>
-          ))}
-        </Table>
-      )}
+      <DataTable
+        columns={columns}
+        rows={data?.data}
+        loading={isLoading}
+        emptyText="Koi material nahi."
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Material naam se search…"
+        sort={sort}
+        dir={dir}
+        onSort={onSort}
+        meta={data?.meta}
+        page={page}
+        onPage={setPage}
+      />
       {(creating || editing) && (
         <Modal title={editing ? 'Edit Material' : 'New Raw Material'} onClose={() => { setCreating(false); setEditing(null) }}>
           <MaterialForm

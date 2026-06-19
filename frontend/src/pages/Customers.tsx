@@ -5,7 +5,7 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { BookText, HandCoins } from 'lucide-react'
-import { Badge, Button, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Spinner, Table } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, Table } from '../components/ui'
 
 interface Customer {
   id: string
@@ -19,10 +19,18 @@ export default function Customers() {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [sort, setSort] = useState('name')
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
   const [creating, setCreating] = useState(false)
   const [ledgerId, setLedgerId] = useState<string | null>(null)
   const [receiveFor, setReceiveFor] = useState<Customer | null>(null)
-  const { data, isLoading } = useList<Customer>('customers', { search, page })
+  const { data, isLoading } = useList<Customer>('customers', { search, page, sort, dir })
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('asc') }
+    setPage(1)
+  }
 
   const create = useMutation({
     mutationFn: (payload: Record<string, string>) => api.post('/customers', payload),
@@ -35,10 +43,24 @@ export default function Customers() {
   const receive = useMutation({
     mutationFn: (payload: Record<string, unknown>) => api.post('/payments/receipt', payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['customers'] })
+      ['customers', 'sales', 'payments', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setReceiveFor(null)
     },
   })
+
+  const columns: Column<Customer>[] = [
+    { key: 'name', label: 'Name', sortable: true, render: (c) => <span className="font-medium">{c.name}</span> },
+    { key: 'phone', label: 'Phone', sortable: true, render: (c) => c.phone ?? '—' },
+    { key: 'balance', label: 'Balance (owes us)', sortable: true, align: 'right', render: (c) => (c.balance > 0 ? <Badge color="amber">{formatPaisa(c.balance)}</Badge> : <Badge color="green">Settled</Badge>) },
+    {
+      key: 'actions', label: '', align: 'right', render: (c) => (
+        <RowActions>
+          {can('payments.manage') && c.balance > 0 && <IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => setReceiveFor(c)} />}
+          <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(c.id)} />
+        </RowActions>
+      ),
+    },
+  ]
 
   return (
     <div>
@@ -48,39 +70,21 @@ export default function Customers() {
         actions={can('customers.manage') && <Button onClick={() => setCreating(true)}>+ Customer</Button>}
       />
 
-      <div className="mb-4">
-        <Input placeholder="Search name or phone…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs" />
-      </div>
-
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Table head={['Name', 'Phone', 'Balance (owes us)', '']}>
-          {data?.data.map((c) => (
-            <tr key={c.id}>
-              <td className="px-4 py-3 font-medium">{c.name}</td>
-              <td className="px-4 py-3">{c.phone ?? '—'}</td>
-              <td className="px-4 py-3">
-                {c.balance > 0 ? <Badge color="amber">{formatPaisa(c.balance)}</Badge> : <Badge color="green">Settled</Badge>}
-              </td>
-              <td className="px-4 py-3">
-                <RowActions>
-                  {can('payments.manage') && c.balance > 0 && (
-                    <IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => setReceiveFor(c)} />
-                  )}
-                  <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(c.id)} />
-                </RowActions>
-              </td>
-            </tr>
-          ))}
-          {data?.data.length === 0 && (
-            <tr>
-              <td colSpan={4} className="px-4 py-6 text-center text-slate-400">No customers yet.</td>
-            </tr>
-          )}
-        </Table>
-      )}
-      <Pagination meta={data?.meta} page={page} onPage={setPage} />
+      <DataTable
+        columns={columns}
+        rows={data?.data}
+        loading={isLoading}
+        emptyText="No customers yet."
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Name ya phone se search…"
+        sort={sort}
+        dir={dir}
+        onSort={onSort}
+        meta={data?.meta}
+        page={page}
+        onPage={setPage}
+      />
 
       {creating && (
         <Modal title="New Customer" onClose={() => setCreating(false)}>

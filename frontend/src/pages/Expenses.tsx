@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, Input, MethodField, Modal, MoneyInput, PageHeader, Select } from '../components/ui'
 
 interface Expense {
   id: string
@@ -23,7 +23,16 @@ export default function Expenses() {
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
   const [page, setPage] = useState(1)
-  const { data, isLoading } = useList<Expense>('expenses', { page })
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('expense_date')
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc')
+  const { data, isLoading } = useList<Expense>('expenses', { page, search, sort, dir })
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('desc') }
+    setPage(1)
+  }
 
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/expenses', p),
@@ -33,6 +42,15 @@ export default function Expenses() {
     },
   })
 
+  const columns: Column<Expense>[] = [
+    { key: 'reference', label: 'Ref', sortable: true, render: (e) => <span className="font-mono text-xs">{e.reference}</span> },
+    { key: 'expense_date', label: 'Date', sortable: true, render: (e) => e.expense_date },
+    { key: 'category', label: 'Category', sortable: true, render: (e) => <Badge color="blue">{e.category}</Badge> },
+    { key: 'title', label: 'Title', render: (e) => e.title },
+    { key: 'amount', label: 'Amount', sortable: true, align: 'right', render: (e) => formatPaisa(e.amount) },
+    { key: 'method', label: 'Method', render: (e) => <span className="capitalize">{e.method}</span> },
+  ]
+
   return (
     <div>
       <PageHeader
@@ -40,23 +58,21 @@ export default function Expenses() {
         subtitle="Kharchay — bijli, diesel waghera"
         actions={can('expenses.manage') && <Button onClick={() => setCreating(true)}>+ Expense</Button>}
       />
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Table head={['Ref', 'Date', 'Category', 'Title', 'Amount', 'Method']}>
-          {data?.data.map((e) => (
-            <tr key={e.id}>
-              <td className="px-4 py-3 font-mono text-xs">{e.reference}</td>
-              <td className="px-4 py-3">{e.expense_date}</td>
-              <td className="px-4 py-3"><Badge color="blue">{e.category}</Badge></td>
-              <td className="px-4 py-3">{e.title}</td>
-              <td className="px-4 py-3">{formatPaisa(e.amount)}</td>
-              <td className="px-4 py-3 capitalize">{e.method}</td>
-            </tr>
-          ))}
-        </Table>
-      )}
-      <Pagination meta={data?.meta} page={page} onPage={setPage} />
+      <DataTable
+        columns={columns}
+        rows={data?.data}
+        loading={isLoading}
+        emptyText="Koi kharcha nahi."
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Ref, category ya title se search…"
+        sort={sort}
+        dir={dir}
+        onSort={onSort}
+        meta={data?.meta}
+        page={page}
+        onPage={setPage}
+      />
       {creating && (
         <Modal title="New Expense" onClose={() => setCreating(false)}>
           <ExpenseForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />

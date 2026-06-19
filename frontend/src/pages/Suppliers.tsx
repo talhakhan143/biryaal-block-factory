@@ -5,7 +5,7 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { BookText, Power, PowerOff, Trash2 } from 'lucide-react'
-import { Badge, Button, Field, IconButton, Input, Modal, PageHeader, Pagination, RowActions, Spinner, Table, useConfirm } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, Modal, PageHeader, RowActions, Spinner, Table, useConfirm } from '../components/ui'
 
 interface Supplier {
   id: string
@@ -22,9 +22,17 @@ export default function Suppliers() {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [sort, setSort] = useState('name')
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
   const [creating, setCreating] = useState(false)
   const [ledgerId, setLedgerId] = useState<string | null>(null)
-  const { data, isLoading } = useList<Supplier>('suppliers', { search, page })
+  const { data, isLoading } = useList<Supplier>('suppliers', { search, page, sort, dir })
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('asc') }
+    setPage(1)
+  }
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['suppliers'] })
 
@@ -48,6 +56,28 @@ export default function Suppliers() {
     onError: (e) => alert(apiError(e)),
   })
 
+  const columns: Column<Supplier>[] = [
+    { key: 'name', label: 'Name', sortable: true, render: (s) => <span className="font-medium" style={{ opacity: s.is_active ? 1 : 0.55 }}>{s.name}</span> },
+    { key: 'phone', label: 'Phone', sortable: true, render: (s) => s.phone ?? '—' },
+    { key: 'balance', label: 'Balance (we owe)', sortable: true, align: 'right', render: (s) => (s.balance > 0 ? <Badge color="red">{formatPaisa(s.balance)}</Badge> : <Badge color="green">Settled</Badge>) },
+    { key: 'is_active', label: 'Status', sortable: true, render: (s) => (s.is_active ? <Badge color="green">Active</Badge> : <Badge color="amber">Off</Badge>) },
+    {
+      key: 'actions', label: '', align: 'right', render: (s) => (
+        <RowActions>
+          <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(s.id)} />
+          {can('suppliers.manage') && (
+            <IconButton icon={s.is_active ? PowerOff : Power} label={s.is_active ? 'Deactivate' : 'Activate'} tone="amber" onClick={() => toggle.mutate(s)} />
+          )}
+          {can('suppliers.manage') && (
+            <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
+              if (await confirm({ title: 'Supplier delete karein?', message: `"${s.name}" delete ho jayega.`, confirmText: 'Delete' })) del.mutate(s.id)
+            }} />
+          )}
+        </RowActions>
+      ),
+    },
+  ]
+
   return (
     <div>
       <PageHeader
@@ -56,47 +86,21 @@ export default function Suppliers() {
         actions={can('suppliers.manage') && <Button onClick={() => setCreating(true)}>+ Supplier</Button>}
       />
 
-      <div className="mb-4">
-        <Input placeholder="Search name or phone…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs" />
-      </div>
-
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Table head={['Name', 'Phone', 'Balance (we owe)', 'Status', '']}>
-          {data?.data.map((s) => (
-            <tr key={s.id} style={{ opacity: s.is_active ? 1 : 0.55 }}>
-              <td className="px-4 py-3 font-medium">{s.name}</td>
-              <td className="px-4 py-3">{s.phone ?? '—'}</td>
-              <td className="px-4 py-3">
-                {s.balance > 0 ? <Badge color="red">{formatPaisa(s.balance)}</Badge> : <Badge color="green">Settled</Badge>}
-              </td>
-              <td className="px-4 py-3">
-                {s.is_active ? <Badge color="green">Active</Badge> : <Badge color="amber">Off</Badge>}
-              </td>
-              <td className="px-4 py-3">
-                <RowActions>
-                  <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(s.id)} />
-                  {can('suppliers.manage') && (
-                    <IconButton icon={s.is_active ? PowerOff : Power} label={s.is_active ? 'Deactivate' : 'Activate'} tone="amber" onClick={() => toggle.mutate(s)} />
-                  )}
-                  {can('suppliers.manage') && (
-                    <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
-                      if (await confirm({ title: 'Supplier delete karein?', message: `"${s.name}" delete ho jayega.`, confirmText: 'Delete' })) del.mutate(s.id)
-                    }} />
-                  )}
-                </RowActions>
-              </td>
-            </tr>
-          ))}
-          {data?.data.length === 0 && (
-            <tr>
-              <td colSpan={5} className="px-4 py-6 text-center text-slate-400">No suppliers yet.</td>
-            </tr>
-          )}
-        </Table>
-      )}
-      <Pagination meta={data?.meta} page={page} onPage={setPage} />
+      <DataTable
+        columns={columns}
+        rows={data?.data}
+        loading={isLoading}
+        emptyText="No suppliers yet."
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Name ya phone se search…"
+        sort={sort}
+        dir={dir}
+        onSort={onSort}
+        meta={data?.meta}
+        page={page}
+        onPage={setPage}
+      />
 
       {creating && (
         <Modal title="New Supplier" onClose={() => setCreating(false)}>

@@ -5,7 +5,7 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { SquarePen, Trash2 } from 'lucide-react'
-import { Badge, Button, Field, IconButton, Input, Modal, MoneyInput, PageHeader, RowActions, Spinner, Table, useConfirm } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, Modal, MoneyInput, PageHeader, RowActions, useConfirm } from '../components/ui'
 
 interface Product {
   id: string
@@ -25,8 +25,18 @@ export default function Products() {
   const qc = useQueryClient()
   const [editing, setEditing] = useState<Product | null>(null)
   const [creating, setCreating] = useState(false)
-  const { data, isLoading } = useList<Product>('products', { per_page: 100 })
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('name')
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
+  const { data, isLoading } = useList<Product>('products', { page, search, sort, dir })
   const manage = can('inventory.manage')
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('asc') }
+    setPage(1)
+  }
 
   const save = useMutation({
     mutationFn: ({ id, payload }: { id?: string; payload: Record<string, unknown> }) =>
@@ -45,6 +55,25 @@ export default function Products() {
   })
   const remove = async (id: string, name: string) => { if (await confirm({ title: 'Product delete karein?', message: `"${name}" delete ho jayega. Wapas nahi aayega.`, confirmText: 'Delete' })) del.mutate(id) }
 
+  const columns: Column<Product>[] = [
+    { key: 'name', label: 'Name', sortable: true, render: (p) => <span className="font-medium">{p.name}</span> },
+    { key: 'sku', label: 'SKU', render: (p) => <span className="font-mono text-xs">{p.sku}</span> },
+    { key: 'unit', label: 'Unit', sortable: true, render: (p) => p.unit },
+    { key: 'curing', label: 'Curing Days', align: 'right', render: (p) => `${p.default_curing_days} din` },
+    { key: 'sale_price', label: 'Sale Rate', sortable: true, align: 'right', render: (p) => formatPaisa(p.sale_price) },
+    { key: 'status', label: 'Status', render: (p) => (p.is_active ? <Badge color="green">Active</Badge> : <Badge color="slate">Off</Badge>) },
+    {
+      key: 'actions', label: '', align: 'right', render: (p) => (
+        manage ? (
+          <RowActions>
+            <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(p)} />
+            <IconButton icon={Trash2} label="Delete" tone="red" onClick={() => remove(p.id, p.name)} />
+          </RowActions>
+        ) : null
+      ),
+    },
+  ]
+
   return (
     <div>
       <PageHeader
@@ -52,28 +81,21 @@ export default function Products() {
         subtitle="Block categories — naam, rate, curing din set karo"
         actions={manage && <Button onClick={() => setCreating(true)}>+ Product</Button>}
       />
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Table head={['Name', 'SKU', 'Unit', 'Curing Days', 'Sale Rate', 'Status', '']}>
-          {data?.data.map((p) => (
-            <tr key={p.id}>
-              <td className="px-4 py-3 font-medium">{p.name}</td>
-              <td className="px-4 py-3 font-mono text-xs">{p.sku}</td>
-              <td className="px-4 py-3">{p.unit}</td>
-              <td className="px-4 py-3">{p.default_curing_days} din</td>
-              <td className="px-4 py-3">{formatPaisa(p.sale_price)}</td>
-              <td className="px-4 py-3">{p.is_active ? <Badge color="green">Active</Badge> : <Badge color="slate">Off</Badge>}</td>
-              <td className="px-4 py-3">
-                <RowActions>
-                  {manage && <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(p)} />}
-                  {manage && <IconButton icon={Trash2} label="Delete" tone="red" onClick={() => remove(p.id, p.name)} />}
-                </RowActions>
-              </td>
-            </tr>
-          ))}
-        </Table>
-      )}
+      <DataTable
+        columns={columns}
+        rows={data?.data}
+        loading={isLoading}
+        emptyText="Koi product nahi."
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Naam ya SKU se search…"
+        sort={sort}
+        dir={dir}
+        onSort={onSort}
+        meta={data?.meta}
+        page={page}
+        onPage={setPage}
+      />
       {(creating || editing) && (
         <Modal title={editing ? 'Edit Product' : 'New Product'} onClose={() => { setCreating(false); setEditing(null) }}>
           <ProductForm

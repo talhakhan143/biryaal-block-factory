@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SalesReturnResource;
 use App\Models\SalesReturn;
@@ -11,18 +12,27 @@ use Illuminate\Http\Request;
 
 class SalesReturnController extends Controller
 {
+    use HasTableQuery;
+
     public function __construct(private SalesReturnService $service) {}
 
     public function index(Request $request)
     {
-        $returns = SalesReturn::query()
+        $query = SalesReturn::query()
             ->with('customer')
             ->when($request->from, fn ($q, $d) => $q->whereDate('return_date', '>=', $d))
-            ->when($request->to, fn ($q, $d) => $q->whereDate('return_date', '<=', $d))
-            ->latest('return_date')
-            ->paginate($request->integer('per_page', 15));
+            ->when($request->to, fn ($q, $d) => $q->whereDate('return_date', '<=', $d));
 
-        return SalesReturnResource::collection($returns);
+        $this->applyTableQuery(
+            $query,
+            $request,
+            sortable: ['return_date', 'reference', 'return_value', 'deduction', 'refund_amount', 'refund_mode'],
+            searchable: ['reference'],
+            defaultSort: 'return_date',
+            searchRelations: ['customer' => ['name']],
+        );
+
+        return SalesReturnResource::collection($query->paginate($request->integer('per_page', 15)));
     }
 
     public function store(Request $request)

@@ -5,7 +5,7 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { BookText, Trash2, Wallet } from 'lucide-react'
-import { Badge, Button, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Spinner, Table, useConfirm } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, Table, useConfirm } from '../components/ui'
 
 interface Driver {
   id: string
@@ -24,9 +24,37 @@ export default function Drivers() {
   const [creating, setCreating] = useState(false)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [sort, setSort] = useState('name')
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
   const [payId, setPayId] = useState<string | null>(null)
   const [ledgerId, setLedgerId] = useState<string | null>(null)
-  const { data, isLoading } = useList<Driver>('drivers', { search, page })
+  const { data, isLoading } = useList<Driver>('drivers', { search, page, sort, dir })
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('asc') }
+    setPage(1)
+  }
+
+  const columns: Column<Driver>[] = [
+    { key: 'name', label: 'Name', sortable: true, render: (d) => <span className="font-medium">{d.name}</span> },
+    { key: 'phone', label: 'Phone', sortable: true, render: (d) => d.phone ?? '—' },
+    { key: 'vehicle_name', label: 'Vehicle (gaari)', sortable: true, render: (d) => d.vehicle_name ? `${d.vehicle_name}${d.vehicle_plate ? ` (${d.vehicle_plate})` : ''}` : '—' },
+    { key: 'balance', label: 'Dues (we owe)', sortable: true, align: 'right', render: (d) => d.balance > 0 ? <Badge color="red">{formatPaisa(d.balance)}</Badge> : <Badge color="green">Settled</Badge> },
+    {
+      key: 'actions', label: '', align: 'right', render: (d) => (
+        <RowActions>
+          <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(d.id)} />
+          {can('payments.manage') && <IconButton icon={Wallet} label="Pay driver" tone="primary" onClick={() => setPayId(d.id)} />}
+          {can('transport.manage') && (
+            <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
+              if (await confirm({ title: 'Driver delete karein?', message: `"${d.name}" delete ho jayega. Yeh wapas nahi aayega.`, confirmText: 'Delete' })) del.mutate(d.id)
+            }} />
+          )}
+        </RowActions>
+      ),
+    },
+  ]
 
   const create = useMutation({
     mutationFn: (p: Record<string, string>) => api.post('/drivers', p),
@@ -34,7 +62,7 @@ export default function Drivers() {
   })
   const pay = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/drivers/${id}/pay`, payload),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['drivers'] }); setPayId(null) },
+    onSuccess: () => { ['drivers', 'transport-trips', 'payments', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); setPayId(null) },
   })
   const del = useMutation({
     mutationFn: (id: string) => api.delete(`/drivers/${id}`),
@@ -45,35 +73,21 @@ export default function Drivers() {
   return (
     <div>
       <PageHeader title="Drivers" subtitle="Driver ka baqi aur payment" actions={can('transport.manage') && <Button onClick={() => setCreating(true)}>+ Driver</Button>} />
-      <div className="mb-4">
-        <Input placeholder="Search name or phone…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs" />
-      </div>
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Table head={['Name', 'Phone', 'Vehicle (gaari)', 'Dues (we owe)', '']}>
-          {data?.data.map((d) => (
-            <tr key={d.id}>
-              <td className="px-4 py-3 font-medium">{d.name}</td>
-              <td className="px-4 py-3">{d.phone ?? '—'}</td>
-              <td className="px-4 py-3">{d.vehicle_name ? `${d.vehicle_name}${d.vehicle_plate ? ` (${d.vehicle_plate})` : ''}` : '—'}</td>
-              <td className="px-4 py-3">{d.balance > 0 ? <Badge color="red">{formatPaisa(d.balance)}</Badge> : <Badge color="green">Settled</Badge>}</td>
-              <td className="px-4 py-3">
-                <RowActions>
-                  <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(d.id)} />
-                  {can('payments.manage') && <IconButton icon={Wallet} label="Pay driver" tone="primary" onClick={() => setPayId(d.id)} />}
-                  {can('transport.manage') && (
-                    <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
-                      if (await confirm({ title: 'Driver delete karein?', message: `"${d.name}" delete ho jayega. Yeh wapas nahi aayega.`, confirmText: 'Delete' })) del.mutate(d.id)
-                    }} />
-                  )}
-                </RowActions>
-              </td>
-            </tr>
-          ))}
-        </Table>
-      )}
-      <Pagination meta={data?.meta} page={page} onPage={setPage} />
+      <DataTable
+        columns={columns}
+        rows={data?.data}
+        loading={isLoading}
+        emptyText="Koi driver nahi."
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Name, phone ya gaari se search…"
+        sort={sort}
+        dir={dir}
+        onSort={onSort}
+        meta={data?.meta}
+        page={page}
+        onPage={setPage}
+      />
       {creating && (
         <Modal title="New Driver" onClose={() => setCreating(false)}>
           <DriverForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />

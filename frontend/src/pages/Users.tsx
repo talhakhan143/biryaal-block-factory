@@ -4,7 +4,7 @@ import { ShieldAlert, SquarePen, TriangleAlert } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Card, Field, IconButton, Input, Modal, PageHeader, Pagination, RowActions, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Card, type Column, DataTable, Field, IconButton, Input, Modal, PageHeader, RowActions, Select } from '../components/ui'
 
 interface AppUser {
   id: number
@@ -23,8 +23,29 @@ export default function Users() {
   const [creating, setCreating] = useState(false)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const { data, isLoading } = useList<AppUser>('users', { search, page })
+  const [sort, setSort] = useState('name')
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
+  const { data, isLoading } = useList<AppUser>('users', { search, page, sort, dir })
   const roles = useQuery({ queryKey: ['roles'], queryFn: async () => (await api.get<string[]>('/roles')).data })
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('asc') }
+    setPage(1)
+  }
+
+  const columns: Column<AppUser>[] = [
+    { key: 'name', label: 'Name', sortable: true, render: (u) => <span className="font-medium">{u.name}</span> },
+    { key: 'email', label: 'Email', sortable: true, render: (u) => u.email },
+    { key: 'phone', label: 'Phone', render: (u) => u.phone ?? '—' },
+    { key: 'role', label: 'Role', render: (u) => u.roles.map((r) => <Badge key={r} color="blue">{r}</Badge>) },
+    { key: 'status', label: 'Status', render: (u) => u.is_active ? <Badge color="green">Active</Badge> : <Badge color="red">Disabled</Badge> },
+    {
+      key: 'actions', label: '', align: 'right', render: (u) => (
+        <RowActions><IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(u)} /></RowActions>
+      ),
+    },
+  ]
 
   const save = useMutation({
     mutationFn: ({ id, payload }: { id?: number; payload: Record<string, unknown> }) =>
@@ -43,30 +64,21 @@ export default function Users() {
         subtitle="Staff logins & roles (kaun kya access kar sakta hai)"
         actions={<Button onClick={() => setCreating(true)}>+ User</Button>}
       />
-      <div className="mb-4">
-        <Input placeholder="Search name or email…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs" />
-      </div>
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Table head={['Name', 'Email', 'Phone', 'Role', 'Status', '']}>
-          {data?.data.map((u) => (
-            <tr key={u.id}>
-              <td className="px-4 py-3 font-medium">{u.name}</td>
-              <td className="px-4 py-3">{u.email}</td>
-              <td className="px-4 py-3">{u.phone ?? '—'}</td>
-              <td className="px-4 py-3">{u.roles.map((r) => <Badge key={r} color="blue">{r}</Badge>)}</td>
-              <td className="px-4 py-3">{u.is_active ? <Badge color="green">Active</Badge> : <Badge color="red">Disabled</Badge>}</td>
-              <td className="px-4 py-3">
-                <RowActions>
-                  <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(u)} />
-                </RowActions>
-              </td>
-            </tr>
-          ))}
-        </Table>
-      )}
-      <Pagination meta={data?.meta} page={page} onPage={setPage} />
+      <DataTable
+        columns={columns}
+        rows={data?.data}
+        loading={isLoading}
+        emptyText="Koi user nahi."
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Naam ya email se search…"
+        sort={sort}
+        dir={dir}
+        onSort={onSort}
+        meta={data?.meta}
+        page={page}
+        onPage={setPage}
+      />
 
       {canReset && <DangerZone />}
 

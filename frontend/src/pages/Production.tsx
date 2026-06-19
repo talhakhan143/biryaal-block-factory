@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, Modal, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, Input, Modal, PageHeader, Select } from '../components/ui'
 
 interface Batch {
   id: string
@@ -21,7 +21,16 @@ export default function Production() {
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
   const [page, setPage] = useState(1)
-  const { data, isLoading } = useList<Batch>('production', { page })
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('production_date')
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc')
+  const { data, isLoading } = useList<Batch>('production', { page, search, sort, dir })
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('desc') }
+    setPage(1)
+  }
 
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/production', p),
@@ -40,6 +49,23 @@ export default function Production() {
     mutationFn: (id: string) => api.post(`/production/${id}/mark-ready`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['production'] }),
   })
+
+  const columns: Column<Batch>[] = [
+    { key: 'reference', label: 'Ref', sortable: true, render: (b) => <span className="font-mono text-xs">{b.reference}</span> },
+    { key: 'production_date', label: 'Date', sortable: true, render: (b) => b.production_date },
+    { key: 'product', label: 'Product', render: (b) => b.product?.name ?? '—' },
+    { key: 'shift', label: 'Shift', render: (b) => <span className="capitalize">{b.shift}</span> },
+    { key: 'quantity_produced', label: 'Qty', sortable: true, render: (b) => b.quantity_produced },
+    { key: 'ready_at', label: 'Ready On', render: (b) => b.ready_at },
+    { key: 'status', label: 'Status', sortable: true, render: (b) => <Badge color={b.status === 'ready' ? 'green' : 'amber'}>{b.status}</Badge> },
+    {
+      key: 'actions', label: '', align: 'right', render: (b) => (
+        can('production.manage') && b.status === 'curing'
+          ? <button className="text-sm font-medium hover:underline disabled:opacity-50" style={{ color: 'var(--green)' }} disabled={markReady.isPending} onClick={() => markReady.mutate(b.id)}>Mark Ready Now</button>
+          : null
+      ),
+    },
+  ]
 
   return (
     <div>
@@ -62,38 +88,21 @@ export default function Production() {
           Promoted {(promote.data?.data as { promoted: number })?.promoted ?? 0} batch(es) to ready stock.
         </p>
       )}
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Table head={['Ref', 'Date', 'Product', 'Shift', 'Qty', 'Ready On', 'Status', '']}>
-          {data?.data.map((b) => (
-            <tr key={b.id}>
-              <td className="px-4 py-3 font-mono text-xs">{b.reference}</td>
-              <td className="px-4 py-3">{b.production_date}</td>
-              <td className="px-4 py-3">{b.product?.name}</td>
-              <td className="px-4 py-3 capitalize">{b.shift}</td>
-              <td className="px-4 py-3">{b.quantity_produced}</td>
-              <td className="px-4 py-3">{b.ready_at}</td>
-              <td className="px-4 py-3">
-                <Badge color={b.status === 'ready' ? 'green' : 'amber'}>{b.status}</Badge>
-              </td>
-              <td className="px-4 py-3 text-right">
-                {can('production.manage') && b.status === 'curing' && (
-                  <button
-                    className="text-sm font-medium hover:underline disabled:opacity-50"
-                    style={{ color: 'var(--green)' }}
-                    disabled={markReady.isPending}
-                    onClick={() => markReady.mutate(b.id)}
-                  >
-                    Mark Ready Now
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </Table>
-      )}
-      <Pagination meta={data?.meta} page={page} onPage={setPage} />
+      <DataTable
+        columns={columns}
+        rows={data?.data}
+        loading={isLoading}
+        emptyText="Koi production batch nahi."
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Ref ya product se search…"
+        sort={sort}
+        dir={dir}
+        onSort={onSort}
+        meta={data?.meta}
+        page={page}
+        onPage={setPage}
+      />
       {creating && (
         <Modal title="Record Production" onClose={() => setCreating(false)}>
           <ProductionForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />

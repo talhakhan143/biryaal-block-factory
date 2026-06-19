@@ -5,7 +5,7 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { Wallet } from 'lucide-react'
-import { Badge, Button, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select } from '../components/ui'
 
 interface Purchase {
   id: string
@@ -26,8 +26,34 @@ export default function Purchases() {
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
   const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('purchase_date')
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [payFor, setPayFor] = useState<Purchase | null>(null)
-  const { data, isLoading } = useList<Purchase>('purchases', { page })
+  const { data, isLoading } = useList<Purchase>('purchases', { page, search, sort, dir })
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('desc') }
+    setPage(1)
+  }
+
+  const columns: Column<Purchase>[] = [
+    { key: 'reference', label: 'Ref', sortable: true, render: (p) => <span className="font-mono text-xs">{p.reference}</span> },
+    { key: 'purchase_date', label: 'Date', sortable: true, render: (p) => p.purchase_date },
+    { key: 'supplier', label: 'Supplier', render: (p) => p.supplier?.name ?? '—' },
+    { key: 'material', label: 'Material', render: (p) => p.raw_material?.name ?? '—' },
+    { key: 'quantity', label: 'Qty', sortable: true, align: 'right', render: (p) => p.quantity },
+    { key: 'total_cost', label: 'Total', sortable: true, align: 'right', render: (p) => formatPaisa(p.total_cost) },
+    { key: 'payment_status', label: 'Status', sortable: true, render: (p) => <Badge color={statusColor[p.payment_status]}>{p.payment_status}</Badge> },
+    {
+      key: 'actions', label: '', align: 'right', render: (p) => (
+        can('payments.manage') && p.payment_status !== 'paid'
+          ? <RowActions><IconButton icon={Wallet} label="Pay" tone="primary" onClick={() => setPayFor(p)} /></RowActions>
+          : null
+      ),
+    },
+  ]
 
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/purchases', p),
@@ -40,7 +66,7 @@ export default function Purchases() {
   const pay = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/purchases/${id}/pay`, payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['purchases'] })
+      ['purchases', 'suppliers', 'payments', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setPayFor(null)
     },
   })
@@ -52,31 +78,21 @@ export default function Purchases() {
         subtitle="Kacha maal khareedna — kharcha aur udhaar"
         actions={can('purchases.manage') && <Button onClick={() => setCreating(true)}>+ Purchase</Button>}
       />
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Table head={['Ref', 'Date', 'Supplier', 'Material', 'Qty', 'Total', 'Status', '']}>
-          {data?.data.map((p) => (
-            <tr key={p.id}>
-              <td className="px-4 py-3 font-mono text-xs">{p.reference}</td>
-              <td className="px-4 py-3">{p.purchase_date}</td>
-              <td className="px-4 py-3">{p.supplier?.name}</td>
-              <td className="px-4 py-3">{p.raw_material?.name}</td>
-              <td className="px-4 py-3">{p.quantity}</td>
-              <td className="px-4 py-3">{formatPaisa(p.total_cost)}</td>
-              <td className="px-4 py-3"><Badge color={statusColor[p.payment_status]}>{p.payment_status}</Badge></td>
-              <td className="px-4 py-3">
-                {can('payments.manage') && p.payment_status !== 'paid' && (
-                  <RowActions>
-                    <IconButton icon={Wallet} label="Pay" tone="primary" onClick={() => setPayFor(p)} />
-                  </RowActions>
-                )}
-              </td>
-            </tr>
-          ))}
-        </Table>
-      )}
-      <Pagination meta={data?.meta} page={page} onPage={setPage} />
+      <DataTable
+        columns={columns}
+        rows={data?.data}
+        loading={isLoading}
+        emptyText="Koi purchase nahi."
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Ref, supplier ya material se search…"
+        sort={sort}
+        dir={dir}
+        onSort={onSort}
+        meta={data?.meta}
+        page={page}
+        onPage={setPage}
+      />
       {payFor && (
         <Modal title={`Pay — ${payFor.reference}`} onClose={() => setPayFor(null)}>
           <PayBillForm

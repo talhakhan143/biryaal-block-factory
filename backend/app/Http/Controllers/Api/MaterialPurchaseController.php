@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePurchaseRequest;
 use App\Http\Resources\MaterialPurchaseResource;
@@ -14,18 +15,29 @@ use Illuminate\Http\Request;
 
 class MaterialPurchaseController extends Controller
 {
+    use HasTableQuery;
+
     public function __construct(private PurchaseService $service, private PaymentService $payments) {}
 
     public function index(Request $request)
     {
-        $purchases = MaterialPurchase::query()
+        $query = MaterialPurchase::query()
             ->with(['supplier', 'rawMaterial'])
             ->when($request->supplier_id, fn ($q, $id) => $q->where('supplier_id', $id))
             ->when($request->payment_status, fn ($q, $s) => $q->where('payment_status', $s))
             ->when($request->from, fn ($q, $d) => $q->whereDate('purchase_date', '>=', $d))
-            ->when($request->to, fn ($q, $d) => $q->whereDate('purchase_date', '<=', $d))
-            ->latest('purchase_date')
-            ->paginate($request->integer('per_page', 15));
+            ->when($request->to, fn ($q, $d) => $q->whereDate('purchase_date', '<=', $d));
+
+        $this->applyTableQuery(
+            $query,
+            $request,
+            ['purchase_date', 'total_cost', 'quantity', 'payment_status'],
+            ['reference'],
+            'purchase_date',
+            ['supplier' => ['name'], 'rawMaterial' => ['name']],
+        );
+
+        $purchases = $query->paginate($request->integer('per_page', 15));
 
         return MaterialPurchaseResource::collection($purchases);
     }

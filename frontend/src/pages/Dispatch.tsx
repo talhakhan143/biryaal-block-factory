@@ -5,7 +5,7 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { FileText } from 'lucide-react'
-import { Badge, Button, Card, Field, IconButton, Input, MethodField, Modal, MoneyInput, PageHeader, Pagination, RowActions, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Card, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, PageHeader, RowActions, Select, Spinner, Table } from '../components/ui'
 
 interface Dispatch {
   id: string
@@ -43,7 +43,16 @@ export default function DispatchPage() {
   const [prefill, setPrefill] = useState<Prefill | null>(null)
   const [challanId, setChallanId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
-  const { data, isLoading } = useList<Dispatch>('dispatches', { page })
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('dispatch_date')
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc')
+  const { data, isLoading } = useList<Dispatch>('dispatches', { page, search, sort, dir })
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('desc') }
+    setPage(1)
+  }
   const pending = useQuery({
     queryKey: ['dispatches-pending'],
     queryFn: async () => (await api.get<{ data: PendingOrder[] }>('/dispatches/pending')).data,
@@ -105,28 +114,29 @@ export default function DispatchPage() {
           title="Dispatch / Challan"
           subtitle="POS order ko 'Dispatch' karein — yahan challan ka record"
         />
-        {isLoading ? (
-          <Spinner />
-        ) : (
-          <Table head={['Challan', 'Date', 'Customer', 'Vehicle', 'Driver', 'Status', '']}>
-            {data?.data.map((d) => (
-              <tr key={d.id}>
-                <td className="px-4 py-3 font-mono text-xs">{d.reference}</td>
-                <td className="px-4 py-3">{d.dispatch_date}</td>
-                <td className="px-4 py-3">{d.customer?.name ?? '—'}</td>
-                <td className="px-4 py-3">{d.vehicle?.name ?? '—'}</td>
-                <td className="px-4 py-3">{d.driver?.name ?? '—'}</td>
-                <td className="px-4 py-3"><Badge color={d.status === 'delivered' ? 'green' : 'amber'}>{d.status}</Badge></td>
-                <td className="px-4 py-3">
-                  <RowActions>
-                    <IconButton icon={FileText} label="Challan" tone="primary" onClick={() => setChallanId(d.id)} />
-                  </RowActions>
-                </td>
-              </tr>
-            ))}
-          </Table>
-        )}
-        <Pagination meta={data?.meta} page={page} onPage={setPage} />
+        <DataTable
+          columns={[
+            { key: 'reference', label: 'Challan', sortable: true, render: (d) => <span className="font-mono text-xs">{d.reference}</span> },
+            { key: 'dispatch_date', label: 'Date', sortable: true, render: (d) => d.dispatch_date },
+            { key: 'customer', label: 'Customer', render: (d) => d.customer?.name ?? '—' },
+            { key: 'vehicle', label: 'Vehicle', render: (d) => d.vehicle?.name ?? '—' },
+            { key: 'driver', label: 'Driver', render: (d) => d.driver?.name ?? '—' },
+            { key: 'status', label: 'Status', sortable: true, render: (d) => <Badge color={d.status === 'delivered' ? 'green' : 'amber'}>{d.status}</Badge> },
+            { key: 'actions', label: '', align: 'right', render: (d) => <RowActions><IconButton icon={FileText} label="Challan" tone="primary" onClick={() => setChallanId(d.id)} /></RowActions> },
+          ] as Column<Dispatch>[]}
+          rows={data?.data}
+          loading={isLoading}
+          emptyText="Koi challan nahi."
+          search={search}
+          onSearch={(v) => { setSearch(v); setPage(1) }}
+          searchPlaceholder="Challan, customer, driver ya vehicle se search…"
+          sort={sort}
+          dir={dir}
+          onSort={onSort}
+          meta={data?.meta}
+          page={page}
+          onPage={setPage}
+        />
       </div>
 
       {formOpen && (

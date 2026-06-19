@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DispatchResource;
 use App\Models\Dispatch;
@@ -12,19 +13,28 @@ use Illuminate\Http\Request;
 
 class DispatchController extends Controller
 {
+    use HasTableQuery;
+
     public function __construct(private DispatchService $service) {}
 
     public function index(Request $request)
     {
-        $dispatches = Dispatch::query()
+        $query = Dispatch::query()
             ->with(['customer', 'vehicle', 'driver'])
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
             ->when($request->from, fn ($q, $d) => $q->whereDate('dispatch_date', '>=', $d))
-            ->when($request->to, fn ($q, $d) => $q->whereDate('dispatch_date', '<=', $d))
-            ->latest('dispatch_date')
-            ->paginate($request->integer('per_page', 15));
+            ->when($request->to, fn ($q, $d) => $q->whereDate('dispatch_date', '<=', $d));
 
-        return DispatchResource::collection($dispatches);
+        $this->applyTableQuery(
+            $query,
+            $request,
+            sortable: ['dispatch_date', 'reference', 'status'],
+            searchable: ['reference'],
+            defaultSort: 'dispatch_date',
+            searchRelations: ['customer' => ['name'], 'driver' => ['name'], 'vehicle' => ['name']],
+        );
+
+        return DispatchResource::collection($query->paginate($request->integer('per_page', 15)));
     }
 
     /** Sales (POS orders) with blocks still left to deliver (partial allowed). */

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\StaffResource;
 use App\Models\Staff;
@@ -10,14 +11,14 @@ use Illuminate\Http\Request;
 
 class StaffController extends Controller
 {
+    use HasTableQuery;
+
     public function index(Request $request)
     {
-        $staff = Staff::query()
-            ->when($request->search, fn ($q, $s) => $q->where('name', 'like', "%{$s}%"))
-            ->orderBy('name')
-            ->paginate($request->integer('per_page', 50));
+        $query = Staff::query();
+        $this->applyTableQuery($query, $request, ['name', 'monthly_salary'], ['name', 'phone'], 'name');
 
-        return StaffResource::collection($staff);
+        return StaffResource::collection($query->paginate($request->integer('per_page', 50)));
     }
 
     public function store(Request $request)

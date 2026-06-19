@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\RawMaterialResource;
 use App\Models\RawMaterial;
@@ -9,13 +10,16 @@ use Illuminate\Http\Request;
 
 class RawMaterialController extends Controller
 {
+    use HasTableQuery;
+
     public function index(Request $request)
     {
-        $materials = RawMaterial::query()
-            ->when($request->search, fn ($q, $s) => $q->where('name', 'like', "%{$s}%"))
-            ->when($request->boolean('low_only'), fn ($q) => $q->whereColumn('current_qty', '<=', 'low_stock_threshold'))
-            ->orderBy('name')
-            ->paginate($request->integer('per_page', 50));
+        $query = RawMaterial::query()
+            ->when($request->boolean('low_only'), fn ($q) => $q->whereColumn('current_qty', '<=', 'low_stock_threshold'));
+
+        $this->applyTableQuery($query, $request, ['name', 'current_qty', 'unit'], ['name'], 'name');
+
+        $materials = $query->paginate($request->integer('per_page', 50));
 
         return RawMaterialResource::collection($materials);
     }

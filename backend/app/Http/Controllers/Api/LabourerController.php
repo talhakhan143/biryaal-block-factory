@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\LabourerResource;
 use App\Http\Resources\PaymentResource;
@@ -12,16 +13,16 @@ use Illuminate\Http\Request;
 
 class LabourerController extends Controller
 {
+    use HasTableQuery;
+
     public function __construct(private PaymentService $payments) {}
 
     public function index(Request $request)
     {
-        $labourers = Labourer::query()
-            ->when($request->search, fn ($q, $s) => $q->where('name', 'like', "%{$s}%"))
-            ->orderBy('name')
-            ->paginate($request->integer('per_page', 50));
+        $query = Labourer::query();
+        $this->applyTableQuery($query, $request, ['name', 'phone', 'daily_wage', 'balance', 'is_active'], ['name', 'phone'], 'name');
 
-        return LabourerResource::collection($labourers);
+        return LabourerResource::collection($query->paginate($request->integer('per_page', 50)));
     }
 
     public function store(Request $request)

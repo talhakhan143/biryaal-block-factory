@@ -5,7 +5,7 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { HandCoins, Wallet } from 'lucide-react'
-import { Badge, Button, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Select, Spinner, Table } from '../components/ui'
 
 interface Payment {
   id: string
@@ -40,7 +40,25 @@ export default function Payments() {
   const [recvPage, setRecvPage] = useState(1)
   const [payPage, setPayPage] = useState(1)
   const [search, setSearch] = useState('')
-  const { data, isLoading } = useList<Payment>('payments', { page, search })
+  const [sort, setSort] = useState('payment_date')
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc')
+  const { data, isLoading } = useList<Payment>('payments', { page, search, sort, dir })
+
+  const onSortHist = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('desc') }
+    setPage(1)
+  }
+
+  const histColumns: Column<Payment>[] = [
+    { key: 'reference', label: 'Ref', sortable: true, render: (p) => <span className="font-mono text-xs">{p.reference}</span> },
+    { key: 'payment_date', label: 'Date', sortable: true, render: (p) => p.payment_date },
+    { key: 'direction', label: 'Direction', sortable: true, render: (p) => <Badge color={p.direction === 'receipt' ? 'green' : 'red'}>{p.direction === 'receipt' ? 'IN' : 'OUT'}</Badge> },
+    { key: 'party', label: 'Party', render: (p) => p.party_name },
+    { key: 'amount', label: 'Amount', sortable: true, align: 'right', render: (p) => formatPaisa(p.amount) },
+    { key: 'method', label: 'Method', sortable: true, render: (p) => <Badge color={p.method === 'bank' ? 'blue' : 'slate'}>{p.method}</Badge> },
+    { key: 'bank_ref', label: 'Bank / ref', render: (p) => <span className="text-xs" style={{ color: 'var(--muted)' }}>{p.bank_ref ?? '—'}</span> },
+  ]
   const recv = useList<Party>('customers', { has_dues: 1, page: recvPage })
   const payables = useQuery({
     queryKey: ['payables'],
@@ -48,7 +66,7 @@ export default function Payments() {
   })
 
   const invalidateAll = () => {
-    ['payments', 'payables', 'customers', 'suppliers', 'drivers', 'labourers', 'salaries', 'dashboard'].forEach((k) =>
+    ['payments', 'payables', 'customers', 'suppliers', 'drivers', 'labourers', 'salaries', 'dashboard', 'sales', 'purchases', 'transport-trips'].forEach((k) =>
       qc.invalidateQueries({ queryKey: [k] }))
   }
 
@@ -139,29 +157,21 @@ export default function Payments() {
       {/* All payments history */}
       <div>
         <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Saari payments (history)</h2>
-        <div className="mb-3">
-          <Input placeholder="Search ref or party name…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs" />
-        </div>
-        {isLoading ? (
-          <Spinner />
-        ) : (
-          <Table head={['Ref', 'Date', 'Direction', 'Party', 'Amount', 'Method', 'Bank / ref']}>
-            {data?.data.map((p) => (
-              <tr key={p.id}>
-                <td className="px-4 py-3 font-mono text-xs">{p.reference}</td>
-                <td className="px-4 py-3">{p.payment_date}</td>
-                <td className="px-4 py-3">
-                  <Badge color={p.direction === 'receipt' ? 'green' : 'red'}>{p.direction === 'receipt' ? 'IN' : 'OUT'}</Badge>
-                </td>
-                <td className="px-4 py-3">{p.party_name}</td>
-                <td className="px-4 py-3">{formatPaisa(p.amount)}</td>
-                <td className="px-4 py-3"><Badge color={p.method === 'bank' ? 'blue' : 'slate'}>{p.method}</Badge></td>
-                <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)' }}>{p.bank_ref ?? '—'}</td>
-              </tr>
-            ))}
-          </Table>
-        )}
-        <Pagination meta={data?.meta} page={page} onPage={setPage} />
+        <DataTable
+          columns={histColumns}
+          rows={data?.data}
+          loading={isLoading}
+          emptyText="Koi payment record nahi."
+          search={search}
+          onSearch={(v) => { setSearch(v); setPage(1) }}
+          searchPlaceholder="Ref ya party naam se search…"
+          sort={sort}
+          dir={dir}
+          onSort={onSortHist}
+          meta={data?.meta}
+          page={page}
+          onPage={setPage}
+        />
       </div>
 
       {modal && (

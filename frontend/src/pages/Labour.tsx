@@ -5,7 +5,7 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { Power, PowerOff, Trash2, Wallet } from 'lucide-react'
-import { Badge, Button, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Select, Spinner, Table, useConfirm } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select, useConfirm } from '../components/ui'
 
 interface Labourer {
   id: string
@@ -24,15 +24,44 @@ export default function Labour() {
   const [marking, setMarking] = useState(false)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [sort, setSort] = useState('name')
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
   const [payId, setPayId] = useState<string | null>(null)
-  const { data, isLoading } = useList<Labourer>('labourers', { search, page })
+  const { data, isLoading } = useList<Labourer>('labourers', { search, page, sort, dir })
   const invalidate = () => { qc.invalidateQueries({ queryKey: ['labourers'] }) }
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('asc') }
+    setPage(1)
+  }
 
   const create = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/labourers', p), onSuccess: () => { invalidate(); setCreating(false) } })
   const mark = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/attendances', p), onSuccess: () => { invalidate(); setMarking(false) } })
   const pay = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/labourers/${id}/pay`, payload), onSuccess: () => { invalidate(); setPayId(null) } })
   const del = useMutation({ mutationFn: (id: string) => api.delete(`/labourers/${id}`), onSuccess: invalidate, onError: (e) => alert(apiError(e)) })
   const toggle = useMutation({ mutationFn: (l: Labourer) => api.put(`/labourers/${l.id}`, { name: l.name, phone: l.phone ?? '', daily_wage: l.daily_wage / 100, is_active: !l.is_active }), onSuccess: invalidate, onError: (e) => alert(apiError(e)) })
+
+  const columns: Column<Labourer>[] = [
+    { key: 'name', label: 'Name', sortable: true, render: (l) => <span className="font-medium" style={{ opacity: l.is_active ? 1 : 0.55 }}>{l.name}</span> },
+    { key: 'phone', label: 'Phone', sortable: true, render: (l) => l.phone ?? '—' },
+    { key: 'daily_wage', label: 'Daily Wage', sortable: true, align: 'right', render: (l) => formatPaisa(l.daily_wage) },
+    { key: 'balance', label: 'Dues', sortable: true, align: 'right', render: (l) => l.balance > 0 ? <Badge color="red">{formatPaisa(l.balance)}</Badge> : <Badge color="green">Settled</Badge> },
+    { key: 'is_active', label: 'Status', sortable: true, render: (l) => l.is_active ? <Badge color="green">Active</Badge> : <Badge color="amber">Off</Badge> },
+    {
+      key: 'actions', label: '', align: 'right', render: (l) => (
+        <RowActions>
+          {can('payments.manage') && <IconButton icon={Wallet} label="Pay mazdoor" tone="primary" onClick={() => setPayId(l.id)} />}
+          {can('labour.manage') && <IconButton icon={l.is_active ? PowerOff : Power} label={l.is_active ? 'Deactivate' : 'Activate'} tone="amber" onClick={() => toggle.mutate(l)} />}
+          {can('labour.manage') && (
+            <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
+              if (await confirm({ title: 'Mazdoor delete karein?', message: `"${l.name}" delete ho jayega.`, confirmText: 'Delete' })) del.mutate(l.id)
+            }} />
+          )}
+        </RowActions>
+      ),
+    },
+  ]
 
   return (
     <div>
@@ -46,36 +75,21 @@ export default function Labour() {
           </>
         )}
       />
-      <div className="mb-4">
-        <Input placeholder="Search labourer name…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs" />
-      </div>
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Table head={['Name', 'Phone', 'Daily Wage', 'Dues', 'Status', '']}>
-          {data?.data.map((l) => (
-            <tr key={l.id} style={{ opacity: l.is_active ? 1 : 0.55 }}>
-              <td className="px-4 py-3 font-medium">{l.name}</td>
-              <td className="px-4 py-3">{l.phone ?? '—'}</td>
-              <td className="px-4 py-3">{formatPaisa(l.daily_wage)}</td>
-              <td className="px-4 py-3">{l.balance > 0 ? <Badge color="red">{formatPaisa(l.balance)}</Badge> : <Badge color="green">Settled</Badge>}</td>
-              <td className="px-4 py-3">{l.is_active ? <Badge color="green">Active</Badge> : <Badge color="amber">Off</Badge>}</td>
-              <td className="px-4 py-3">
-                <RowActions>
-                  {can('payments.manage') && <IconButton icon={Wallet} label="Pay mazdoor" tone="primary" onClick={() => setPayId(l.id)} />}
-                  {can('labour.manage') && <IconButton icon={l.is_active ? PowerOff : Power} label={l.is_active ? 'Deactivate' : 'Activate'} tone="amber" onClick={() => toggle.mutate(l)} />}
-                  {can('labour.manage') && (
-                    <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
-                      if (await confirm({ title: 'Mazdoor delete karein?', message: `"${l.name}" delete ho jayega.`, confirmText: 'Delete' })) del.mutate(l.id)
-                    }} />
-                  )}
-                </RowActions>
-              </td>
-            </tr>
-          ))}
-        </Table>
-      )}
-      <Pagination meta={data?.meta} page={page} onPage={setPage} />
+      <DataTable
+        columns={columns}
+        rows={data?.data}
+        loading={isLoading}
+        emptyText="Koi mazdoor nahi."
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Mazdoor name ya phone se search…"
+        sort={sort}
+        dir={dir}
+        onSort={onSort}
+        meta={data?.meta}
+        page={page}
+        onPage={setPage}
+      />
       {creating && (
         <Modal title="New Labourer" onClose={() => setCreating(false)}>
           <LabourerForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />

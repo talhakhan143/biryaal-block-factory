@@ -5,7 +5,7 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { Trash2, Wallet } from 'lucide-react'
-import { Badge, Button, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select, Spinner, Table, useConfirm } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select, Spinner, Table, useConfirm } from '../components/ui'
 
 interface Staff {
   id: string
@@ -33,9 +33,37 @@ export default function StaffPage() {
   const [addStaff, setAddStaff] = useState(false)
   const [genSalary, setGenSalary] = useState(false)
   const [payId, setPayId] = useState<string | null>(null)
-  const staff = useList<Staff>('staff', { per_page: 100 })
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('name')
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
+  const staff = useList<Staff>('staff', { page, search, sort, dir })
+  const allStaff = useList<Staff>('staff', { per_page: 200 }) // full list for the salary dropdown
   const salaries = useList<Salary>('salaries')
   const refresh = () => { qc.invalidateQueries({ queryKey: ['staff'] }); qc.invalidateQueries({ queryKey: ['salaries'] }) }
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('asc') }
+    setPage(1)
+  }
+
+  const staffColumns: Column<Staff>[] = [
+    { key: 'name', label: 'Name', sortable: true, render: (s) => <span className="font-medium">{s.name}</span> },
+    { key: 'role', label: 'Role', render: (s) => s.role ?? '—' },
+    { key: 'monthly_salary', label: 'Monthly Salary', sortable: true, align: 'right', render: (s) => formatPaisa(s.monthly_salary) },
+    {
+      key: 'actions', label: '', align: 'right', render: (s) => (
+        can('hr.manage') ? (
+          <RowActions>
+            <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
+              if (await confirm({ title: 'Staff delete karein?', message: `"${s.name}" delete ho jayega.`, confirmText: 'Delete' })) delStaff.mutate(s.id)
+            }} />
+          </RowActions>
+        ) : null
+      ),
+    },
+  ]
 
   const createStaff = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/staff', p), onSuccess: () => { refresh(); setAddStaff(false) } })
   const delStaff = useMutation({ mutationFn: (id: string) => api.delete(`/staff/${id}`), onSuccess: refresh, onError: (e) => alert(apiError(e)) })
@@ -46,26 +74,21 @@ export default function StaffPage() {
     <div className="space-y-8">
       <div>
         <PageHeader title="Staff" subtitle="Mahine wale mulazim aur unki tankha" actions={can('hr.manage') && <Button onClick={() => setAddStaff(true)}>+ Staff</Button>} />
-        {staff.isLoading ? <Spinner /> : (
-          <Table head={['Name', 'Role', 'Monthly Salary', '']}>
-            {staff.data?.data.map((s) => (
-              <tr key={s.id}>
-                <td className="px-4 py-3 font-medium">{s.name}</td>
-                <td className="px-4 py-3">{s.role ?? '—'}</td>
-                <td className="px-4 py-3">{formatPaisa(s.monthly_salary)}</td>
-                <td className="px-4 py-3">
-                  {can('hr.manage') && (
-                    <RowActions>
-                      <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
-                        if (await confirm({ title: 'Staff delete karein?', message: `"${s.name}" delete ho jayega.`, confirmText: 'Delete' })) delStaff.mutate(s.id)
-                      }} />
-                    </RowActions>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </Table>
-        )}
+        <DataTable
+          columns={staffColumns}
+          rows={staff.data?.data}
+          loading={staff.isLoading}
+          emptyText="Koi staff nahi."
+          search={search}
+          onSearch={(v) => { setSearch(v); setPage(1) }}
+          searchPlaceholder="Naam ya phone se search…"
+          sort={sort}
+          dir={dir}
+          onSort={onSort}
+          meta={staff.data?.meta}
+          page={page}
+          onPage={setPage}
+        />
       </div>
 
       <div>
@@ -101,7 +124,7 @@ export default function StaffPage() {
       )}
       {genSalary && (
         <Modal title="Generate Salary" onClose={() => setGenSalary(false)}>
-          <SalaryForm staff={staff.data?.data ?? []} onSubmit={(p) => generate.mutate(p)} busy={generate.isPending} error={generate.error ? apiError(generate.error) : ''} />
+          <SalaryForm staff={allStaff.data?.data ?? []} onSubmit={(p) => generate.mutate(p)} busy={generate.isPending} error={generate.error ? apiError(generate.error) : ''} />
         </Modal>
       )}
       {payId && (

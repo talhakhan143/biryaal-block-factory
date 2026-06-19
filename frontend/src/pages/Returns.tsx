@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, PageHeader, Pagination, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, Input, MethodField, Modal, MoneyInput, PageHeader, Select } from '../components/ui'
 
 interface SalesReturn {
   id: string
@@ -22,12 +22,31 @@ export default function Returns() {
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
   const [page, setPage] = useState(1)
-  const { data, isLoading } = useList<SalesReturn>('sales-returns', { page })
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('return_date')
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc')
+  const { data, isLoading } = useList<SalesReturn>('sales-returns', { page, search, sort, dir })
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('desc') }
+    setPage(1)
+  }
 
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/sales-returns', p),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['sales-returns'] }); setCreating(false) },
   })
+
+  const columns: Column<SalesReturn>[] = [
+    { key: 'reference', label: 'Ref', sortable: true, render: (r) => <span className="font-mono text-xs">{r.reference}</span> },
+    { key: 'return_date', label: 'Date', sortable: true, render: (r) => r.return_date },
+    { key: 'customer', label: 'Customer', render: (r) => r.customer?.name ?? 'Walk-in' },
+    { key: 'return_value', label: 'Return Value', sortable: true, align: 'right', render: (r) => formatPaisa(r.return_value) },
+    { key: 'deduction', label: 'Deduction', sortable: true, align: 'right', render: (r) => formatPaisa(r.deduction) },
+    { key: 'refund_amount', label: 'Refund', sortable: true, align: 'right', render: (r) => <span className="font-semibold">{formatPaisa(r.refund_amount)}</span> },
+    { key: 'refund_mode', label: 'Mode', sortable: true, render: (r) => <Badge color="blue">{r.refund_mode}</Badge> },
+  ]
 
   return (
     <div>
@@ -36,27 +55,21 @@ export default function Returns() {
         subtitle="Block wapas — stock me wapas, paisa refund (kiraya/cut ke baad)"
         actions={can('sales.manage') && <Button onClick={() => setCreating(true)}>+ Return</Button>}
       />
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Table head={['Ref', 'Date', 'Customer', 'Return Value', 'Deduction', 'Refund', 'Mode']}>
-          {data?.data.map((r) => (
-            <tr key={r.id}>
-              <td className="px-4 py-3 font-mono text-xs">{r.reference}</td>
-              <td className="px-4 py-3">{r.return_date}</td>
-              <td className="px-4 py-3">{r.customer?.name ?? 'Walk-in'}</td>
-              <td className="px-4 py-3">{formatPaisa(r.return_value)}</td>
-              <td className="px-4 py-3">{formatPaisa(r.deduction)}</td>
-              <td className="px-4 py-3 font-semibold">{formatPaisa(r.refund_amount)}</td>
-              <td className="px-4 py-3"><Badge color="blue">{r.refund_mode}</Badge></td>
-            </tr>
-          ))}
-          {data?.data.length === 0 && (
-            <tr><td colSpan={7} className="px-4 py-6 text-center" style={{ color: 'var(--muted)' }}>Koi return nahi.</td></tr>
-          )}
-        </Table>
-      )}
-      <Pagination meta={data?.meta} page={page} onPage={setPage} />
+      <DataTable
+        columns={columns}
+        rows={data?.data}
+        loading={isLoading}
+        emptyText="Koi return nahi."
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Ref ya customer se search…"
+        sort={sort}
+        dir={dir}
+        onSort={onSort}
+        meta={data?.meta}
+        page={page}
+        onPage={setPage}
+      />
       {creating && (
         <Modal title="New Block Return" onClose={() => setCreating(false)}>
           <ReturnForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />

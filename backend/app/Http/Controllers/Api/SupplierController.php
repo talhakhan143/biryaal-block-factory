@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SupplierResource;
 use App\Models\MaterialPurchase;
@@ -11,16 +12,17 @@ use Illuminate\Http\Request;
 
 class SupplierController extends Controller
 {
+    use HasTableQuery;
+
     public function index(Request $request)
     {
-        $suppliers = Supplier::query()
-            ->when($request->search, fn ($q, $s) => $q->where('name', 'like', "%{$s}%")->orWhere('phone', 'like', "%{$s}%"))
-            ->when($request->boolean('has_dues'), fn ($q) => $q->where('balance', '>', 0)->orderByDesc('balance'))
-            ->when($request->boolean('active_only'), fn ($q) => $q->where('is_active', true))
-            ->orderBy('name')
-            ->paginate($request->integer('per_page', 15));
+        $query = Supplier::query()
+            ->when($request->boolean('has_dues'), fn ($q) => $q->where('balance', '>', 0))
+            ->when($request->boolean('active_only'), fn ($q) => $q->where('is_active', true));
 
-        return SupplierResource::collection($suppliers);
+        $this->applyTableQuery($query, $request, ['name', 'balance', 'phone', 'is_active'], ['name', 'phone'], 'name');
+
+        return SupplierResource::collection($query->paginate($request->integer('per_page', 15)));
     }
 
     public function store(Request $request)

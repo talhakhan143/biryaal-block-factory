@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DriverResource;
 use App\Http\Resources\PaymentResource;
@@ -14,16 +15,16 @@ use Illuminate\Http\Request;
 
 class DriverController extends Controller
 {
+    use HasTableQuery;
+
     public function __construct(private PaymentService $payments) {}
 
     public function index(Request $request)
     {
-        $drivers = Driver::query()
-            ->when($request->search, fn ($q, $s) => $q->where('name', 'like', "%{$s}%")->orWhere('phone', 'like', "%{$s}%"))
-            ->orderBy('name')
-            ->paginate($request->integer('per_page', 50));
+        $query = Driver::query();
+        $this->applyTableQuery($query, $request, ['name', 'phone', 'balance', 'vehicle_name'], ['name', 'phone', 'vehicle_name'], 'name');
 
-        return DriverResource::collection($drivers);
+        return DriverResource::collection($query->paginate($request->integer('per_page', 50)));
     }
 
     public function store(Request $request)

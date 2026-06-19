@@ -5,7 +5,7 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { Eye, HandCoins, Trash2 } from 'lucide-react'
-import { Badge, Button, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Spinner, Table, useConfirm } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, useConfirm } from '../components/ui'
 
 interface Sale {
   id: string
@@ -27,14 +27,22 @@ export default function Sales() {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [sort, setSort] = useState('sale_date')
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [viewId, setViewId] = useState<string | null>(null)
   const [receiveFor, setReceiveFor] = useState<Sale | null>(null)
-  const { data, isLoading } = useList<Sale>('sales', { search, page })
+  const { data, isLoading } = useList<Sale>('sales', { search, page, sort, dir })
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('desc') }
+    setPage(1)
+  }
 
   const receive = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/sales/${id}/receive`, payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sales'] })
+      ['sales', 'customers', 'payments', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setReceiveFor(null)
     },
   })
@@ -48,44 +56,50 @@ export default function Sales() {
     onError: (e) => alert(apiError(e)),
   })
 
+  const columns: Column<Sale>[] = [
+    { key: 'invoice_no', label: 'Invoice', sortable: true, render: (s) => <span className="font-mono text-xs">{s.invoice_no}</span> },
+    { key: 'sale_date', label: 'Date', sortable: true, render: (s) => s.sale_date },
+    { key: 'customer', label: 'Customer', render: (s) => s.customer?.name ?? 'Walk-in' },
+    { key: 'type', label: 'Type', sortable: true, render: (s) => <span className="capitalize">{s.type}</span> },
+    { key: 'total', label: 'Total', sortable: true, align: 'right', render: (s) => formatPaisa(s.total) },
+    { key: 'paid', label: 'Paid', sortable: true, align: 'right', render: (s) => formatPaisa(s.paid) },
+    { key: 'balance', label: 'Balance', sortable: true, align: 'right', render: (s) => formatPaisa(s.balance) },
+    { key: 'status', label: 'Status', sortable: true, render: (s) => <Badge color={statusColor[s.status]}>{s.status}</Badge> },
+    {
+      key: 'actions', label: '', align: 'right', render: (s) => (
+        <RowActions>
+          {can('payments.manage') && s.balance > 0 && (
+            <IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => setReceiveFor(s)} />
+          )}
+          <IconButton icon={Eye} label="View" tone="primary" onClick={() => setViewId(s.id)} />
+          {can('sales.manage') && (
+            <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
+              if (await confirm({ title: 'Invoice delete karein?', message: `Invoice ${s.invoice_no} delete ho jayega. Stock wapas ready me chala jayega.`, confirmText: 'Delete' })) del.mutate(s.id)
+            }} />
+          )}
+        </RowActions>
+      ),
+    },
+  ]
+
   return (
     <div>
       <PageHeader title="Sales" subtitle="Saari bikri — cash aur udhaar" />
-      <div className="mb-4">
-        <Input placeholder="Search invoice no…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs" />
-      </div>
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Table head={['Invoice', 'Date', 'Customer', 'Type', 'Total', 'Paid', 'Balance', 'Status', '']}>
-          {data?.data.map((s) => (
-            <tr key={s.id}>
-              <td className="px-4 py-3 font-mono text-xs">{s.invoice_no}</td>
-              <td className="px-4 py-3">{s.sale_date}</td>
-              <td className="px-4 py-3">{s.customer?.name ?? 'Walk-in'}</td>
-              <td className="px-4 py-3 capitalize">{s.type}</td>
-              <td className="px-4 py-3">{formatPaisa(s.total)}</td>
-              <td className="px-4 py-3">{formatPaisa(s.paid)}</td>
-              <td className="px-4 py-3">{formatPaisa(s.balance)}</td>
-              <td className="px-4 py-3"><Badge color={statusColor[s.status]}>{s.status}</Badge></td>
-              <td className="px-4 py-3">
-                <RowActions>
-                  {can('payments.manage') && s.balance > 0 && (
-                    <IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => setReceiveFor(s)} />
-                  )}
-                  <IconButton icon={Eye} label="View" tone="primary" onClick={() => setViewId(s.id)} />
-                  {can('sales.manage') && (
-                    <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
-                      if (await confirm({ title: 'Invoice delete karein?', message: `Invoice ${s.invoice_no} delete ho jayega. Stock wapas ready me chala jayega.`, confirmText: 'Delete' })) del.mutate(s.id)
-                    }} />
-                  )}
-                </RowActions>
-              </td>
-            </tr>
-          ))}
-        </Table>
-      )}
-      <Pagination meta={data?.meta} page={page} onPage={setPage} />
+      <DataTable
+        columns={columns}
+        rows={data?.data}
+        loading={isLoading}
+        emptyText="Koi bikri nahi."
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Invoice no ya customer se search…"
+        sort={sort}
+        dir={dir}
+        onSort={onSort}
+        meta={data?.meta}
+        page={page}
+        onPage={setPage}
+      />
       {viewId && <InvoiceModal id={viewId} onClose={() => setViewId(null)} />}
       {receiveFor && (
         <Modal title={`Receive — ${receiveFor.invoice_no}`} onClose={() => setReceiveFor(null)}>
