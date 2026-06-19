@@ -4,6 +4,7 @@ namespace App\Services\Payments;
 
 use App\Models\Account;
 use App\Models\Customer;
+use App\Models\Driver;
 use App\Models\MaterialPurchase;
 use App\Models\Payment;
 use App\Models\Sale;
@@ -280,6 +281,13 @@ class PaymentService
 
             $party->decrement('balance', $amount);
 
+            // A driver's dues are the sum of their unpaid transport trips. Spread
+            // this payment across those trips (oldest first) so the Transport tab
+            // stays in sync with the driver's balance.
+            if ($party instanceof Driver) {
+                $this->allocateToDriverTrips($party, $amount);
+            }
+
             $cashAccount = CashAccountResolver::code($data['method'] ?? 'cash');
             $name = $party->name ?? class_basename($party);
             $this->ledger->post(
@@ -294,6 +302,38 @@ class PaymentService
 
             return $payment;
         });
+    }
+
+    /**
+     * Apply a lump driver payment to their open trips (oldest first), updating
+     * each trip's paid/balance/status until the amount is consumed.
+     */
+    private function allocateToDriverTrips(Driver $driver, int $amount): void
+    {
+        $remaining = $amount;
+
+        $trips = TransportTrip::where('driver_id', $driver->getKey())
+            ->where('balance', '>', 0)
+            ->orderBy('trip_date')
+            ->orderBy('created_at')
+            ->get();
+
+        foreach ($trips as $trip) {
+            if ($remaining <= 0) {
+                break;
+            }
+
+            $apply = min($remaining, (int) $trip->balance);
+            $paid = (int) $trip->paid + $apply;
+
+            $trip->update([
+                'paid' => $paid,
+                'balance' => (int) $trip->rate - $paid,
+                'status' => $paid >= (int) $trip->rate ? 'paid' : ($paid > 0 ? 'partial' : 'unpaid'),
+            ]);
+
+            $remaining -= $apply;
+        }
     }
 
     private function assertPositive(int $amount): void
