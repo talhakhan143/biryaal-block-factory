@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
-import { AlertTriangle, X, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, ChevronsUpDown, Search, X, type LucideIcon } from 'lucide-react'
 
 export function Button({
   variant = 'primary',
@@ -271,6 +271,109 @@ export function OutstandingNote({ label, amount, onFill }: { label: string; amou
           </button>
         )}
       </span>
+    </div>
+  )
+}
+
+// ===== Reusable DataTable: searchable, sortable headers, paginated =====
+export interface Column<T> {
+  key: string
+  label: string
+  sortable?: boolean
+  align?: 'left' | 'right'
+  render: (row: T) => ReactNode
+}
+
+/**
+ * Server-driven table. The parent owns the query state (search/sort/dir/page)
+ * and passes the current rows; this renders the search box, clickable sort
+ * headers (asc/desc), and pagination. Newest-first is just the parent's default.
+ */
+export function DataTable<T>({
+  columns,
+  rows,
+  loading,
+  emptyText = 'Koi record nahi.',
+  search,
+  onSearch,
+  searchPlaceholder = 'Search…',
+  sort,
+  dir,
+  onSort,
+  meta,
+  page,
+  onPage,
+  actions,
+}: {
+  columns: Column<T>[]
+  rows: T[] | undefined
+  loading?: boolean
+  emptyText?: string
+  search?: string
+  onSearch?: (v: string) => void
+  searchPlaceholder?: string
+  sort?: string
+  dir?: 'asc' | 'desc'
+  onSort?: (key: string) => void
+  meta?: { current_page: number; last_page: number; total: number }
+  page: number
+  onPage: (p: number) => void
+  actions?: ReactNode
+}) {
+  return (
+    <div>
+      {(onSearch || actions) && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          {onSearch ? (
+            <div className="relative max-w-xs flex-1">
+              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--muted)' }} />
+              <Input value={search ?? ''} onChange={(e) => onSearch(e.target.value)} placeholder={searchPlaceholder} className="!pl-9" />
+            </div>
+          ) : <span />}
+          {actions}
+        </div>
+      )}
+      <div className="overflow-x-auto rounded-xl border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wide" style={{ background: 'var(--surface-2)', color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
+              {columns.map((c) => {
+                const active = sort === c.key
+                return (
+                  <th key={c.key} className={`px-4 py-3 font-semibold ${c.align === 'right' ? 'text-right' : ''}`}>
+                    {c.sortable && onSort ? (
+                      <button
+                        onClick={() => onSort(c.key)}
+                        className={`inline-flex items-center gap-1 transition hover:text-[var(--text)] ${c.align === 'right' ? 'flex-row-reverse' : ''}`}
+                        style={{ color: active ? 'var(--text)' : 'inherit' }}
+                      >
+                        {c.label}
+                        {active ? (dir === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />) : <ChevronsUpDown size={13} style={{ opacity: 0.5 }} />}
+                      </button>
+                    ) : c.label}
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+          <tbody style={{ color: 'var(--text)' }}>
+            {loading ? (
+              <tr><td colSpan={columns.length} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--muted)' }}>Loading…</td></tr>
+            ) : rows && rows.length > 0 ? (
+              rows.map((row, i) => (
+                <tr key={i} className="transition hover:bg-[var(--surface-hover)]" style={{ borderTop: '1px solid var(--border)' }}>
+                  {columns.map((c) => (
+                    <td key={c.key} className={`px-4 py-3 ${c.align === 'right' ? 'text-right' : ''}`}>{c.render(row)}</td>
+                  ))}
+                </tr>
+              ))
+            ) : (
+              <tr><td colSpan={columns.length} className="px-4 py-6 text-center text-sm" style={{ color: 'var(--muted)' }}>{emptyText}</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <Pagination meta={meta} page={page} onPage={onPage} />
     </div>
   )
 }

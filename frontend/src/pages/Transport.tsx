@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Wallet } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, Spinner, Table } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions } from '../components/ui'
 
 interface Trip {
   id: string
@@ -24,48 +25,62 @@ export default function Transport() {
   const { can } = useAuth()
   const qc = useQueryClient()
   const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('trip_date')
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [payFor, setPayFor] = useState<Trip | null>(null)
-  const { data, isLoading } = useList<Trip>('transport-trips', { page })
+  const { data, isLoading } = useList<Trip>('transport-trips', { page, search, sort, dir })
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('desc') }
+    setPage(1)
+  }
 
   const pay = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/transport-trips/${id}/pay`, payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['transport-trips'] })
-      qc.invalidateQueries({ queryKey: ['drivers'] })
+      ['transport-trips', 'drivers', 'dashboard', 'payables'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setPayFor(null)
     },
   })
 
+  const columns: Column<Trip>[] = [
+    { key: 'reference', label: 'Ref', sortable: true, render: (t) => <span className="font-mono text-xs">{t.reference}</span> },
+    { key: 'trip_date', label: 'Date', sortable: true, render: (t) => t.trip_date },
+    { key: 'vehicle', label: 'Vehicle', render: (t) => t.vehicle_label ?? '—' },
+    { key: 'driver', label: 'Driver', render: (t) => t.driver?.name ?? '—' },
+    { key: 'rate', label: 'Rate', sortable: true, align: 'right', render: (t) => formatPaisa(t.rate) },
+    { key: 'paid', label: 'Paid', sortable: true, align: 'right', render: (t) => formatPaisa(t.paid) },
+    { key: 'balance', label: 'Balance', sortable: true, align: 'right', render: (t) => formatPaisa(t.balance) },
+    { key: 'status', label: 'Status', sortable: true, render: (t) => <Badge color={statusColor[t.status]}>{t.status}</Badge> },
+    {
+      key: 'actions', label: '', align: 'right', render: (t) => (
+        can('payments.manage') && t.status !== 'paid' && t.driver
+          ? <RowActions><IconButton icon={Wallet} label="Pay" tone="primary" onClick={() => setPayFor(t)} /></RowActions>
+          : null
+      ),
+    },
+  ]
+
   return (
     <div>
       <PageHeader title="Transport Trips" subtitle="Trips dispatch se khud-ba-khud bante hain · yahin se driver ko pay karein" />
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Table head={['Ref', 'Date', 'Vehicle', 'Driver', 'Rate', 'Paid', 'Balance', 'Status', '']}>
-          {data?.data.map((t) => (
-            <tr key={t.id}>
-              <td className="px-4 py-3 font-mono text-xs">{t.reference}</td>
-              <td className="px-4 py-3">{t.trip_date}</td>
-              <td className="px-4 py-3">{t.vehicle_label ?? '—'}</td>
-              <td className="px-4 py-3">{t.driver?.name ?? '—'}</td>
-              <td className="px-4 py-3">{formatPaisa(t.rate)}</td>
-              <td className="px-4 py-3">{formatPaisa(t.paid)}</td>
-              <td className="px-4 py-3">{formatPaisa(t.balance)}</td>
-              <td className="px-4 py-3"><Badge color={statusColor[t.status]}>{t.status}</Badge></td>
-              <td className="px-4 py-3 text-right">
-                {can('payments.manage') && t.status !== 'paid' && t.driver && (
-                  <button className="text-sm hover:underline" style={{ color: 'var(--primary)' }} onClick={() => setPayFor(t)}>Pay</button>
-                )}
-              </td>
-            </tr>
-          ))}
-          {data?.data.length === 0 && (
-            <tr><td colSpan={9} className="px-4 py-6 text-center" style={{ color: 'var(--muted)' }}>Koi trip nahi — dispatch pe kiraya daalo to yahan aayega.</td></tr>
-          )}
-        </Table>
-      )}
-      <Pagination meta={data?.meta} page={page} onPage={setPage} />
+      <DataTable
+        columns={columns}
+        rows={data?.data}
+        loading={isLoading}
+        emptyText="Koi trip nahi — dispatch pe kiraya daalo to yahan aayega."
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Ref, driver ya vehicle se search…"
+        sort={sort}
+        dir={dir}
+        onSort={onSort}
+        meta={data?.meta}
+        page={page}
+        onPage={setPage}
+      />
       {payFor && (
         <Modal title={`Pay Driver — ${payFor.reference}`} onClose={() => setPayFor(null)}>
           <PayForm
