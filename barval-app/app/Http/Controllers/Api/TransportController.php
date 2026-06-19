@@ -17,11 +17,21 @@ class TransportController extends Controller
 
     public function index(Request $request)
     {
+        $sortable = ['trip_date', 'rate', 'paid', 'balance', 'status', 'reference'];
+        $sort = in_array($request->sort, $sortable, true) ? $request->sort : 'trip_date';
+        $dir = $request->dir === 'asc' ? 'asc' : 'desc';
+
         $trips = TransportTrip::query()
             ->with(['vehicle', 'driver'])
             ->when($request->driver_id, fn ($q, $id) => $q->where('driver_id', $id))
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
-            ->latest('trip_date')
+            ->when($request->search, fn ($q, $s) => $q->where(function ($q) use ($s) {
+                $q->where('reference', 'like', "%{$s}%")
+                    ->orWhereHas('driver', fn ($q) => $q->where('name', 'like', "%{$s}%"))
+                    ->orWhereHas('vehicle', fn ($q) => $q->where('name', 'like', "%{$s}%"));
+            }))
+            ->orderBy($sort, $dir)
+            ->orderBy('created_at', 'desc') // newest-first tiebreak
             ->paginate($request->integer('per_page', 15));
 
         return TransportTripResource::collection($trips);
