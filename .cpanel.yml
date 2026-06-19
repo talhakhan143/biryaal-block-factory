@@ -1,0 +1,7 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home2/baryal
+    - /bin/mkdir -p $DEPLOYPATH/barval-app
+    - /bin/cp -R barval-app/. $DEPLOYPATH/barval-app/
+    - /bin/cp -R public_html/. $DEPLOYPATH/public_html/
