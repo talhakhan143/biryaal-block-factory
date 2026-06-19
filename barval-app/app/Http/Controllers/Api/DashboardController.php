@@ -123,35 +123,24 @@ class DashboardController extends Controller
         ]);
     }
 
-    /** Count POS orders that still have blocks left to deliver. */
+    /**
+     * Count POS orders that still have blocks left to deliver. Done entirely in
+     * SQL (per sale+product: ordered minus dispatched) — no model hydration, so
+     * it stays fast as data grows.
+     */
     private function pendingDispatchCount(): int
     {
-        $count = 0;
-
-        Sale::with(['items:id,sale_id,product_id,quantity', 'dispatches.items:id,dispatch_id,product_id,quantity'])
-            ->latest('sale_date')
-            ->limit(500)
-            ->get()
-            ->each(function (Sale $sale) use (&$count) {
-                $ordered = [];
-                foreach ($sale->items as $i) {
-                    $ordered[$i->product_id] = ($ordered[$i->product_id] ?? 0) + (int) $i->quantity;
-                }
-                $dispatched = [];
-                foreach ($sale->dispatches as $d) {
-                    foreach ($d->items as $di) {
-                        $dispatched[$di->product_id] = ($dispatched[$di->product_id] ?? 0) + (int) $di->quantity;
-                    }
-                }
-                foreach ($ordered as $pid => $qty) {
-                    if ($qty - ($dispatched[$pid] ?? 0) > 0) {
-                        $count++;
-                        break;
-                    }
-                }
-            });
-
-        return $count;
+        return DB::table('sale_items as si')
+            ->select('si.sale_id')
+            ->groupBy('si.sale_id', 'si.product_id')
+            ->havingRaw('SUM(si.quantity) - COALESCE((
+                SELECT SUM(di.quantity) FROM dispatch_items di
+                JOIN dispatches d ON d.id = di.dispatch_id
+                WHERE d.sale_id = si.sale_id AND di.product_id = si.product_id
+            ), 0) > 0')
+            ->pluck('si.sale_id')
+            ->unique()
+            ->count();
     }
 
     private function accountBalance(string $code): int
