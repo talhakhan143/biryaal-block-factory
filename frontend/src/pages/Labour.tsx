@@ -129,7 +129,8 @@ function LabourerForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
 }
 
 function AttendanceForm({ labourers, onSubmit, busy, error }: { labourers: Labourer[]; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
-  const [form, setForm] = useState({ labourer_id: '', work_date: new Date().toISOString().slice(0, 10), status: 'present' })
+  const today = new Date().toISOString().slice(0, 10)
+  const [form, setForm] = useState({ labourer_id: '', work_date: today, status: 'present' })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(form) }} className="space-y-3">
@@ -140,7 +141,7 @@ function AttendanceForm({ labourers, onSubmit, busy, error }: { labourers: Labou
         </Select>
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Date"><Input type="date" value={form.work_date} onChange={(e) => set('work_date', e.target.value)} required /></Field>
+        <Field label="Date"><Input type="date" max={today} value={form.work_date} onChange={(e) => set('work_date', e.target.value)} required /></Field>
         <Field label="Status">
           <Select value={form.status} onChange={(e) => set('status', e.target.value)}>
             <option value="present">Present</option>

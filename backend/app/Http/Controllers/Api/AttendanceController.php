@@ -30,9 +30,11 @@ class AttendanceController extends Controller
     {
         $data = $request->validate([
             'labourer_id' => ['required', 'uuid', 'exists:labourers,id'],
-            'work_date' => ['required', 'date'],
+            'work_date' => ['required', 'date', 'before_or_equal:today'],
             'status' => ['required', 'in:present,half,absent'],
             'note' => ['nullable', 'string'],
+        ], [
+            'work_date.before_or_equal' => 'Future date ki attendance nahi ho sakti — sirf aaj tak.',
         ]);
 
         return new AttendanceResource($this->service->markAttendance($data)->load('labourer'));

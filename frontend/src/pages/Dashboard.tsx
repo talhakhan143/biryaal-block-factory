@@ -6,10 +6,11 @@ import { Card, PageHeader, Spinner } from '../components/ui'
 
 interface DashboardData {
   today: { production_qty: number; blocks_sold: number; sales_total: number; expenses_total: number; money_in: number; money_out: number }
-  month: { label: string; sales_total: number; expenses_total: number; net_profit: number }
-  totals: { production: number; sold: number }
+  month: { label: string; sales_total: number; income: number; expenses_total: number; net_profit: number }
+  totals: { production: number; sold: number; income: number; cost: number; net_profit: number }
   cash_in_hand: number
   bank_balance: number
+  total_cash: number
   receivables: number
   payables: number
   payable_breakdown: { suppliers: number; drivers: number; labourers: number; staff: number }
@@ -69,6 +70,7 @@ export default function Dashboard() {
       {/* Money position */}
       <SectionTitle title="Paisa" note="cash position" />
       <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Stat label="Total Cash" hint="Bank + haath ka cash (total liquid)" value={formatPaisa(data.total_cash)} tone={data.total_cash < 0 ? 'red' : 'green'} to="/cash-book" />
         <Stat label="Cash in hand" hint="Cash mojood · click for cash book" value={formatPaisa(data.cash_in_hand)} tone={data.cash_in_hand < 0 ? 'red' : 'green'} to="/cash-book" />
         <Stat label="Bank balance" hint="Bank me · click for cash book" value={formatPaisa(data.bank_balance)} tone={data.bank_balance < 0 ? 'red' : 'primary'} to="/cash-book" />
         <Stat label="Receivables" hint={`${d.customers} customers se lene hain · click for list`} value={formatPaisa(data.receivables)} tone="primary" to="/payments" />
@@ -88,13 +90,13 @@ export default function Dashboard() {
         <Stat label="Ready Stock" hint="Tayar maal · click for list" value={`${data.stock.ready} pcs`} tone="green" to="/inventory" />
       </div>
 
-      {/* This month */}
-      <SectionTitle title={`Is mahine (${data.month.label})`} note="month P&L" />
+      {/* Profit & Loss */}
+      <SectionTitle title={`Munafa / Nuksan (${data.month.label})`} note="profit & loss — kharch me expenses + salaries + labour sab" />
       <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Month Sales" hint="Is mahine bikri" value={formatPaisa(data.month.sales_total)} tone="green" to="/sales" />
-        <Stat label="Month Expenses" hint="Is mahine kharch" value={formatPaisa(data.month.expenses_total)} tone="red" to="/expenses" />
-        <Stat label="Net Profit" hint="Maal bikri − kharch" value={formatPaisa(data.month.net_profit)} tone={data.month.net_profit < 0 ? 'red' : 'green'} to="/reports" />
-        <Stat label="Curing Stock" hint="Curing me · tayar honay baqi" value={`${data.stock.curing} pcs`} tone="amber" to="/production" />
+        <Stat label="Is mahine Aamdani" hint="Bikri + other income" value={formatPaisa(data.month.income)} tone="green" to="/reports" />
+        <Stat label="Is mahine Kharch" hint="Expenses + salary + labour" value={formatPaisa(data.month.expenses_total)} tone="red" to="/reports" />
+        <Stat label="Net Profit (mahina)" hint={data.month.net_profit < 0 ? 'NUKSAN' : 'Munafa is mahine'} value={formatPaisa(data.month.net_profit)} tone={data.month.net_profit < 0 ? 'red' : 'green'} to="/reports" />
+        <Stat label="Net Profit (ab tak)" hint={data.totals.net_profit < 0 ? 'NUKSAN — lifetime' : 'Lifetime munafa'} value={formatPaisa(data.totals.net_profit)} tone={data.totals.net_profit < 0 ? 'red' : 'green'} to="/reports" />
       </div>
 
       {/* Lifetime */}
@@ -103,6 +105,7 @@ export default function Dashboard() {
         <Stat label="Total Production" hint="Ab tak banaye blocks" value={`${data.totals.production} pcs`} tone="primary" to="/production" />
         <Stat label="Total Sold" hint="Ab tak bik'e blocks" value={`${data.totals.sold} pcs`} tone="green" to="/sales" />
         <Stat label="Remaining Ready" hint="Bechne ke liye baqi" value={`${data.stock.ready} pcs`} tone="green" to="/inventory" />
+        <Stat label="Curing Stock" hint="Curing me · tayar honay baqi" value={`${data.stock.curing} pcs`} tone="amber" to="/production" />
         <Stat label="Damaged" hint="Kharab maal" value={`${data.stock.damaged} pcs`} tone="red" to="/inventory" />
       </div>
 

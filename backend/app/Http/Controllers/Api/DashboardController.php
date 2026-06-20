@@ -35,12 +35,19 @@ class DashboardController extends Controller
         $todayMoneyIn = (int) Payment::where('direction', Payment::RECEIPT)->whereDate('payment_date', $today)->sum('amount');
         $todayMoneyOut = (int) Payment::where('direction', Payment::PAYMENT)->whereDate('payment_date', $today)->sum('amount');
 
-        // ---- This month (rough P&L: goods sales minus expenses) ----
-        $monthGoods = (int) Sale::whereBetween('sale_date', [$monthStart, $monthEnd])->sum(DB::raw('subtotal - discount'));
+        // ---- This month P&L (ledger-based). Cost = EVERY operating cost that
+        //      hits the EXPENSE account: misc expenses + staff salaries + labour
+        //      wages. Income = sales + other income/adjustments. ----
         $monthSalesTotal = (int) Sale::whereBetween('sale_date', [$monthStart, $monthEnd])->sum('total');
-        $monthExpenses = (int) Expense::whereBetween('expense_date', [$monthStart, $monthEnd])->sum('amount');
+        $monthIncome = $this->accountNet(Account::SALES, 'credit', $monthStart, $monthEnd)
+            + $this->accountNet(Account::OTHER_INCOME, 'credit', $monthStart, $monthEnd);
+        $monthCost = $this->accountNet(Account::EXPENSE, 'debit', $monthStart, $monthEnd);
+        $monthProfit = $monthIncome - $monthCost;
 
-        // ---- Lifetime ----
+        // ---- Lifetime P&L + production ----
+        $lifeIncome = $this->accountNet(Account::SALES, 'credit') + $this->accountNet(Account::OTHER_INCOME, 'credit');
+        $lifeCost = $this->accountNet(Account::EXPENSE, 'debit');
+        $lifeProfit = $lifeIncome - $lifeCost;
         $totalProduction = (int) ProductionBatch::sum('quantity_produced');
         $totalSold = (int) SaleItem::sum('quantity');
 
@@ -87,6 +94,9 @@ class DashboardController extends Controller
                 'threshold' => (int) $s->product->low_stock_threshold,
             ])->values();
 
+        $cash = $this->accountBalance(Account::CASH);
+        $bank = $this->accountBalance(Account::BANK);
+
         return response()->json([
             'today' => [
                 'production_qty' => $todayProduction,
@@ -99,15 +109,20 @@ class DashboardController extends Controller
             'month' => [
                 'label' => Carbon::now()->format('F Y'),
                 'sales_total' => $monthSalesTotal,
-                'expenses_total' => $monthExpenses,
-                'net_profit' => $monthGoods - $monthExpenses, // goods sales − expenses (freight is pass-through)
+                'income' => $monthIncome,
+                'expenses_total' => $monthCost, // all operating costs (expenses + salaries + labour)
+                'net_profit' => $monthProfit,
             ],
             'totals' => [
                 'production' => $totalProduction,
                 'sold' => $totalSold,
+                'income' => $lifeIncome,
+                'cost' => $lifeCost,
+                'net_profit' => $lifeProfit,
             ],
-            'cash_in_hand' => $this->accountBalance(Account::CASH),
-            'bank_balance' => $this->accountBalance(Account::BANK),
+            'cash_in_hand' => $cash,
+            'bank_balance' => $bank,
+            'total_cash' => $cash + $bank,
             'receivables' => $receivables,
             'payables' => $payables,
             'payable_breakdown' => $payableBreakdown,
@@ -148,5 +163,24 @@ class DashboardController extends Controller
         $account = Account::where('code', $code)->first();
 
         return $account ? $account->balance() : 0;
+    }
+
+    /** Net movement of an account over an optional date range, by its normal side. */
+    private function accountNet(string $code, string $side, ?string $from = null, ?string $to = null): int
+    {
+        $account = Account::where('code', $code)->first();
+        if (! $account) {
+            return 0;
+        }
+
+        $query = $account->lines()
+            ->when($from || $to, fn ($q) => $q->whereHas('entry', function ($q) use ($from, $to) {
+                $q->when($from, fn ($q, $d) => $q->whereDate('entry_date', '>=', $d))
+                    ->when($to, fn ($q, $d) => $q->whereDate('entry_date', '<=', $d));
+            }));
+
+        return $side === 'credit'
+            ? (int) $query->sum('credit') - (int) $query->sum('debit')
+            : (int) $query->sum('debit') - (int) $query->sum('credit');
     }
 }
