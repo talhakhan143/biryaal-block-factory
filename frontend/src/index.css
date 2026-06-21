@@ -1,44 +1,36 @@
 @import "tailwindcss";
 
-/* Theming via CSS variables. Default = dark (black). html.light flips to white. */
+/* Single light theme. Content area = clean white. Sidebar = deep indigo
+   (matches the logo). No dark-mode toggle. */
 :root {
-  /* ===== Dark theme (default, black) ===== */
-  --bg: #07070a;
-  --surface: #111118;
-  --surface-2: #181822;
-  --surface-hover: #1f1f2b;
-  --border: #262632;
-  --text: #f4f4f5;
-  --muted: #9aa0ac;
-  --primary: #3b82f6;        /* blue */
-  --primary-hover: #2563eb;
-  --primary-fg: #ffffff;
-  --secondary: #f97316;      /* dark orange */
-  --secondary-fg: #ffffff;
-  --ring: #3b82f6;
-  --green: #34d399;
-  --red: #f87171;
-  --amber: #fbbf24;
-}
-
-html.light {
-  /* ===== Light theme (white) ===== */
-  --bg: #f4f6fb;
+  /* ===== App content (light / white) ===== */
+  --bg: #f3f5fb;
   --surface: #ffffff;
   --surface-2: #f8fafc;
-  --surface-hover: #eef2f7;
-  --border: #e2e8f0;
-  --text: #0f172a;
-  --muted: #64748b;
-  --primary: #1e3a8a;        /* dark blue */
-  --primary-hover: #1e40af;
+  --surface-hover: #f1f3fb;
+  --border: #e6e8f2;
+  --text: #1a1c2e;
+  --muted: #6b7180;
+  --primary: #4338ca;        /* indigo-700 — matches logo */
+  --primary-hover: #3730a3;
   --primary-fg: #ffffff;
   --secondary: #c2410c;      /* dark orange */
   --secondary-fg: #ffffff;
-  --ring: #1e3a8a;
+  --ring: #4338ca;
   --green: #059669;
   --red: #dc2626;
   --amber: #b45309;
+
+  /* ===== Sidebar (deep indigo/purple, matches logo) ===== */
+  --sidebar-bg: #1e1b4b;       /* indigo-950 */
+  --sidebar-bg-2: #312e81;     /* indigo-900 — gradient end */
+  --sidebar-text: #e8e9fb;
+  --sidebar-muted: #9d9bd0;
+  --sidebar-hover: rgba(255, 255, 255, 0.07);
+  --sidebar-active-bg: rgba(255, 255, 255, 0.14);
+  --sidebar-active-fg: #ffffff;
+  --sidebar-accent: #a78bfa;   /* violet-400 — active marker */
+  --sidebar-border: rgba(255, 255, 255, 0.10);
 }
 
 html, body, #root {
@@ -97,6 +89,10 @@ table tbody tr:hover { background: var(--surface-hover); }
 .bf-stagger > *:nth-child(6) { animation-delay: 0.22s; }
 .bf-stagger > *:nth-child(7) { animation-delay: 0.26s; }
 .bf-stagger > *:nth-child(8) { animation-delay: 0.30s; }
+
+/* sidebar nav items: smooth hover (inline style wins for active state) */
+.bf-nav-item { transition: background-color 0.15s ease, color 0.15s ease; }
+.bf-nav-item:hover { background: var(--sidebar-hover); }
 
 /* card hover lift */
 .bf-lift { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }

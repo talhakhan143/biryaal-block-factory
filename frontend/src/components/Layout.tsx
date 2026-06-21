@@ -3,10 +3,9 @@ import {
   LayoutDashboard, ShoppingCart, ReceiptText, Users, HandCoins, Factory, Boxes,
   Package, Truck, ClipboardList, Car, UserRound, HardHat, Wallet, BookText,
   FileSpreadsheet, FileBarChart, Tag, BookOpenText, UsersRound, History,
-  Undo2, LogOut, Moon, Sun, Languages, type LucideIcon,
+  Undo2, LogOut, Languages, type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
-import { useTheme } from '../lib/theme'
 import { useLang } from '../lib/lang'
 
 interface NavItem {
@@ -92,7 +91,6 @@ const GROUPS: NavGroup[] = [
 
 export default function Layout() {
   const { user, logout, can } = useAuth()
-  const { theme, toggle } = useTheme()
   const { lang, toggle: toggleLang } = useLang()
   const navigate = useNavigate()
   const ur = lang === 'ur'
@@ -101,11 +99,15 @@ export default function Layout() {
     <div className="flex h-full" style={{ background: 'var(--bg)' }}>
       <aside
         className="no-print flex w-64 shrink-0 flex-col border-r"
-        style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+        style={{
+          background: 'linear-gradient(180deg, var(--sidebar-bg-2) 0%, var(--sidebar-bg) 100%)',
+          borderColor: 'var(--sidebar-border)',
+          color: 'var(--sidebar-text)',
+        }}
       >
-        <div className="border-b px-4 py-4" style={{ borderColor: 'var(--border)' }}>
-          <div className="flex items-center justify-center rounded-xl bg-white px-3 py-2 shadow-sm">
-            <img src="/logo.png" alt="Barval Block Factory" className="block h-28 w-auto max-w-full object-contain" />
+        <div className="px-4 py-5" style={{ borderBottom: '1px solid var(--sidebar-border)' }}>
+          <div className="flex items-center justify-center rounded-2xl bg-white px-3 py-3 shadow-lg shadow-black/20">
+            <img src="/logo.png" alt="Barval Block Factory" className="block h-24 w-auto max-w-full object-contain" />
           </div>
         </div>
 
@@ -114,11 +116,11 @@ export default function Layout() {
             const items = group.items.filter((i) => can(i.permission))
             if (items.length === 0) return null
             return (
-              <div key={group.en} className="mb-4">
+              <div key={group.en} className="mb-5">
                 <div
                   dir={ur ? 'rtl' : 'ltr'}
-                  className="mb-1 px-2 text-[10px] font-bold uppercase tracking-wider"
-                  style={{ color: 'var(--muted)' }}
+                  className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: 'var(--sidebar-muted)' }}
                 >
                   {ur ? group.ur : group.en}
                 </div>
@@ -130,16 +132,20 @@ export default function Layout() {
                       to={item.to}
                       end={item.to === '/'}
                       dir={ur ? 'rtl' : 'ltr'}
-                      className="mb-0.5 flex items-center gap-3 rounded-lg px-2.5 py-2 transition"
+                      className="bf-nav-item mb-0.5 flex items-center gap-3 rounded-lg px-2.5 py-2"
                       style={({ isActive }) =>
                         isActive
-                          ? { background: 'var(--primary)', color: 'var(--primary-fg)' }
-                          : { color: 'var(--text)' }
+                          ? {
+                              background: 'var(--sidebar-active-bg)',
+                              color: 'var(--sidebar-active-fg)',
+                              boxShadow: `inset 3px 0 0 0 var(--sidebar-accent)`,
+                            }
+                          : { color: 'var(--sidebar-text)' }
                       }
                     >
                       {({ isActive }) => (
                         <>
-                          <Icon size={18} style={{ opacity: isActive ? 1 : 0.7, flexShrink: 0 }} />
+                          <Icon size={18} style={{ opacity: isActive ? 1 : 0.65, flexShrink: 0, color: isActive ? 'var(--sidebar-accent)' : undefined }} />
                           <span className={ur ? 'text-[16px] leading-relaxed' : 'text-sm font-medium'}>
                             {ur ? item.ur : item.en}
                           </span>
@@ -153,8 +159,8 @@ export default function Layout() {
           })}
         </nav>
 
-        <div className="border-t px-4 py-3 text-center text-[10px] leading-relaxed" style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}>
-          Design &amp; Developed by <span style={{ color: 'var(--text)' }}>Talha Khan</span>
+        <div className="px-4 py-3 text-center text-[10px] leading-relaxed" style={{ borderTop: '1px solid var(--sidebar-border)', color: 'var(--sidebar-muted)' }}>
+          Design &amp; Developed by <span style={{ color: 'var(--sidebar-text)' }}>Talha Khan</span>
           <br />
           WhatsApp: 92-336-8469404
         </div>
@@ -174,14 +180,6 @@ export default function Layout() {
               style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
             >
               <Languages size={16} /> {ur ? 'English' : 'اردو'}
-            </button>
-            <button
-              onClick={toggle}
-              title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border transition hover:opacity-80"
-              style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
-            >
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>
             <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{user?.name}</span>
             <button
