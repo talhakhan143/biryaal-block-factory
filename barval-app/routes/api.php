@@ -125,6 +125,7 @@ Route::prefix('v1')->group(function () {
         // Payments
         Route::get('payments', [PaymentController::class, 'index'])->middleware('permission:payments.view');
         Route::get('payments/payables', [PaymentController::class, 'payables'])->middleware('permission:payments.view');
+        Route::get('payments/advances', [PaymentController::class, 'advances'])->middleware('permission:payments.view');
         Route::middleware('permission:payments.manage')->group(function () {
             Route::post('payments/receipt', [PaymentController::class, 'receipt']);
             Route::post('payments/supplier', [PaymentController::class, 'payment']);
