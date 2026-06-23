@@ -78,7 +78,7 @@ export default function Dashboard() {
         <Stat label="Receivables" hint={`${d.customers} customers se lene hain · click for list`} value={formatPaisa(data.receivables)} tone="primary" to="/payments" />
         <Stat label="Payables" hint={`${d.suppliers + d.drivers + d.labourers} ko dene hain · click for list`} value={formatPaisa(data.payables)} tone="red" to="/payments" />
         {data.advances > 0 && (
-          <Stat label="Advances diye" hint="Mazdoor/driver ko pehle diya · aage adjust hoga" value={formatPaisa(data.advances)} tone="primary" to="/labour" />
+          <Stat label="Advances diye" hint="Mazdoor/driver ko pehle diya · click for list" value={formatPaisa(data.advances)} tone="primary" to="/payments" />
         )}
       </div>
 

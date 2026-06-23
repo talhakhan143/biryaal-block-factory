@@ -71,6 +71,35 @@ class PaymentController extends Controller
         return response()->json(['data' => $rows->sortByDesc('balance')->values()]);
     }
 
+    /**
+     * Everyone who is holding an advance from us — i.e. a NEGATIVE balance,
+     * money we paid before any dues existed. Returned as a positive `advance`
+     * amount. These work off automatically as future wages/charges accrue.
+     */
+    public function advances()
+    {
+        $rows = collect();
+
+        Driver::where('balance', '<', 0)->get(['id', 'name', 'balance'])
+            ->each(fn ($d) => $rows->push(['type' => 'driver', 'id' => $d->id, 'name' => $d->name, 'advance' => (int) abs((int) $d->balance)]));
+
+        Labourer::where('balance', '<', 0)->get(['id', 'name', 'balance'])
+            ->each(fn ($l) => $rows->push(['type' => 'labourer', 'id' => $l->id, 'name' => $l->name, 'advance' => (int) abs((int) $l->balance)]));
+
+        Supplier::where('balance', '<', 0)->get(['id', 'name', 'balance'])
+            ->each(fn ($s) => $rows->push(['type' => 'supplier', 'id' => $s->id, 'name' => $s->name, 'advance' => (int) abs((int) $s->balance)]));
+
+        Salary::with('staff:id,name')->where('balance', '<', 0)->get()
+            ->each(fn ($sal) => $rows->push([
+                'type' => 'salary',
+                'id' => $sal->id,
+                'name' => ($sal->staff?->name ?? 'Staff').' — '.$sal->month,
+                'advance' => (int) abs((int) $sal->balance),
+            ]));
+
+        return response()->json(['data' => $rows->sortByDesc('advance')->values()]);
+    }
+
     public function receipt(Request $request)
     {
         $data = $request->validate([

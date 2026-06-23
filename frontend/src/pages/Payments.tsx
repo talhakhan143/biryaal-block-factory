@@ -4,8 +4,8 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { HandCoins, Wallet } from 'lucide-react'
-import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Select, Spinner, Table } from '../components/ui'
+import { Coins, HandCoins, Wallet } from 'lucide-react'
+import { AdvanceForm, Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Select, Spinner, Table } from '../components/ui'
 
 interface Payment {
   id: string
@@ -21,6 +21,13 @@ interface Payment {
 interface Party { id: string; name: string; balance: number }
 type PayableType = 'supplier' | 'driver' | 'labourer' | 'salary'
 interface Payable { type: PayableType; id: string; name: string; balance: number }
+interface Advance { type: PayableType; id: string; name: string; advance: number }
+
+// Only labour & driver advances can be topped up (they have an advance endpoint).
+const advanceUrl = (row: Advance) =>
+  row.type === 'driver' ? `/drivers/${row.id}/advance`
+    : row.type === 'labourer' ? `/labourers/${row.id}/advance`
+    : null
 
 const payUrl = (row: Payable) =>
   row.type === 'driver' ? `/drivers/${row.id}/pay`
@@ -36,6 +43,7 @@ export default function Payments() {
   const [modal, setModal] = useState<'receipt' | 'supplier' | null>(null)
   const [preset, setPreset] = useState<string>('')
   const [settle, setSettle] = useState<Payable | null>(null)
+  const [topUp, setTopUp] = useState<Advance | null>(null)
   const [page, setPage] = useState(1)
   const [recvPage, setRecvPage] = useState(1)
   const [payPage, setPayPage] = useState(1)
@@ -64,9 +72,13 @@ export default function Payments() {
     queryKey: ['payables'],
     queryFn: async () => (await api.get<{ data: Payable[] }>('/payments/payables')).data.data,
   })
+  const advances = useQuery({
+    queryKey: ['advances'],
+    queryFn: async () => (await api.get<{ data: Advance[] }>('/payments/advances')).data.data,
+  })
 
   const invalidateAll = () => {
-    ['payments', 'payables', 'customers', 'suppliers', 'drivers', 'labourers', 'salaries', 'dashboard', 'sales', 'purchases', 'transport-trips'].forEach((k) =>
+    ['payments', 'payables', 'advances', 'customers', 'suppliers', 'drivers', 'labourers', 'salaries', 'dashboard', 'sales', 'purchases', 'transport-trips'].forEach((k) =>
       qc.invalidateQueries({ queryKey: [k] }))
   }
 
@@ -82,7 +94,15 @@ export default function Payments() {
     onSuccess: () => { invalidateAll(); setSettle(null) },
   })
 
+  const topUpMut = useMutation({
+    mutationFn: ({ row, payload }: { row: Advance; payload: Record<string, unknown> }) =>
+      api.post(advanceUrl(row)!, payload),
+    onSuccess: () => { invalidateAll(); setTopUp(null) },
+  })
+
   const open = (kind: 'receipt' | 'supplier', partyId = '') => { setPreset(partyId); setModal(kind) }
+
+  const advRows = advances.data ?? []
 
   // Payables come as one full list — paginate on the client so the page never grows endless.
   const PAY_PER = 10
@@ -154,6 +174,30 @@ export default function Payments() {
         )}
       </div>
 
+      {/* Advances given — negative balances; work off against future dues */}
+      <div>
+        <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Advance diye <span className="font-normal" style={{ color: 'var(--muted)' }}>— jo aage mazdoori / charge se khud adjust honge</span></h2>
+        {advances.isLoading ? <Spinner /> : (
+          <Table head={['Kis ko', 'Type', 'Advance jama', '']}>
+            {advRows.map((a) => (
+              <tr key={`${a.type}-${a.id}`}>
+                <td className="px-4 py-3 font-medium">{a.name}</td>
+                <td className="px-4 py-3"><Badge color="slate">{typeLabel[a.type]}</Badge></td>
+                <td className="px-4 py-3"><Badge color="blue">{formatPaisa(a.advance)}</Badge></td>
+                <td className="px-4 py-3">
+                  {can('payments.manage') && advanceUrl(a) && (
+                    <RowActions>
+                      <IconButton icon={Coins} label="Aur advance dein" tone="amber" onClick={() => setTopUp(a)} />
+                    </RowActions>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {advRows.length === 0 && <tr><td colSpan={4} className="px-4 py-4 text-center text-sm" style={{ color: 'var(--muted)' }}>Kisi ko advance nahi diya.</td></tr>}
+          </Table>
+        )}
+      </div>
+
       {/* All payments history */}
       <div>
         <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Saari payments (history)</h2>
@@ -193,6 +237,18 @@ export default function Payments() {
             onSubmit={(payload) => settleMut.mutate({ row: settle, payload })}
             busy={settleMut.isPending}
             error={settleMut.error ? apiError(settleMut.error) : ''}
+          />
+        </Modal>
+      )}
+
+      {topUp && (
+        <Modal title={`Advance — ${topUp.name}`} onClose={() => setTopUp(null)}>
+          <AdvanceForm
+            who={typeLabel[topUp.type]}
+            balance={-topUp.advance}
+            onSubmit={(payload) => topUpMut.mutate({ row: topUp, payload })}
+            busy={topUpMut.isPending}
+            error={topUpMut.error ? apiError(topUpMut.error) : ''}
           />
         </Modal>
       )}
