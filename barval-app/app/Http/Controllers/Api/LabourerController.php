@@ -6,10 +6,13 @@ use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\LabourerResource;
 use App\Http\Resources\PaymentResource;
+use App\Models\Attendance;
 use App\Models\Labourer;
+use App\Models\Payment;
 use App\Services\Payments\PaymentService;
 use App\Support\Money;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class LabourerController extends Controller
 {
@@ -64,6 +67,51 @@ class LabourerController extends Controller
         $data['amount'] = Money::toPaisa($data['amount']);
 
         return new PaymentResource($this->payments->settleParty($labourer, $data));
+    }
+
+    /** Give an advance to a labourer (paisa diye bina baqi ke — balance jama ho jata hai). */
+    public function advance(Request $request, Labourer $labourer)
+    {
+        $data = $request->validate([
+            'payment_date' => ['required', 'date'],
+            'amount' => ['required', 'numeric', 'gt:0'],
+            'method' => ['nullable', 'in:cash,bank'],
+            'bank_ref' => ['nullable', 'string', 'max:255', 'required_if:method,bank'],
+            'notes' => ['nullable', 'string'],
+        ], [
+            'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
+        ]);
+        $data['amount'] = Money::toPaisa($data['amount']);
+
+        return new PaymentResource($this->payments->advanceToParty($labourer, $data));
+    }
+
+    /** Labourer ledger: rozana mazdoori (haazri se) + payments/advances. */
+    public function ledger(Labourer $labourer)
+    {
+        $wages = Attendance::where('labourer_id', $labourer->id)
+            ->where('wage', '>', 0)->get()->map(fn (Attendance $a) => [
+                'date' => Carbon::parse($a->work_date)->toDateString(),
+                'reference' => ucfirst((string) $a->status),
+                'description' => 'Mazdoori ('.$a->status.')',
+                'credit' => (int) $a->wage,   // increases dues
+                'debit' => 0,
+            ]);
+
+        $payments = Payment::where('party_type', $labourer->getMorphClass())
+            ->where('party_id', $labourer->id)->get()->map(fn (Payment $p) => [
+                'date' => Carbon::parse($p->payment_date)->toDateString(),
+                'reference' => $p->reference,
+                'description' => $p->notes ?: 'Payment',
+                'credit' => 0,
+                'debit' => (int) $p->amount,
+            ]);
+
+        return response()->json([
+            'labourer' => new LabourerResource($labourer),
+            'balance' => (int) $labourer->balance,
+            'rows' => $wages->concat($payments)->sortBy('date')->values(),
+        ]);
     }
 
     private function validateData(Request $request): array

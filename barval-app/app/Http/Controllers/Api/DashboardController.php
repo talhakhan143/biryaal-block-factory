@@ -58,15 +58,26 @@ class DashboardController extends Controller
             DB::raw('COALESCE(SUM(damaged_qty),0) damaged'),
         )->first();
 
-        // ---- Money owed (from the ledger control accounts — covers EVERY party) ----
-        $receivables = $this->accountBalance(Account::RECEIVABLE);
-        $payables = $this->accountBalance(Account::PAYABLE);
+        // ---- Money owed vs advances. We split each party's signed balance:
+        //      positive = we owe them (payable), negative = advance we've already
+        //      paid (they work it off). Summing positives/negatives separately
+        //      keeps both figures honest — the PAYABLE control account is just
+        //      their net, so the books still reconcile. ----
+        $receivables = (int) Customer::where('balance', '>', 0)->sum('balance');
         $payableBreakdown = [
             'suppliers' => (int) Supplier::where('balance', '>', 0)->sum('balance'),
             'drivers' => (int) Driver::where('balance', '>', 0)->sum('balance'),
             'labourers' => (int) Labourer::where('balance', '>', 0)->sum('balance'),
             'staff' => (int) Salary::where('balance', '>', 0)->sum('balance'),
         ];
+        $payables = array_sum($payableBreakdown);
+        $advanceBreakdown = [
+            'suppliers' => (int) abs((int) Supplier::where('balance', '<', 0)->sum('balance')),
+            'drivers' => (int) abs((int) Driver::where('balance', '<', 0)->sum('balance')),
+            'labourers' => (int) abs((int) Labourer::where('balance', '<', 0)->sum('balance')),
+            'staff' => (int) abs((int) Salary::where('balance', '<', 0)->sum('balance')),
+        ];
+        $advances = array_sum($advanceBreakdown);
         $dueCounts = [
             'customers' => Customer::where('balance', '>', 0)->count(),
             'suppliers' => Supplier::where('balance', '>', 0)->count(),
@@ -126,6 +137,8 @@ class DashboardController extends Controller
             'receivables' => $receivables,
             'payables' => $payables,
             'payable_breakdown' => $payableBreakdown,
+            'advances' => $advances,
+            'advance_breakdown' => $advanceBreakdown,
             'due_counts' => $dueCounts,
             'pending_dispatch' => $pendingDispatch,
             'stock' => [

@@ -12,10 +12,12 @@ use App\Models\Supplier;
 use App\Models\TransportTrip;
 use App\Services\Accounting\CashAccountResolver;
 use App\Services\Accounting\LedgerService;
+use App\Support\Money;
 use App\Support\Sequence;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 class PaymentService
@@ -33,6 +35,7 @@ class PaymentService
             $customer = Customer::findOrFail($data['customer_id']);
             $amount = (int) $data['amount'];
             $this->assertPositive($amount);
+            $this->assertWithinOutstanding($amount, (int) $customer->balance);
 
             $payment = Payment::create([
                 'reference' => Sequence::next('PAY'),
@@ -80,6 +83,7 @@ class PaymentService
             $supplier = Supplier::findOrFail($data['supplier_id']);
             $amount = (int) $data['amount'];
             $this->assertPositive($amount);
+            $this->assertWithinOutstanding($amount, (int) $supplier->balance);
 
             $payment = Payment::create([
                 'reference' => Sequence::next('PAY'),
@@ -274,6 +278,7 @@ class PaymentService
         return DB::transaction(function () use ($party, $data) {
             $amount = (int) $data['amount'];
             $this->assertPositive($amount);
+            $this->assertWithinOutstanding($amount, (int) $party->balance);
 
             $payment = Payment::create([
                 'reference' => Sequence::next('PAY'),
@@ -302,6 +307,53 @@ class PaymentService
             $this->ledger->post(
                 $data['payment_date'],
                 "Payment {$payment->reference} to {$name}",
+                [
+                    ['account' => Account::PAYABLE, 'debit' => $amount, 'memo' => $name],
+                    ['account' => $cashAccount, 'credit' => $amount],
+                ],
+                $payment,
+            );
+
+            return $payment;
+        });
+    }
+
+    /**
+     * Pay an ADVANCE to a party that carries a `balance` column (Driver,
+     * Labourer) — money given before any dues exist. This intentionally drives
+     * the balance NEGATIVE; that negative balance is the outstanding advance
+     * (the party will work it off against future dues). It does NOT settle any
+     * open trips. Same ledger posting as a normal payment: Dr Payable, Cr Cash.
+     */
+    public function advanceToParty(Model $party, array $data): Payment
+    {
+        return DB::transaction(function () use ($party, $data) {
+            $amount = (int) $data['amount'];
+            $this->assertPositive($amount);
+
+            $name = $party->name ?? class_basename($party);
+            $note = trim('Advance — '.($data['notes'] ?? ''), " —\t\n");
+
+            $payment = Payment::create([
+                'reference' => Sequence::next('PAY'),
+                'direction' => Payment::PAYMENT,
+                'party_type' => $party->getMorphClass(),
+                'party_id' => $party->getKey(),
+                'payment_date' => $data['payment_date'],
+                'amount' => $amount,
+                'method' => $data['method'] ?? 'cash',
+                'bank_ref' => $data['bank_ref'] ?? null,
+                'notes' => $note,
+                'created_by' => Auth::id(),
+            ]);
+
+            // Negative balance = advance still to be worked off.
+            $party->decrement('balance', $amount);
+
+            $cashAccount = CashAccountResolver::code($data['method'] ?? 'cash');
+            $this->ledger->post(
+                $data['payment_date'],
+                "Advance {$payment->reference} to {$name}",
                 [
                     ['account' => Account::PAYABLE, 'debit' => $amount, 'memo' => $name],
                     ['account' => $cashAccount, 'credit' => $amount],
@@ -407,6 +459,25 @@ class PaymentService
     {
         if ($amount <= 0) {
             throw new InvalidArgumentException('Payment amount must be positive.');
+        }
+    }
+
+    /**
+     * Block a settlement from exceeding what is actually owed. Overpaying is how
+     * money silently "disappears" (balance goes negative untracked) — to give
+     * more than the dues, the explicit Advance flow must be used instead.
+     */
+    private function assertWithinOutstanding(int $amount, int $outstanding): void
+    {
+        if ($outstanding <= 0) {
+            throw ValidationException::withMessages([
+                'amount' => 'Iska koi baqi nahi — sab clear hai. Zyada dena ho to "Advance" ka option use karein.',
+            ]);
+        }
+        if ($amount > $outstanding) {
+            throw ValidationException::withMessages([
+                'amount' => 'Baqi sirf '.Money::format($outstanding).' hai — us se zyada "Pay" nahi ho sakta. Zyada dena ho to "Advance" ka option use karein.',
+            ]);
         }
     }
 }

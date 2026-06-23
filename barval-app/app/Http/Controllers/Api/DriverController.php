@@ -58,6 +58,23 @@ class DriverController extends Controller
         return new PaymentResource($payment);
     }
 
+    /** Give an advance to a driver (baqi ke bina — balance jama ho jata hai). */
+    public function advance(Request $request, Driver $driver)
+    {
+        $data = $request->validate([
+            'payment_date' => ['required', 'date'],
+            'amount' => ['required', 'numeric', 'gt:0'],
+            'method' => ['nullable', 'in:cash,bank'],
+            'bank_ref' => ['nullable', 'string', 'max:255', 'required_if:method,bank'],
+            'notes' => ['nullable', 'string'],
+        ], [
+            'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
+        ]);
+        $data['amount'] = Money::toPaisa($data['amount']);
+
+        return new PaymentResource($this->payments->advanceToParty($driver, $data));
+    }
+
     public function destroy(Driver $driver)
     {
         try {
@@ -83,7 +100,7 @@ class DriverController extends Controller
             ->where('party_id', $driver->id)->get()->map(fn (Payment $p) => [
                 'date' => $p->payment_date->toDateString(),
                 'reference' => $p->reference,
-                'description' => 'Payment made',
+                'description' => $p->notes ?: 'Payment made',
                 'credit' => 0,
                 'debit' => (int) $p->amount,
             ]);
