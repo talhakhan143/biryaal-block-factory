@@ -136,10 +136,22 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
   })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
 
+  // Live bill: maal (qty × unit) + transport + loading + unloading.
+  const rs = (n: number) => 'Rs ' + n.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const qty = Number(form.quantity) || 0
+  const unit = Number(form.unit_cost) || 0
+  const goods = qty * unit
+  const extras = (Number(form.transport_cost) || 0) + (Number(form.loading_cost) || 0) + (Number(form.unloading_cost) || 0)
+  const total = goods + extras
+  const paid = Number(form.paid_amount) || 0
+  const remaining = total - paid
+  const overpaid = paid > total && total > 0
+
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault()
+        if (overpaid) return
         onSubmit({
           ...form,
           quantity: Number(form.quantity),
@@ -173,9 +185,26 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
         <Field label="Unloading (Rs, total)"><MoneyInput value={form.unloading_cost} onChange={(v) => set('unloading_cost', v)} /></Field>
         <Field label="Paid now (Rs)"><MoneyInput value={form.paid_amount} onChange={(v) => set('paid_amount', v)} /></Field>
       </div>
+
+      {/* Live bill total */}
+      <div className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+        <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Maal ({qty || 0} × {rs(unit)})</span><span>{rs(goods)}</span></div>
+        <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Transport + loading + unloading</span><span>{rs(extras)}</span></div>
+        <div className="mt-1 flex justify-between border-t pt-1 text-base font-bold" style={{ borderColor: 'var(--border)' }}>
+          <span>Total bill</span><span style={{ color: 'var(--primary)' }}>{rs(total)}</span>
+        </div>
+        {paid > 0 && (
+          <>
+            <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Abhi diya</span><span>{rs(paid)}</span></div>
+            <div className="flex justify-between font-semibold"><span>Baqi (udhaar)</span><span style={{ color: remaining > 0 ? 'var(--amber)' : 'var(--green)' }}>{rs(Math.max(remaining, 0))}</span></div>
+          </>
+        )}
+      </div>
+      {overpaid && <p className="text-sm" style={{ color: 'var(--red)' }}>Diya hua amount bill ({rs(total)}) se zyada hai — kam karein.</p>}
+
       <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Record Purchase'}</Button>
+      <Button type="submit" disabled={busy || overpaid} className="w-full">{busy ? 'Saving…' : 'Record Purchase'}</Button>
     </form>
   )
 }

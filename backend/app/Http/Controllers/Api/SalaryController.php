@@ -55,7 +55,19 @@ class SalaryController extends Controller
         ], [
             'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
         ]);
-        $data['amount'] = Money::toPaisa($data['amount']);
+        $paisa = Money::toPaisa($data['amount']);
+        $outstanding = (int) $salary->balance;
+        if ($outstanding <= 0) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'amount' => 'Is tankha ka koi baqi nahi — sab clear hai.',
+            ]);
+        }
+        if ($paisa > $outstanding) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'amount' => 'Baqi tankha sirf '.Money::format($outstanding).' hai — us se zyada nahi de sakte.',
+            ]);
+        }
+        $data['amount'] = $paisa;
 
         return new PaymentResource($this->service->pay($salary, $data));
     }

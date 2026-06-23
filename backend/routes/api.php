@@ -151,6 +151,7 @@ Route::prefix('v1')->group(function () {
             Route::delete('drivers/{driver}', [DriverController::class, 'destroy']);
         });
         Route::post('drivers/{driver}/pay', [DriverController::class, 'pay'])->middleware('permission:payments.manage');
+        Route::post('drivers/{driver}/advance', [DriverController::class, 'advance'])->middleware('permission:payments.manage');
 
         // Transport trips
         Route::get('transport-trips', [TransportController::class, 'index'])->middleware('permission:transport.view');
@@ -170,6 +171,7 @@ Route::prefix('v1')->group(function () {
 
         // Labour
         Route::get('labourers', [LabourerController::class, 'index'])->middleware('permission:labour.view');
+        Route::get('labourers/{labourer}/ledger', [LabourerController::class, 'ledger'])->middleware('permission:labour.view');
         Route::middleware('permission:labour.manage')->group(function () {
             Route::post('labourers', [LabourerController::class, 'store']);
             Route::put('labourers/{labourer}', [LabourerController::class, 'update']);
@@ -178,6 +180,7 @@ Route::prefix('v1')->group(function () {
             Route::post('attendances', [AttendanceController::class, 'store']);
         });
         Route::post('labourers/{labourer}/pay', [LabourerController::class, 'pay'])->middleware('permission:payments.manage');
+        Route::post('labourers/{labourer}/advance', [LabourerController::class, 'advance'])->middleware('permission:payments.manage');
 
         // Staff & Salaries (HR)
         Route::middleware('permission:hr.view')->group(function () {

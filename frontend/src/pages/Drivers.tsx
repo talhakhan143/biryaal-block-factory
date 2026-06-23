@@ -4,8 +4,8 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { BookText, Trash2, Wallet } from 'lucide-react'
-import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, Table, useConfirm } from '../components/ui'
+import { BookText, Coins, Trash2, Wallet } from 'lucide-react'
+import { AdvanceForm, Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, Table, useConfirm } from '../components/ui'
 
 interface Driver {
   id: string
@@ -27,6 +27,7 @@ export default function Drivers() {
   const [sort, setSort] = useState('name')
   const [dir, setDir] = useState<'asc' | 'desc'>('asc')
   const [payId, setPayId] = useState<string | null>(null)
+  const [advanceId, setAdvanceId] = useState<string | null>(null)
   const [ledgerId, setLedgerId] = useState<string | null>(null)
   const { data, isLoading } = useList<Driver>('drivers', { search, page, sort, dir })
 
@@ -40,12 +41,13 @@ export default function Drivers() {
     { key: 'name', label: 'Name', sortable: true, render: (d) => <span className="font-medium">{d.name}</span> },
     { key: 'phone', label: 'Phone', sortable: true, render: (d) => d.phone ?? '—' },
     { key: 'vehicle_name', label: 'Vehicle (gaari)', sortable: true, render: (d) => d.vehicle_name ? `${d.vehicle_name}${d.vehicle_plate ? ` (${d.vehicle_plate})` : ''}` : '—' },
-    { key: 'balance', label: 'Dues (we owe)', sortable: true, align: 'right', render: (d) => d.balance > 0 ? <Badge color="red">{formatPaisa(d.balance)}</Badge> : <Badge color="green">Settled</Badge> },
+    { key: 'balance', label: 'Dues / Advance', sortable: true, align: 'right', render: (d) => d.balance > 0 ? <Badge color="red">{formatPaisa(d.balance)}</Badge> : d.balance < 0 ? <Badge color="blue">Advance {formatPaisa(-d.balance)}</Badge> : <Badge color="green">Settled</Badge> },
     {
       key: 'actions', label: '', align: 'right', render: (d) => (
         <RowActions>
           <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(d.id)} />
           {can('payments.manage') && <IconButton icon={Wallet} label="Pay driver" tone="primary" onClick={() => setPayId(d.id)} />}
+          {can('payments.manage') && <IconButton icon={Coins} label="Advance dein" tone="amber" onClick={() => setAdvanceId(d.id)} />}
           {can('transport.manage') && (
             <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
               if (await confirm({ title: 'Driver delete karein?', message: `"${d.name}" delete ho jayega. Yeh wapas nahi aayega.`, confirmText: 'Delete' })) del.mutate(d.id)
@@ -63,6 +65,10 @@ export default function Drivers() {
   const pay = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/drivers/${id}/pay`, payload),
     onSuccess: () => { ['drivers', 'transport-trips', 'payments', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); setPayId(null) },
+  })
+  const advance = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/drivers/${id}/advance`, payload),
+    onSuccess: () => { ['drivers', 'payments', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); setAdvanceId(null) },
   })
   const del = useMutation({
     mutationFn: (id: string) => api.delete(`/drivers/${id}`),
@@ -103,6 +109,17 @@ export default function Drivers() {
           />
         </Modal>
       )}
+      {advanceId && (
+        <Modal title="Advance — Driver" onClose={() => setAdvanceId(null)}>
+          <AdvanceForm
+            who="Driver"
+            balance={data?.data.find((d) => d.id === advanceId)?.balance ?? 0}
+            onSubmit={(payload) => advance.mutate({ id: advanceId, payload })}
+            busy={advance.isPending}
+            error={advance.error ? apiError(advance.error) : ''}
+          />
+        </Modal>
+      )}
       {ledgerId && <LedgerModal id={ledgerId} onClose={() => setLedgerId(null)} />}
     </div>
   )
@@ -131,20 +148,22 @@ function PayForm({ outstanding, onSubmit, busy, error }: { outstanding: number; 
   const [form, setForm] = useState({ payment_date: new Date().toISOString().slice(0, 10), amount: '', method: 'cash', bank_ref: '' })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
   const settled = outstanding <= 0
+  const over = Math.round(Number(form.amount) * 100) > outstanding
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, amount: Number(form.amount) }) }} className="space-y-3">
+    <form onSubmit={(e) => { e.preventDefault(); if (over) return; onSubmit({ ...form, amount: Number(form.amount) }) }} className="space-y-3">
       <OutstandingNote label="Driver ko dene hain (baqi)" amount={outstanding} onFill={(rs) => set('amount', String(rs))} />
       {settled ? (
-        <p className="text-sm" style={{ color: 'var(--green)' }}>Sab clear — koi payment baqi nahi.</p>
+        <p className="text-sm" style={{ color: 'var(--green)' }}>Sab clear — koi payment baqi nahi. Zyada dena ho to "Advance" use karein.</p>
       ) : (
         <>
           <Field label="Date"><Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} required /></Field>
           <Field label="Amount (Rs)"><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} required /></Field>
           <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
+          {over && <p className="text-sm" style={{ color: 'var(--red)' }}>Baqi se zyada — sirf {formatPaisa(outstanding)} de sakte hain. Zyada ke liye "Advance" use karein.</p>}
         </>
       )}
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
-      <Button type="submit" disabled={busy || settled} className="w-full">{busy ? 'Saving…' : 'Pay'}</Button>
+      <Button type="submit" disabled={busy || settled || over} className="w-full">{busy ? 'Saving…' : 'Pay'}</Button>
     </form>
   )
 }

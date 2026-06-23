@@ -14,6 +14,8 @@ interface DashboardData {
   receivables: number
   payables: number
   payable_breakdown: { suppliers: number; drivers: number; labourers: number; staff: number }
+  advances: number
+  advance_breakdown: { suppliers: number; drivers: number; labourers: number; staff: number }
   due_counts: { customers: number; suppliers: number; drivers: number; labourers: number }
   pending_dispatch: number
   stock: { curing: number; ready: number; damaged: number }
@@ -75,6 +77,9 @@ export default function Dashboard() {
         <Stat label="Bank balance" hint="Bank me · click for cash book" value={formatPaisa(data.bank_balance)} tone={data.bank_balance < 0 ? 'red' : 'primary'} to="/cash-book" />
         <Stat label="Receivables" hint={`${d.customers} customers se lene hain · click for list`} value={formatPaisa(data.receivables)} tone="primary" to="/payments" />
         <Stat label="Payables" hint={`${d.suppliers + d.drivers + d.labourers} ko dene hain · click for list`} value={formatPaisa(data.payables)} tone="red" to="/payments" />
+        {data.advances > 0 && (
+          <Stat label="Advances diye" hint="Mazdoor/driver ko pehle diya · aage adjust hoga" value={formatPaisa(data.advances)} tone="primary" to="/labour" />
+        )}
       </div>
 
       {/* Today */}

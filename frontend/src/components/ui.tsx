@@ -248,6 +248,19 @@ export function MethodField({ method, bankRef, onChange }: { method: string; ban
 
 /** Shows an outstanding balance inside a payment form, with a "fill full" shortcut. */
 export function OutstandingNote({ label, amount, onFill }: { label: string; amount: number; onFill?: (rupees: number) => void }) {
+  // Negative balance = advance already paid (party owes us / will work it off).
+  if (amount < 0) {
+    const adv = (-amount / 100).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return (
+      <div
+        className="flex items-center justify-between rounded-lg px-3 py-2 text-sm"
+        style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
+      >
+        <span style={{ color: 'var(--muted)' }}>Advance jama (pehle diya hua)</span>
+        <strong style={{ color: 'var(--green)' }}>Rs {adv}</strong>
+      </div>
+    )
+  }
   const rupees = (amount / 100).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const settled = amount <= 0
   return (
@@ -272,6 +285,30 @@ export function OutstandingNote({ label, amount, onFill }: { label: string; amou
         )}
       </span>
     </div>
+  )
+}
+
+/**
+ * Advance payment form — give money before any dues exist. Unlike a settlement
+ * there is NO outstanding cap; the party's balance simply moves into advance
+ * (goes negative) and future wages/charges work it off automatically.
+ */
+export function AdvanceForm({ balance, who, onSubmit, busy, error }: { balance: number; who: string; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
+  const [form, setForm] = useState({ payment_date: new Date().toISOString().slice(0, 10), amount: '', method: 'cash', bank_ref: '', notes: '' })
+  const set = (k: string, v: string) => setForm({ ...form, [k]: v })
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, amount: Number(form.amount) }) }} className="space-y-3">
+      <OutstandingNote label={`${who} ko abhi dene hain (baqi)`} amount={balance} />
+      <p className="text-xs" style={{ color: 'var(--muted)' }}>
+        Advance = baqi ke bina paisa dena. Yeh advance me jama hoga aur aage ki mazdoori / charge se khud adjust ho jayega.
+      </p>
+      <Field label="Date"><Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} required /></Field>
+      <Field label="Advance amount (Rs)"><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} required /></Field>
+      <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
+      <Field label="Note (optional)"><Input value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="kis liye advance" /></Field>
+      {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
+      <Button type="submit" variant="secondary" disabled={busy || Number(form.amount) <= 0} className="w-full">{busy ? 'Saving…' : 'Give Advance'}</Button>
+    </form>
   )
 }
 
