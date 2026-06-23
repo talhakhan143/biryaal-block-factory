@@ -145,7 +145,8 @@ function InvoiceModal({ id, onClose }: { id: string; onClose: () => void }) {
         ) : (
           <>
             <div className="text-center">
-              <img src="/logo.png" alt="Barval" className="mx-auto mb-2 h-16 w-auto object-contain" />
+              <img src="/logo.png" alt="Baryal Block Factory" className="mx-auto mb-1 h-28 w-auto object-contain" />
+              <p className="text-lg font-bold text-slate-900">Baryal Block Factory</p>
               <p className="text-xs text-slate-500">Sales Invoice</p>
               <p className="mt-1 font-mono text-sm">{String(data.invoice_no)}</p>
               <p className="text-xs text-slate-500">{data.sale_date} · {data.customer?.name ?? 'Walk-in'} · {String(data.type).toUpperCase()}</p>
