@@ -39,4 +39,22 @@ class AttendanceController extends Controller
 
         return new AttendanceResource($this->service->markAttendance($data)->load('labourer'));
     }
+
+    /** Bulk-mark attendance for one labourer across many dates (calendar select). */
+    public function bulkStore(Request $request)
+    {
+        $data = $request->validate([
+            'labourer_id' => ['required', 'uuid', 'exists:labourers,id'],
+            'status' => ['required', 'in:present,half,absent'],
+            'dates' => ['required', 'array', 'min:1', 'max:31'],
+            'dates.*' => ['date', 'before_or_equal:today', 'distinct'],
+            'note' => ['nullable', 'string'],
+        ], [
+            'dates.*.before_or_equal' => 'Future date ki attendance nahi ho sakti — sirf aaj tak.',
+        ]);
+
+        $marked = $this->service->markAttendanceBulk($data);
+
+        return response()->json(['marked' => $marked]);
+    }
 }

@@ -179,6 +179,7 @@ Route::prefix('v1')->group(function () {
             Route::delete('labourers/{labourer}', [LabourerController::class, 'destroy']);
             Route::get('attendances', [AttendanceController::class, 'index']);
             Route::post('attendances', [AttendanceController::class, 'store']);
+            Route::post('attendances/bulk', [AttendanceController::class, 'bulkStore']);
         });
         Route::post('labourers/{labourer}/pay', [LabourerController::class, 'pay'])->middleware('permission:payments.manage');
         Route::post('labourers/{labourer}/advance', [LabourerController::class, 'advance'])->middleware('permission:payments.manage');
