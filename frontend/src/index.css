@@ -103,6 +103,26 @@ table tbody tr:hover { background: var(--surface-hover); }
 }
 
 @media print {
-  .no-print { display: none !important; }
+  /* A4 sheet with sensible margins for invoices / receipts / challans */
+  @page { size: A4; margin: 16mm; }
   body { background: #fff; color: #000; }
+  .no-print { display: none !important; }
+
+  /* Print ONLY the receipt/invoice/challan card — hide the dimmed backdrop
+     and everything behind it, and stretch the card across the A4 width. */
+  body * { visibility: hidden !important; }
+  .print-area, .print-area * { visibility: visible !important; }
+  .print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    color: #000 !important;
+  }
 }

@@ -182,7 +182,7 @@ function Receipt({ sale, onClose }: { sale: Record<string, unknown>; onClose: ()
   const items = (sale.items as { product_name: string; quantity: number; unit_price: number; line_total: number }[]) ?? []
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-xl bg-white p-6 text-slate-900" onClick={(e) => e.stopPropagation()}>
+      <div className="print-area w-full max-w-sm rounded-xl bg-white p-6 text-slate-900" onClick={(e) => e.stopPropagation()}>
         <div className="text-center">
           <img src="/logo.png" alt="Baryal Block Factory" className="mx-auto mb-1 h-28 w-auto object-contain" />
           <p className="text-lg font-bold text-slate-900">Baryal Block Factory</p>
