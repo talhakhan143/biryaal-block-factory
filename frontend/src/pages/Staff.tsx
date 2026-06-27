@@ -54,7 +54,7 @@ export default function StaffPage() {
     { key: 'monthly_salary', label: 'Monthly Salary', sortable: true, align: 'right', render: (s) => formatPaisa(s.monthly_salary) },
     {
       key: 'actions', label: '', align: 'right', render: (s) => (
-        can('hr.manage') ? (
+        can('hr.delete') ? (
           <RowActions>
             <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
               if (await confirm({ title: 'Staff delete karein?', message: `"${s.name}" delete ho jayega.`, confirmText: 'Delete' })) delStaff.mutate(s.id)

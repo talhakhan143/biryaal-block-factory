@@ -48,7 +48,7 @@ export default function Drivers() {
           <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(d.id)} />
           {can('payments.manage') && <IconButton icon={Wallet} label="Pay driver" tone="primary" onClick={() => setPayId(d.id)} />}
           {can('payments.manage') && <IconButton icon={Coins} label="Advance dein" tone="amber" onClick={() => setAdvanceId(d.id)} />}
-          {can('transport.manage') && (
+          {can('transport.delete') && (
             <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
               if (await confirm({ title: 'Driver delete karein?', message: `"${d.name}" delete ho jayega. Yeh wapas nahi aayega.`, confirmText: 'Delete' })) del.mutate(d.id)
             }} />

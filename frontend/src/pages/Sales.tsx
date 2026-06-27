@@ -68,11 +68,11 @@ export default function Sales() {
     {
       key: 'actions', label: '', align: 'right', render: (s) => (
         <RowActions>
-          {can('payments.manage') && s.balance > 0 && (
+          {can('payments.receive') && s.balance > 0 && (
             <IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => setReceiveFor(s)} />
           )}
           <IconButton icon={Eye} label="View" tone="primary" onClick={() => setViewId(s.id)} />
-          {can('sales.manage') && (
+          {can('sales.delete') && (
             <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
               if (await confirm({ title: 'Invoice delete karein?', message: `Invoice ${s.invoice_no} delete ho jayega. Stock wapas ready me chala jayega.`, confirmText: 'Delete' })) del.mutate(s.id)
             }} />

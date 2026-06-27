@@ -37,5 +37,19 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Accountant', 'password' => 'password', 'is_active' => true],
         );
         $accountant->syncRoles(['Accountant']);
+
+        // Baryal — real owner login.
+        $baryalOwner = User::updateOrCreate(
+            ['email' => 'muhammadali@baryal.pk'],
+            ['name' => 'Muhammad Ali (Owner)', 'password' => 'm_ali_owner@786', 'is_active' => true],
+        );
+        $baryalOwner->syncRoles(['Owner']);
+
+        // Baryal — sales person login (password managed by Owner).
+        $baryalSales = User::updateOrCreate(
+            ['email' => 'sales@baryal.pk'],
+            ['name' => 'Saleman', 'password' => 'm_ali_sales@786', 'is_active' => true],
+        );
+        $baryalSales->syncRoles(['Sales User']);
     }
 }

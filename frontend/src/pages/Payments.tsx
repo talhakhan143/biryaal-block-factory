@@ -116,12 +116,10 @@ export default function Payments() {
         title="Payments"
         subtitle="Paisa aana (receipt) aur paisa jana (payment)"
         actions={
-          can('payments.manage') && (
-            <>
-              <Button variant="ghost" onClick={() => open('supplier')}><Wallet size={16} /> Pay Supplier</Button>
-              <Button onClick={() => open('receipt')}><HandCoins size={16} /> Receive Payment</Button>
-            </>
-          )
+          <>
+            {can('payments.manage') && <Button variant="ghost" onClick={() => open('supplier')}><Wallet size={16} /> Pay Supplier</Button>}
+            {can('payments.receive') && <Button onClick={() => open('receipt')}><HandCoins size={16} /> Receive Payment</Button>}
+          </>
         }
       />
 
@@ -134,7 +132,7 @@ export default function Payments() {
               <td className="px-4 py-3 font-medium">{c.name}</td>
               <td className="px-4 py-3"><Badge color="amber">{formatPaisa(c.balance)}</Badge></td>
               <td className="px-4 py-3">
-                {can('payments.manage') && (
+                {can('payments.receive') && (
                   <RowActions>
                     <IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => open('receipt', c.id)} />
                   </RowActions>

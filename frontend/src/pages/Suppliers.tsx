@@ -68,7 +68,7 @@ export default function Suppliers() {
           {can('suppliers.manage') && (
             <IconButton icon={s.is_active ? PowerOff : Power} label={s.is_active ? 'Deactivate' : 'Activate'} tone="amber" onClick={() => toggle.mutate(s)} />
           )}
-          {can('suppliers.manage') && (
+          {can('suppliers.delete') && (
             <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
               if (await confirm({ title: 'Supplier delete karein?', message: `"${s.name}" delete ho jayega.`, confirmText: 'Delete' })) del.mutate(s.id)
             }} />

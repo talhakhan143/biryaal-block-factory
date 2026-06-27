@@ -63,7 +63,7 @@ export default function RawMaterials() {
         manage ? (
           <RowActions>
             <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(m)} />
-            <IconButton icon={Trash2} label="Delete" tone="red" onClick={() => remove(m.id, m.name)} />
+            {can('materials.delete') && <IconButton icon={Trash2} label="Delete" tone="red" onClick={() => remove(m.id, m.name)} />}
           </RowActions>
         ) : null
       ),

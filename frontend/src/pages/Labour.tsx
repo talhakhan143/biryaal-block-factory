@@ -60,7 +60,7 @@ export default function Labour() {
           {can('payments.manage') && <IconButton icon={Wallet} label="Pay mazdoor" tone="primary" onClick={() => setPayId(l.id)} />}
           {can('payments.manage') && <IconButton icon={Coins} label="Advance dein" tone="amber" onClick={() => setAdvanceId(l.id)} />}
           {can('labour.manage') && <IconButton icon={l.is_active ? PowerOff : Power} label={l.is_active ? 'Deactivate' : 'Activate'} tone="amber" onClick={() => toggle.mutate(l)} />}
-          {can('labour.manage') && (
+          {can('labour.delete') && (
             <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
               if (await confirm({ title: 'Mazdoor delete karein?', message: `"${l.name}" delete ho jayega.`, confirmText: 'Delete' })) del.mutate(l.id)
             }} />

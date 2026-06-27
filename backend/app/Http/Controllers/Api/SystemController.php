@@ -9,13 +9,52 @@ use App\Models\MaterialPurchase;
 use App\Models\Sale;
 use App\Models\Supplier;
 use App\Models\TransportTrip;
+use App\Models\User;
 use App\Services\Admin\SystemResetService;
+use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Spatie\Permission\PermissionRegistrar;
 
 class SystemController extends Controller
 {
     public function __construct(private SystemResetService $service) {}
+
+    /**
+     * Re-sync roles & permissions and ensure the Owner / Sales accounts exist.
+     * Safe to run on production (no terminal there): re-runs RolePermissionSeeder
+     * (idempotent), upserts the two Baryal logins, and flushes the Spatie
+     * permission cache so new permissions take effect immediately. Idempotent.
+     */
+    public function syncAccess(Request $request)
+    {
+        abort_unless($request->user()?->hasAnyRole(['Super Admin', 'Owner']), 403, 'Sirf Owner / Super Admin yeh kar sakta hai.');
+
+        // 1) Permissions + role mappings (creates new perms, re-syncs every role).
+        (new RolePermissionSeeder)->run();
+
+        // 2) Real Baryal logins — only created if missing, otherwise role re-synced.
+        $owner = User::firstOrCreate(
+            ['email' => 'muhammadali@baryal.pk'],
+            ['name' => 'Muhammad Ali (Owner)', 'password' => 'm_ali_owner@786', 'is_active' => true],
+        );
+        $owner->syncRoles(['Owner']);
+
+        $sales = User::firstOrCreate(
+            ['email' => 'sales@baryal.pk'],
+            ['name' => 'Saleman', 'password' => 'm_ali_sales@786', 'is_active' => true],
+        );
+        $sales->syncRoles(['Sales User']);
+
+        // 3) Flush the permission cache so the new grants are live right now.
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        return response()->json([
+            'message' => 'Roles, permissions aur accounts sync ho gaye. Permission cache clear.',
+            'owner_created' => $owner->wasRecentlyCreated,
+            'sales_created' => $sales->wasRecentlyCreated,
+        ]);
+    }
 
     /**
      * DANGER: wipe all business/test data. Super Admin only, and the caller must

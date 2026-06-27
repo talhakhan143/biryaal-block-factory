@@ -1,13 +1,15 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, ReceiptText, Users, HandCoins, Factory, Boxes,
   Package, Truck, ClipboardList, Car, UserRound, HardHat, Wallet, BookText,
   FileSpreadsheet, FileBarChart, Tag, BookOpenText, UsersRound, History,
-  Undo2, LogOut, Languages, Menu, X, type LucideIcon,
+  Undo2, LogOut, Languages, Menu, X, KeyRound, type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { useLang } from '../lib/lang'
+import { api, apiError } from '../lib/api'
+import { Modal, Field, Input, Button } from './ui'
 
 interface NavItem {
   to: string
@@ -96,6 +98,9 @@ export default function Layout() {
   const navigate = useNavigate()
   const ur = lang === 'ur'
   const [navOpen, setNavOpen] = useState(false)
+  const [pwOpen, setPwOpen] = useState(false)
+  // Sales Users cannot change their own password — Owner manages it for them.
+  const canChangePw = !!user && !user.roles.includes('Sales User')
 
   return (
     <div className="flex h-full" style={{ background: 'var(--bg)' }}>
@@ -212,6 +217,16 @@ export default function Layout() {
               <Languages size={16} /> {ur ? 'English' : 'اردو'}
             </button>
             <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{user?.name}</span>
+            {canChangePw && (
+              <button
+                onClick={() => setPwOpen(true)}
+                title={ur ? 'پاس ورڈ تبدیل کریں' : 'Change Password'}
+                className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition hover:opacity-80"
+                style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
+              >
+                <KeyRound size={15} /> <span className="hidden sm:inline">{ur ? 'پاس ورڈ' : 'Password'}</span>
+              </button>
+            )}
             <button
               onClick={async () => {
                 await logout()
@@ -228,6 +243,67 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+      {pwOpen && <ChangePasswordModal ur={ur} onClose={() => setPwOpen(false)} />}
     </div>
+  )
+}
+
+function ChangePasswordModal({ ur, onClose }: { ur: boolean; onClose: () => void }) {
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    setError('')
+    if (next !== confirm) {
+      setError(ur ? 'نیا پاس ورڈ میچ نہیں کر رہا' : 'New password aur confirm match nahi kar rahe.')
+      return
+    }
+    setBusy(true)
+    try {
+      await api.post('/change-password', {
+        current_password: current,
+        password: next,
+        password_confirmation: confirm,
+      })
+      setDone(true)
+    } catch (err) {
+      setError(apiError(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal title={ur ? 'پاس ورڈ تبدیل کریں' : 'Change Password'} onClose={onClose}>
+      {done ? (
+        <div className="space-y-4">
+          <p className="text-sm" style={{ color: 'var(--text)' }}>
+            {ur ? 'پاس ورڈ تبدیل ہو گیا۔' : 'Password change ho gaya.'}
+          </p>
+          <Button onClick={onClose}>{ur ? 'ٹھیک ہے' : 'Theek hai'}</Button>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="space-y-3">
+          <Field label={ur ? 'پرانا (موجودہ) پاس ورڈ' : 'Purana (current) password'}>
+            <Input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} required autoFocus />
+          </Field>
+          <Field label={ur ? 'نیا پاس ورڈ' : 'Naya password'}>
+            <Input type="password" value={next} onChange={(e) => setNext(e.target.value)} required minLength={6} />
+          </Field>
+          <Field label={ur ? 'نیا پاس ورڈ دوبارہ' : 'Naya password dobara'}>
+            <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={6} />
+          </Field>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" disabled={busy}>
+            {busy ? '...' : ur ? 'تبدیل کریں' : 'Change'}
+          </Button>
+        </form>
+      )}
+    </Modal>
   )
 }

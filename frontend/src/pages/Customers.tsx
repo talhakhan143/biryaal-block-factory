@@ -55,7 +55,7 @@ export default function Customers() {
     {
       key: 'actions', label: '', align: 'right', render: (c) => (
         <RowActions>
-          {can('payments.manage') && c.balance > 0 && <IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => setReceiveFor(c)} />}
+          {can('payments.receive') && c.balance > 0 && <IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => setReceiveFor(c)} />}
           <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(c.id)} />
         </RowActions>
       ),

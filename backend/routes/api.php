@@ -39,6 +39,8 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
+        // Self password change — verifies current password; blocked for Sales Users.
+        Route::post('change-password', [AuthController::class, 'changePassword']);
 
         Route::get('dashboard', [DashboardController::class, 'index'])
             ->middleware('permission:dashboard.view');
@@ -52,8 +54,8 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:suppliers.manage')->group(function () {
             Route::post('suppliers', [SupplierController::class, 'store']);
             Route::put('suppliers/{supplier}', [SupplierController::class, 'update']);
-            Route::delete('suppliers/{supplier}', [SupplierController::class, 'destroy']);
         });
+        Route::delete('suppliers/{supplier}', [SupplierController::class, 'destroy'])->middleware('permission:suppliers.delete');
 
         // Customers
         Route::middleware('permission:customers.view')->group(function () {
@@ -64,8 +66,8 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:customers.manage')->group(function () {
             Route::post('customers', [CustomerController::class, 'store']);
             Route::put('customers/{customer}', [CustomerController::class, 'update']);
-            Route::delete('customers/{customer}', [CustomerController::class, 'destroy']);
         });
+        Route::delete('customers/{customer}', [CustomerController::class, 'destroy'])->middleware('permission:customers.delete');
 
         // Raw materials
         Route::middleware('permission:materials.view')->group(function () {
@@ -75,8 +77,8 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:materials.manage')->group(function () {
             Route::post('raw-materials', [RawMaterialController::class, 'store']);
             Route::put('raw-materials/{rawMaterial}', [RawMaterialController::class, 'update']);
-            Route::delete('raw-materials/{rawMaterial}', [RawMaterialController::class, 'destroy']);
         });
+        Route::delete('raw-materials/{rawMaterial}', [RawMaterialController::class, 'destroy'])->middleware('permission:materials.delete');
 
         // Products
         Route::get('products', [ProductController::class, 'index'])->middleware('permission:inventory.view');
@@ -84,8 +86,8 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:inventory.manage')->group(function () {
             Route::post('products', [ProductController::class, 'store']);
             Route::put('products/{product}', [ProductController::class, 'update']);
-            Route::delete('products/{product}', [ProductController::class, 'destroy']);
         });
+        Route::delete('products/{product}', [ProductController::class, 'destroy'])->middleware('permission:inventory.delete');
 
         // Material purchases
         Route::get('purchases', [MaterialPurchaseController::class, 'index'])->middleware('permission:purchases.view');
@@ -114,8 +116,8 @@ Route::prefix('v1')->group(function () {
         Route::get('sales', [SaleController::class, 'index'])->middleware('permission:sales.view');
         Route::get('sales/{sale}', [SaleController::class, 'show'])->middleware('permission:sales.view');
         Route::post('sales', [SaleController::class, 'store'])->middleware('permission:sales.manage');
-        Route::delete('sales/{sale}', [SaleController::class, 'destroy'])->middleware('permission:sales.manage');
-        Route::post('sales/{sale}/receive', [SaleController::class, 'receive'])->middleware('permission:payments.manage');
+        Route::delete('sales/{sale}', [SaleController::class, 'destroy'])->middleware('permission:sales.delete');
+        Route::post('sales/{sale}/receive', [SaleController::class, 'receive'])->middleware('permission:payments.receive');
 
         // Block returns (wapsi)
         Route::get('sales-returns', [SalesReturnController::class, 'index'])->middleware('permission:sales.view');
@@ -126,10 +128,10 @@ Route::prefix('v1')->group(function () {
         Route::get('payments', [PaymentController::class, 'index'])->middleware('permission:payments.view');
         Route::get('payments/payables', [PaymentController::class, 'payables'])->middleware('permission:payments.view');
         Route::get('payments/advances', [PaymentController::class, 'advances'])->middleware('permission:payments.view');
-        Route::middleware('permission:payments.manage')->group(function () {
-            Route::post('payments/receipt', [PaymentController::class, 'receipt']);
-            Route::post('payments/supplier', [PaymentController::class, 'payment']);
-        });
+        // Customer money IN — receipts (allowed for sales staff).
+        Route::post('payments/receipt', [PaymentController::class, 'receipt'])->middleware('permission:payments.receive');
+        // Money OUT to suppliers — theft-sensitive, manage only.
+        Route::post('payments/supplier', [PaymentController::class, 'payment'])->middleware('permission:payments.manage');
 
         // Expenses
         Route::get('expenses', [ExpenseController::class, 'index'])->middleware('permission:expenses.view');
@@ -149,8 +151,8 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:transport.manage')->group(function () {
             Route::post('drivers', [DriverController::class, 'store']);
             Route::put('drivers/{driver}', [DriverController::class, 'update']);
-            Route::delete('drivers/{driver}', [DriverController::class, 'destroy']);
         });
+        Route::delete('drivers/{driver}', [DriverController::class, 'destroy'])->middleware('permission:transport.delete');
         Route::post('drivers/{driver}/pay', [DriverController::class, 'pay'])->middleware('permission:payments.manage');
         Route::post('drivers/{driver}/advance', [DriverController::class, 'advance'])->middleware('permission:payments.manage');
 
@@ -176,11 +178,11 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:labour.manage')->group(function () {
             Route::post('labourers', [LabourerController::class, 'store']);
             Route::put('labourers/{labourer}', [LabourerController::class, 'update']);
-            Route::delete('labourers/{labourer}', [LabourerController::class, 'destroy']);
             Route::get('attendances', [AttendanceController::class, 'index']);
             Route::post('attendances', [AttendanceController::class, 'store']);
             Route::post('attendances/bulk', [AttendanceController::class, 'bulkStore']);
         });
+        Route::delete('labourers/{labourer}', [LabourerController::class, 'destroy'])->middleware('permission:labour.delete');
         Route::post('labourers/{labourer}/pay', [LabourerController::class, 'pay'])->middleware('permission:payments.manage');
         Route::post('labourers/{labourer}/advance', [LabourerController::class, 'advance'])->middleware('permission:payments.manage');
 
@@ -192,10 +194,10 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:hr.manage')->group(function () {
             Route::post('staff', [StaffController::class, 'store']);
             Route::put('staff/{staff}', [StaffController::class, 'update']);
-            Route::delete('staff/{staff}', [StaffController::class, 'destroy']);
             Route::post('salaries', [SalaryController::class, 'store']);
             Route::post('salaries/{salary}/pay', [SalaryController::class, 'pay']);
         });
+        Route::delete('staff/{staff}', [StaffController::class, 'destroy'])->middleware('permission:hr.delete');
 
         // User management
         Route::middleware('permission:users.manage')->group(function () {
@@ -208,6 +210,9 @@ Route::prefix('v1')->group(function () {
         // Audit logs
         Route::get('audits', [AuditController::class, 'index'])->middleware('permission:audit.view');
 
+        // One-shot: sync roles/permissions + Baryal accounts + clear perm cache
+        // (role checked inside controller). Run once after a deploy on live.
+        Route::post('system/sync-access', [SystemController::class, 'syncAccess']);
         // DANGER — Super Admin hard reset (role checked inside controller)
         Route::post('system/reset', [SystemController::class, 'reset']);
         // Maintenance — re-sync transport trips to driver balances

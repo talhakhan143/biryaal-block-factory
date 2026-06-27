@@ -96,7 +96,13 @@ class UserController extends Controller
             'phone' => $data['phone'] ?? null,
             'is_active' => $data['is_active'] ?? $user->is_active,
         ]);
+        // You can reset a subordinate's password here (no old password needed),
+        // but you cannot change YOUR OWN password from this admin screen — that
+        // must go through change-password, which verifies your current password.
         if (! empty($data['password'])) {
+            if ($request->user()->id === $user->id) {
+                abort(422, 'Apna password yahan se change nahi hota — "Change Password" use karein (current password verify hoga).');
+            }
             $user->password = $data['password'];
         }
         $user->save();

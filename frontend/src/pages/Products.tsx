@@ -67,7 +67,7 @@ export default function Products() {
         manage ? (
           <RowActions>
             <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(p)} />
-            <IconButton icon={Trash2} label="Delete" tone="red" onClick={() => remove(p.id, p.name)} />
+            {can('inventory.delete') && <IconButton icon={Trash2} label="Delete" tone="red" onClick={() => remove(p.id, p.name)} />}
           </RowActions>
         ) : null
       ),
