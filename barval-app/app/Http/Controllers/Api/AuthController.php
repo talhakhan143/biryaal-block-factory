@@ -52,6 +52,40 @@ class AuthController extends Controller
         return response()->json(['message' => 'Logged out.']);
     }
 
+    /**
+     * Change your OWN password — requires the current password for verification.
+     *
+     * Sales Users cannot change their own password; the Owner manages it for them.
+     */
+    public function changePassword(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->hasRole('Sales User')) {
+            abort(403, 'Aap apna password khud change nahi kar sakte. Owner se rabta karein.');
+        }
+
+        $data = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:6', 'confirmed'],
+        ]);
+
+        if (! Hash::check($data['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Purana (current) password galat hai.'],
+            ]);
+        }
+
+        $user->password = $data['password'];
+        $user->save();
+
+        // Keep this session alive, log out every other device.
+        $current = $user->currentAccessToken();
+        $user->tokens()->where('id', '!=', $current->id)->delete();
+
+        return response()->json(['message' => 'Password change ho gaya.']);
+    }
+
     /** Email a password reset link to the user's registered email. */
     public function forgotPassword(Request $request): JsonResponse
     {
