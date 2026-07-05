@@ -5,3 +5,5 @@ deployment:
     - /bin/mkdir -p $DEPLOYPATH/barval-app
     - /bin/cp -R barval-app/. $DEPLOYPATH/barval-app/
     - /bin/cp -R public_html/. $DEPLOYPATH/public_html/
+    # Drop any stale route/config/package caches so new reseller routes register
+    - /bin/rm -f $DEPLOYPATH/barval-app/bootstrap/cache/routes-v7.php $DEPLOYPATH/barval-app/bootstrap/cache/config.php $DEPLOYPATH/barval-app/bootstrap/cache/packages.php $DEPLOYPATH/barval-app/bootstrap/cache/services.php
