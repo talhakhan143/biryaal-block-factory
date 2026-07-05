@@ -1,8 +1,10 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../lib/api'
+import { SquarePen } from 'lucide-react'
+import { api, apiError } from '../lib/api'
 import { formatPaisa } from '../lib/money'
-import { Card, PageHeader, Spinner } from '../components/ui'
+import { Button, Card, Field, Input, Modal, PageHeader, Spinner } from '../components/ui'
 
 interface DashboardData {
   today: { production_qty: number; blocks_sold: number; sales_total: number; expenses_total: number; money_in: number; money_out: number }
@@ -19,7 +21,7 @@ interface DashboardData {
   due_counts: { customers: number; suppliers: number; drivers: number; labourers: number }
   pending_dispatch: number
   stock: { curing: number; ready: number; damaged: number }
-  low_stock_alerts: { id: string; name: string; unit: string; current_qty: number }[]
+  low_stock_alerts: { id: string; name: string; unit: string; current_qty: number; low_stock_threshold: number }[]
   low_ready_alerts: { id: string; name: string; ready_qty: number; threshold: number }[]
 }
 
@@ -55,10 +57,18 @@ function SectionTitle({ title, note }: { title: string; note?: string }) {
   )
 }
 
+type LowMat = DashboardData['low_stock_alerts'][number]
+
 export default function Dashboard() {
+  const qc = useQueryClient()
+  const [editMat, setEditMat] = useState<LowMat | null>(null)
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: async () => (await api.get<DashboardData>('/dashboard')).data,
+  })
+  const saveMat = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.put(`/raw-materials/${id}`, payload),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['dashboard'] }); qc.invalidateQueries({ queryKey: ['raw-materials'] }); setEditMat(null) },
   })
 
   if (isLoading || !data) return <Spinner />
@@ -111,7 +121,7 @@ export default function Dashboard() {
         <Stat label="Total Sold" hint="Ab tak bik'e blocks" value={`${data.totals.sold} pcs`} tone="green" to="/sales" />
         <Stat label="Remaining Ready" hint="Bechne ke liye baqi" value={`${data.stock.ready} pcs`} tone="green" to="/inventory" />
         <Stat label="Curing Stock" hint="Curing me · tayar honay baqi" value={`${data.stock.curing} pcs`} tone="amber" to="/production" />
-        <Stat label="Damaged" hint="Kharab maal" value={`${data.stock.damaged} pcs`} tone="red" to="/inventory" />
+        {/* Damaged card hidden — data safe, re-enable anytime */}
       </div>
 
       {/* Alerts */}
@@ -119,9 +129,14 @@ export default function Dashboard() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {data.low_stock_alerts.map((m) => (
           <Card key={`raw-${m.id}`} className="!border-[var(--red)]">
-            <div className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Raw material</div>
+            <div className="flex items-start justify-between">
+              <div className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Raw material</div>
+              <button onClick={() => setEditMat(m)} className="flex items-center gap-1 text-xs font-medium" style={{ color: 'var(--primary)' }}>
+                <SquarePen size={13} /> Update
+              </button>
+            </div>
             <div className="font-semibold" style={{ color: 'var(--red)' }}>{m.name}</div>
-            <div className="text-sm" style={{ color: 'var(--muted)' }}>{m.current_qty} {m.unit} bacha hai</div>
+            <div className="text-sm" style={{ color: 'var(--muted)' }}>{m.current_qty} {m.unit} bacha hai (alert &le; {m.low_stock_threshold})</div>
           </Card>
         ))}
         {data.low_ready_alerts.map((p) => (
@@ -135,6 +150,46 @@ export default function Dashboard() {
           <p className="text-sm" style={{ color: 'var(--muted)' }}>Sab stock theek hai.</p>
         )}
       </div>
+
+      {editMat && (
+        <Modal title={`Update — ${editMat.name}`} onClose={() => setEditMat(null)}>
+          <MaterialEditForm
+            mat={editMat}
+            busy={saveMat.isPending}
+            error={saveMat.error ? apiError(saveMat.error) : ''}
+            onSubmit={(payload) => saveMat.mutate({ id: editMat.id, payload })}
+          />
+        </Modal>
+      )}
     </div>
+  )
+}
+
+function MaterialEditForm({ mat, onSubmit, busy, error }: { mat: LowMat; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
+  const [form, setForm] = useState({
+    name: mat.name,
+    unit: mat.unit,
+    current_qty: String(mat.current_qty),
+    low_stock_threshold: String(mat.low_stock_threshold),
+  })
+  const set = (k: string, v: string) => setForm({ ...form, [k]: v })
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        onSubmit({ name: form.name, unit: form.unit, current_qty: Number(form.current_qty), low_stock_threshold: Number(form.low_stock_threshold) })
+      }}
+      className="space-y-3"
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Name"><Input value={form.name} onChange={(e) => set('name', e.target.value)} required /></Field>
+        <Field label="Unit"><Input value={form.unit} onChange={(e) => set('unit', e.target.value)} required /></Field>
+        <Field label={`Current stock (${form.unit})`}><Input type="number" step="0.001" min="0" value={form.current_qty} onChange={(e) => set('current_qty', e.target.value)} required /></Field>
+        <Field label="Low stock alert par"><Input type="number" step="0.001" min="0" value={form.low_stock_threshold} onChange={(e) => set('low_stock_threshold', e.target.value)} /></Field>
+      </div>
+      <p className="text-xs" style={{ color: 'var(--muted)' }}>Stock manual theek karne ke liye — khareed ke liye Purchases use karein.</p>
+      {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
+      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Update'}</Button>
+    </form>
   )
 }

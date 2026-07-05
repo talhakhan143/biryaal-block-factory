@@ -6,6 +6,7 @@ import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { FileText } from 'lucide-react'
 import { Badge, Button, Card, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, PageHeader, RowActions, Select, Spinner, Table } from '../components/ui'
+import InvoiceSheet from '../components/InvoiceSheet'
 
 interface Dispatch {
   id: string
@@ -248,35 +249,20 @@ function Challan({ id, onClose }: { id: string; onClose: () => void }) {
     queryKey: ['dispatch', id],
     queryFn: async () => (await api.get(`/dispatches/${id}`)).data.data,
   })
+  if (isLoading || !data) {
+    return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}><Spinner /></div>
+  }
+  const gaadi = `${data.driver?.vehicle_name ?? data.vehicle?.name ?? '—'}${data.driver?.vehicle_plate ? ` (${data.driver.vehicle_plate})` : ''}`
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="print-area w-full max-w-md rounded-xl bg-white p-6 text-slate-900" onClick={(e) => e.stopPropagation()}>
-        {isLoading || !data ? <Spinner /> : (
-          <>
-            <div className="text-center">
-              <img src="/logo.png" alt="Baryal Block Factory" className="mx-auto mb-1 h-28 w-auto object-contain" />
-              <p className="text-lg font-bold text-slate-900">Baryal Block Factory</p>
-              <p className="text-xs text-slate-500">Dispatch Challan</p>
-              <p className="mt-1 font-mono">{data.reference}</p>
-            </div>
-            <div className="my-3 text-sm">
-              <div>Date: {data.dispatch_date}</div>
-              <div>Customer: {data.customer?.name ?? '—'}</div>
-              <div>Driver: {data.driver?.name ?? '—'} · Gaari: {data.driver?.vehicle_name ?? data.vehicle?.name ?? '—'}{data.driver?.vehicle_plate ? ` (${data.driver.vehicle_plate})` : ''}</div>
-            </div>
-            <Table head={['Product', 'Qty']}>
-              {data.items?.map((it: { id: string; product_name: string; quantity: number }) => (
-                <tr key={it.id}><td className="px-4 py-2">{it.product_name}</td><td className="px-4 py-2">{it.quantity}</td></tr>
-              ))}
-            </Table>
-            <p className="mt-4 text-center text-[10px] text-slate-400">Developer: Talha Khan · Phone: 0336-8469404</p>
-            <div className="no-print mt-5 flex gap-2">
-              <Button variant="ghost" className="flex-1" onClick={onClose}>Close</Button>
-              <Button className="flex-1" onClick={() => window.print()}>Print</Button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+    <InvoiceSheet
+      docType="Dispatch Challan"
+      number={data.reference}
+      date={data.dispatch_date}
+      customer={data.customer?.name ?? 'Walk-in'}
+      details={[`Driver: ${data.driver?.name ?? '—'} · Gaari: ${gaadi}`]}
+      showRates={false}
+      lines={(data.items ?? []).map((it: { product_name: string; quantity: number }) => ({ name: it.product_name, qty: String(it.quantity) }))}
+      onClose={onClose}
+    />
   )
 }

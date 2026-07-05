@@ -3,10 +3,12 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, ReceiptText, Users, HandCoins, Factory, Boxes,
   Package, Truck, ClipboardList, Car, UserRound, HardHat, Wallet, BookText,
-  FileSpreadsheet, FileBarChart, Tag, BookOpenText, UsersRound, History,
-  Undo2, LogOut, Languages, Menu, X, KeyRound, type LucideIcon,
+  FileBarChart, Tag, UsersRound, History,
+  Undo2, LogOut, Languages, Menu, X, KeyRound, Store, Factory as FactoryIcon,
+  CalendarClock, type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
+import { useWorkspace, type Workspace } from '../lib/workspace'
 import { useLang } from '../lib/lang'
 import { api, apiError } from '../lib/api'
 import { Modal, Field, Input, Button } from './ui'
@@ -24,7 +26,7 @@ interface NavGroup {
   items: NavItem[]
 }
 
-const GROUPS: NavGroup[] = [
+const FACTORY_GROUPS: NavGroup[] = [
   {
     en: 'Overview', ur: 'مرکزی',
     items: [
@@ -77,10 +79,9 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: '/cash-book', en: 'Cash Book', ur: 'روزانہ کیش', permission: 'accounting.view', icon: Wallet },
       { to: '/expenses', en: 'Expenses', ur: 'اخراجات', permission: 'expenses.view', icon: BookText },
-      { to: '/adjustments', en: 'Adjustments', ur: 'ایڈجسٹمنٹ', permission: 'accounting.view', icon: Undo2 },
-      { to: '/trial-balance', en: 'Accounts Summary', ur: 'اکاؤنٹس خلاصہ', permission: 'accounting.view', icon: FileSpreadsheet },
-      { to: '/accounts', en: 'Accounts Ledger', ur: 'اکاؤنٹ لیجر', permission: 'accounting.view', icon: BookOpenText },
       { to: '/reports', en: 'Reports', ur: 'رپورٹس', permission: 'reports.view', icon: FileBarChart },
+      // Hidden — accountant-only screens (Adjustments, Trial Balance, Accounts Ledger) to keep it simple.
+      // Routes/data intact; re-add here anytime.
     ],
   },
   {
@@ -92,12 +93,69 @@ const GROUPS: NavGroup[] = [
   },
 ]
 
+// Resellers Point — apna panel, grouped like the block factory.
+const RESELLER_GROUPS: NavGroup[] = [
+  {
+    en: 'Overview', ur: 'مرکزی',
+    items: [
+      { to: '/reseller', en: 'Dashboard', ur: 'ڈیش بورڈ', permission: 'reseller.view', icon: LayoutDashboard },
+    ],
+  },
+  {
+    en: 'Sales', ur: 'فروخت',
+    items: [
+      { to: '/reseller/pos', en: 'New Sale (POS)', ur: 'نئی فروخت', permission: 'reseller.manage', icon: ShoppingCart },
+      { to: '/reseller/sales', en: 'Sales', ur: 'فروخت', permission: 'reseller.view', icon: ReceiptText },
+      { to: '/reseller/returns', en: 'Returns', ur: 'واپسی', permission: 'reseller.view', icon: Undo2 },
+      { to: '/reseller/payments', en: 'Payments', ur: 'لین دین', permission: 'reseller.view', icon: HandCoins },
+    ],
+  },
+  {
+    en: 'Stock & Purchases', ur: 'اسٹاک اور خریداری',
+    items: [
+      { to: '/reseller/items', en: 'Items', ur: 'آئٹمز', permission: 'reseller.view', icon: Tag },
+      { to: '/reseller/purchases', en: 'Purchases', ur: 'خریداری', permission: 'reseller.view', icon: ClipboardList },
+      { to: '/reseller/suppliers', en: 'Suppliers', ur: 'سپلائر', permission: 'reseller.view', icon: Users },
+    ],
+  },
+  {
+    en: 'Rental', ur: 'کرایہ',
+    items: [
+      { to: '/reseller/kiraya', en: 'Kiraya (Rental)', ur: 'کرایہ', permission: 'reseller.view', icon: CalendarClock },
+    ],
+  },
+  {
+    // Shared across both panels — same records
+    en: 'Shared', ur: 'مشترکہ',
+    items: [
+      { to: '/reseller/dispatch', en: 'Dispatch', ur: 'چالان', permission: 'reseller.view', icon: Truck },
+      { to: '/customers', en: 'Customers', ur: 'کسٹمر', permission: 'customers.view', icon: Users },
+      { to: '/drivers', en: 'Drivers', ur: 'ڈرائیور', permission: 'transport.view', icon: UserRound },
+      // Vehicles hata diya — driver add karte waqt gaadi wahin add hoti hai
+    ],
+  },
+]
+
+const WORKSPACE_HOME: Record<Workspace, string> = { factory: '/', reseller: '/reseller' }
+
 export default function Layout() {
   const { user, logout, can } = useAuth()
   const { lang, toggle: toggleLang } = useLang()
+  const { workspace, setWorkspace } = useWorkspace()
   const navigate = useNavigate()
   const ur = lang === 'ur'
+  const canReseller = can('reseller.view')
+  // Fall back to factory if user has no reseller access.
+  const activeWorkspace: Workspace = workspace === 'reseller' && canReseller ? 'reseller' : 'factory'
+  const groups = activeWorkspace === 'reseller' ? RESELLER_GROUPS : FACTORY_GROUPS
+
   const [navOpen, setNavOpen] = useState(false)
+
+  const switchWorkspace = (w: Workspace) => {
+    setWorkspace(w)
+    setNavOpen(false)
+    navigate(WORKSPACE_HOME[w])
+  }
   const [pwOpen, setPwOpen] = useState(false)
   // Sales Users cannot change their own password — Owner manages it for them.
   const canChangePw = !!user && !user.roles.includes('Sales User')
@@ -134,8 +192,29 @@ export default function Layout() {
           </div>
         </div>
 
+        {canReseller && (
+          <div className="px-3 pt-3">
+            <div className="grid grid-cols-2 gap-1 rounded-xl p-1" style={{ background: 'var(--sidebar-hover)' }}>
+              {([['factory', FactoryIcon, ur ? 'بلاک فیکٹری' : 'Block Factory'], ['reseller', Store, ur ? 'ریسیلر' : 'Resellers']] as const).map(([w, Icon, label]) => (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => switchWorkspace(w)}
+                  className="flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition"
+                  style={activeWorkspace === w
+                    ? { background: 'var(--sidebar-active-bg)', color: 'var(--sidebar-active-fg)', boxShadow: 'inset 0 0 0 1px var(--sidebar-accent)' }
+                    : { color: 'var(--sidebar-muted)' }}
+                >
+                  <Icon size={15} style={{ color: activeWorkspace === w ? 'var(--sidebar-accent)' : undefined }} />
+                  <span className="truncate">{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <nav className="flex-1 overflow-y-auto px-3 py-3">
-          {GROUPS.map((group) => {
+          {groups.map((group) => {
             const items = group.items.filter((i) => can(i.permission))
             if (items.length === 0) return null
             return (
@@ -153,7 +232,7 @@ export default function Layout() {
                     <NavLink
                       key={item.to}
                       to={item.to}
-                      end={item.to === '/'}
+                      end={item.to === '/' || item.to === '/reseller'}
                       dir={ur ? 'rtl' : 'ltr'}
                       onClick={() => setNavOpen(false)}
                       className="bf-nav-item mb-0.5 flex items-center gap-3 rounded-lg px-2.5 py-2"

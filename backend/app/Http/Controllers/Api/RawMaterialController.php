@@ -59,6 +59,7 @@ class RawMaterialController extends Controller
         return [
             'name' => ['required', 'string', 'max:255'],
             'unit' => ['required', 'string', 'max:50'],
+            'current_qty' => ['nullable', 'numeric', 'min:0'], // manual stock correction
             'low_stock_threshold' => ['nullable', 'numeric', 'min:0'],
             'is_active' => ['boolean'],
         ];

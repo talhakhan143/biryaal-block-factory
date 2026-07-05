@@ -31,6 +31,16 @@ import Accounts from './pages/Accounts'
 import Adjustments from './pages/Adjustments'
 import Users from './pages/Users'
 import AuditLogs from './pages/AuditLogs'
+import ResellerDashboard from './pages/ResellerDashboard'
+import ResellerItems from './pages/ResellerItems'
+import ResellerSuppliers from './pages/ResellerSuppliers'
+import ResellerPurchases from './pages/ResellerPurchases'
+import ResellerKiraya from './pages/ResellerKiraya'
+import ResellerPOS from './pages/ResellerPOS'
+import ResellerSales from './pages/ResellerSales'
+import ResellerDispatch from './pages/ResellerDispatch'
+import ResellerReturns from './pages/ResellerReturns'
+import ResellerPayments from './pages/ResellerPayments'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -78,6 +88,17 @@ export default function App() {
         <Route path="/adjustments" element={<Adjustments />} />
         <Route path="/users" element={<Users />} />
         <Route path="/audit-logs" element={<AuditLogs />} />
+        {/* Resellers Point */}
+        <Route path="/reseller" element={<ResellerDashboard />} />
+        <Route path="/reseller/pos" element={<ResellerPOS />} />
+        <Route path="/reseller/sales" element={<ResellerSales />} />
+        <Route path="/reseller/payments" element={<ResellerPayments />} />
+        <Route path="/reseller/returns" element={<ResellerReturns />} />
+        <Route path="/reseller/dispatch" element={<ResellerDispatch />} />
+        <Route path="/reseller/items" element={<ResellerItems />} />
+        <Route path="/reseller/suppliers" element={<ResellerSuppliers />} />
+        <Route path="/reseller/purchases" element={<ResellerPurchases />} />
+        <Route path="/reseller/kiraya" element={<ResellerKiraya />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

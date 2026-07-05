@@ -31,19 +31,19 @@ export default function Inventory() {
     <div>
       <PageHeader
         title="Finished Goods"
-        subtitle="Curing → Tayar → Kharab maal"
+        subtitle="Curing → Tayar"
         actions={can('inventory.manage') && <Button onClick={() => setAdjusting(true)}>Stock Adjustment</Button>}
       />
       {isLoading ? (
         <Spinner />
       ) : (
-        <Table head={['Product', 'Curing', 'Ready', 'Damaged']}>
+        // Damaged column hidden — data safe, re-enable anytime
+        <Table head={['Product', 'Curing', 'Ready']}>
           {data?.data.map((p) => (
             <tr key={p.id}>
               <td className="px-4 py-3 font-medium">{p.name}</td>
               <td className="px-4 py-3 text-amber-600">{p.stock?.curing_qty ?? 0}</td>
               <td className="px-4 py-3 font-semibold text-green-600">{p.stock?.ready_qty ?? 0}</td>
-              <td className="px-4 py-3 text-red-600">{p.stock?.damaged_qty ?? 0}</td>
             </tr>
           ))}
         </Table>
@@ -73,7 +73,7 @@ function AdjustForm({ products, onSubmit, busy, error }: { products: Product[]; 
           <Select value={form.bucket} onChange={(e) => set('bucket', e.target.value)}>
             <option value="curing">Curing</option>
             <option value="ready">Ready</option>
-            <option value="damaged">Damaged</option>
+            {/* Damaged option hidden */}
           </Select>
         </Field>
         <Field label="Delta (+/-)"><Input type="number" value={form.delta} onChange={(e) => set('delta', e.target.value)} required /></Field>

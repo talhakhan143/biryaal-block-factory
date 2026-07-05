@@ -6,6 +6,7 @@ import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { Eye, HandCoins, Trash2 } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, useConfirm } from '../components/ui'
+import InvoiceSheet from '../components/InvoiceSheet'
 
 interface Sale {
   id: string
@@ -135,47 +136,27 @@ function InvoiceModal({ id, onClose }: { id: string; onClose: () => void }) {
     queryKey: ['sale', id],
     queryFn: async () => (await api.get(`/sales/${id}`)).data.data,
   })
-  const items = (data?.items as { product_name: string; quantity: number; unit_price: number; line_total: number }[]) ?? []
-
+  if (isLoading || !data) {
+    return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}><Spinner /></div>
+  }
+  const items = (data.items as { product_name: string; quantity: number; unit_price: number; line_total: number }[]) ?? []
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="print-area w-full max-w-sm rounded-xl bg-white p-6 text-slate-900" onClick={(e) => e.stopPropagation()}>
-        {isLoading || !data ? (
-          <Spinner />
-        ) : (
-          <>
-            <div className="text-center">
-              <img src="/logo.png" alt="Baryal Block Factory" className="mx-auto mb-1 h-28 w-auto object-contain" />
-              <p className="text-lg font-bold text-slate-900">Baryal Block Factory</p>
-              <p className="text-xs text-slate-500">Sales Invoice</p>
-              <p className="mt-1 font-mono text-sm">{String(data.invoice_no)}</p>
-              <p className="text-xs text-slate-500">{data.sale_date} · {data.customer?.name ?? 'Walk-in'} · {String(data.type).toUpperCase()}</p>
-              {data.payment_method && (
-                <p className="text-xs text-slate-500">Paid via {String(data.payment_method).toUpperCase()}{data.bank_ref ? ` (${data.bank_ref})` : ''}</p>
-              )}
-            </div>
-            <div className="my-4 border-y border-dashed border-slate-300 py-3 text-sm">
-              {items.map((it, i) => (
-                <div key={i} className="flex justify-between">
-                  <span>{it.product_name} × {it.quantity}</span>
-                  <span>{formatPaisa(it.line_total)}</span>
-                </div>
-              ))}
-            </div>
-            <div className="space-y-1 text-sm">
-              {Number(data.transport_fare) > 0 && <div className="flex justify-between"><span>Transport (kiraya)</span><span>{formatPaisa(Number(data.transport_fare))}</span></div>}
-              <div className="flex justify-between font-bold"><span>Total</span><span>{formatPaisa(Number(data.total))}</span></div>
-              <div className="flex justify-between"><span>Paid</span><span>{formatPaisa(Number(data.paid))}</span></div>
-              <div className="flex justify-between"><span>Balance</span><span>{formatPaisa(Number(data.balance))}</span></div>
-            </div>
-            <p className="mt-4 text-center text-[10px] text-slate-400">Developer: Talha Khan · Phone: 0336-8469404</p>
-            <div className="no-print mt-5 flex gap-2">
-              <Button variant="ghost" className="flex-1" onClick={onClose}>Close</Button>
-              <Button className="flex-1" onClick={() => window.print()}>Print</Button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+    <InvoiceSheet
+      docType="Sales Invoice"
+      number={String(data.invoice_no)}
+      date={data.sale_date}
+      customer={data.customer?.name ?? 'Walk-in'}
+      meta={data.payment_method ? `Paid via ${String(data.payment_method).toUpperCase()}${data.bank_ref ? ` (${data.bank_ref})` : ''}` : String(data.type).toUpperCase()}
+      lines={items.map((it) => ({ name: it.product_name, qty: String(it.quantity), rate: it.unit_price, total: it.line_total }))}
+      totals={[
+        { label: 'Subtotal', value: Number(data.subtotal) },
+        ...(Number(data.discount) > 0 ? [{ label: 'Discount', value: Number(data.discount), sign: '−' }] : []),
+        ...(Number(data.transport_fare) > 0 ? [{ label: 'Transport (kiraya)', value: Number(data.transport_fare) }] : []),
+        { label: 'Total', value: Number(data.total), strong: true },
+        { label: 'Paid', value: Number(data.paid) },
+        { label: 'Balance', value: Number(data.balance) },
+      ]}
+      onClose={onClose}
+    />
   )
 }

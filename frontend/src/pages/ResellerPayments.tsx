@@ -1,0 +1,128 @@
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { api, apiError } from '../lib/api'
+import { formatPaisa } from '../lib/money'
+import { useAuth } from '../lib/auth'
+import { Wallet, HandCoins } from 'lucide-react'
+import { Badge, Button, Card, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, Table } from '../components/ui'
+
+interface Payable { type: string; id: string; name: string; balance: number }
+interface Receivable { customer_id: string; name: string; sale_due: number; kiraya_due: number; total: number }
+interface PayRow { id: string; reference: string; direction: string; party: string; amount: number; method: string; payment_date: string }
+
+export default function ResellerPayments() {
+  const { can } = useAuth()
+  const qc = useQueryClient()
+  const manage = can('reseller.manage')
+  const [payFor, setPayFor] = useState<Payable | null>(null)
+  const [receiveFor, setReceiveFor] = useState<Receivable | null>(null)
+
+  const payables = useQuery({ queryKey: ['reseller/payables'], queryFn: async () => (await api.get<{ data: Payable[] }>('/reseller/payables')).data.data })
+  const receivables = useQuery({ queryKey: ['reseller/receivables'], queryFn: async () => (await api.get<{ data: Receivable[] }>('/reseller/receivables')).data.data })
+  const history = useQuery({ queryKey: ['reseller/payments'], queryFn: async () => (await api.get<{ data: PayRow[] }>('/reseller/payments')).data.data })
+
+  const refresh = () => ['reseller/payables', 'reseller/receivables', 'reseller/payments', 'reseller/suppliers', 'reseller/sales', 'reseller/dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+
+  const pay = useMutation({
+    mutationFn: ({ p, payload }: { p: Payable; payload: Record<string, unknown> }) =>
+      p.type === 'supplier' ? api.post(`/reseller/suppliers/${p.id}/pay`, payload) : api.post(`/reseller/payments/driver/${p.id}/pay`, payload),
+    onSuccess: () => { refresh(); setPayFor(null) },
+  })
+  const receive = useMutation({
+    mutationFn: (payload: Record<string, unknown>) => api.post('/reseller/payments/receive', payload),
+    onSuccess: () => { refresh(); setReceiveFor(null) },
+  })
+
+  return (
+    <div className="space-y-8">
+      <PageHeader title="Resellers Point — Payments" subtitle="Sab lena-dena ek jagah — jise dena hai, jis se lena hai" />
+
+      {/* Receivable — jis se lena hai */}
+      <div>
+        <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Receivable — Customers se lena</h2>
+        {receivables.isLoading ? <Spinner /> : (receivables.data?.length ?? 0) === 0 ? (
+          <Card><p className="text-sm" style={{ color: 'var(--muted)' }}>Kisi ka koi baqi nahi.</p></Card>
+        ) : (
+          <Table head={['Customer', 'Sale udhaar', 'Kiraya baqi', 'Total', '']}>
+            {receivables.data?.map((r) => (
+              <tr key={r.customer_id}>
+                <td className="px-4 py-3 font-medium">{r.name}</td>
+                <td className="px-4 py-3">{formatPaisa(r.sale_due)}</td>
+                <td className="px-4 py-3">{formatPaisa(r.kiraya_due)}</td>
+                <td className="px-4 py-3 font-semibold" style={{ color: 'var(--amber)' }}>{formatPaisa(r.total)}</td>
+                <td className="px-4 py-3 text-right">{manage && <RowActions><IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => setReceiveFor(r)} /></RowActions>}</td>
+              </tr>
+            ))}
+          </Table>
+        )}
+      </div>
+
+      {/* Payable — jise dena hai */}
+      <div>
+        <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Payable — Jise dena hai</h2>
+        {payables.isLoading ? <Spinner /> : (payables.data?.length ?? 0) === 0 ? (
+          <Card><p className="text-sm" style={{ color: 'var(--muted)' }}>Kisi ko kuch dena nahi.</p></Card>
+        ) : (
+          <Table head={['Party', 'Type', 'Dena', '']}>
+            {payables.data?.map((p) => (
+              <tr key={`${p.type}-${p.id}`}>
+                <td className="px-4 py-3 font-medium">{p.name}</td>
+                <td className="px-4 py-3"><Badge color={p.type === 'supplier' ? 'blue' : 'amber'}>{p.type}</Badge></td>
+                <td className="px-4 py-3 font-semibold" style={{ color: 'var(--red)' }}>{formatPaisa(p.balance)}</td>
+                <td className="px-4 py-3 text-right">{manage && <RowActions><IconButton icon={Wallet} label="Pay" tone="primary" onClick={() => setPayFor(p)} /></RowActions>}</td>
+              </tr>
+            ))}
+          </Table>
+        )}
+      </div>
+
+      {/* History */}
+      <div>
+        <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Cash Log (lain-den)</h2>
+        {history.isLoading ? <Spinner /> : (history.data?.length ?? 0) === 0 ? (
+          <Card><p className="text-sm" style={{ color: 'var(--muted)' }}>Abhi koi lain-den nahi.</p></Card>
+        ) : (
+          <Table head={['Ref', 'Date', 'Party', 'Type', 'Amount']}>
+            {history.data?.map((h) => (
+              <tr key={h.id}>
+                <td className="px-4 py-3 font-mono text-xs">{h.reference}</td>
+                <td className="px-4 py-3">{h.payment_date}</td>
+                <td className="px-4 py-3">{h.party}</td>
+                <td className="px-4 py-3"><Badge color={h.direction === 'in' ? 'green' : 'red'}>{h.direction === 'in' ? 'IN' : 'OUT'}</Badge></td>
+                <td className="px-4 py-3 font-medium">{formatPaisa(h.amount)}</td>
+              </tr>
+            ))}
+          </Table>
+        )}
+      </div>
+
+      {payFor && (
+        <Modal title={`Pay — ${payFor.name}`} onClose={() => setPayFor(null)}>
+          <SettleForm label="Dena (total baqi)" outstanding={payFor.balance} busy={pay.isPending} error={pay.error ? apiError(pay.error) : ''}
+            onSubmit={(payload) => pay.mutate({ p: payFor, payload })} action="Pay" />
+        </Modal>
+      )}
+      {receiveFor && (
+        <Modal title={`Receive — ${receiveFor.name}`} onClose={() => setReceiveFor(null)}>
+          <SettleForm label="Lena (total baqi)" outstanding={receiveFor.total} busy={receive.isPending} error={receive.error ? apiError(receive.error) : ''}
+            onSubmit={(payload) => receive.mutate({ ...payload, customer_id: receiveFor.customer_id })} action="Receive" />
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+function SettleForm({ label, outstanding, onSubmit, busy, error, action }: { label: string; outstanding: number; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string; action: string }) {
+  const [form, setForm] = useState({ payment_date: new Date().toISOString().slice(0, 10), amount: '', method: 'cash', bank_ref: '' })
+  const set = (k: string, v: string) => setForm({ ...form, [k]: v })
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, amount: Number(form.amount) }) }} className="space-y-3">
+      <OutstandingNote label={label} amount={outstanding} onFill={(rs) => set('amount', String(rs))} />
+      <Field label="Date"><Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} required /></Field>
+      <Field label="Amount (Rs)"><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} required /></Field>
+      <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
+      {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
+      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : action}</Button>
+    </form>
+  )
+}
