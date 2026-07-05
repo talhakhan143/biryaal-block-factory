@@ -19,6 +19,15 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductionController;
 use App\Http\Controllers\Api\RawMaterialController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\ResellerDashboardController;
+use App\Http\Controllers\Api\ResellerDispatchController;
+use App\Http\Controllers\Api\ResellerItemController;
+use App\Http\Controllers\Api\ResellerPaymentController;
+use App\Http\Controllers\Api\ResellerPurchaseController;
+use App\Http\Controllers\Api\ResellerRentalController;
+use App\Http\Controllers\Api\ResellerSaleController;
+use App\Http\Controllers\Api\ResellerSalesReturnController;
+use App\Http\Controllers\Api\ResellerSupplierController;
 use App\Http\Controllers\Api\SalaryController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SalesReturnController;
@@ -228,6 +237,54 @@ Route::prefix('v1')->group(function () {
         // Adjustments (manual balance / cash corrections)
         Route::get('adjustments', [AdjustmentController::class, 'index'])->middleware('permission:accounting.view');
         Route::post('adjustments', [AdjustmentController::class, 'store'])->middleware('permission:payments.manage');
+
+        // ===== Resellers Point (separate books; shares customers only) =====
+        Route::middleware('permission:reseller.view')->group(function () {
+            Route::get('reseller/dashboard', [ResellerDashboardController::class, 'index']);
+            Route::get('reseller/items', [ResellerItemController::class, 'index']);
+            Route::get('reseller/suppliers', [ResellerSupplierController::class, 'index']);
+            Route::get('reseller/purchases', [ResellerPurchaseController::class, 'index']);
+            Route::get('reseller/rentals', [ResellerRentalController::class, 'index']);
+            Route::get('reseller/sales', [ResellerSaleController::class, 'index']);
+            Route::get('reseller/sales/{resellerSale}', [ResellerSaleController::class, 'show']);
+            Route::get('reseller/dispatches', [ResellerDispatchController::class, 'index']);
+            Route::get('reseller/dispatches/pending', [ResellerDispatchController::class, 'pending']);
+            Route::get('reseller/dispatches/{resellerDispatch}', [ResellerDispatchController::class, 'show']);
+            Route::get('reseller/returns', [ResellerSalesReturnController::class, 'index']);
+            // Money hub
+            Route::get('reseller/payments', [ResellerPaymentController::class, 'index']);
+            Route::get('reseller/payables', [ResellerPaymentController::class, 'payables']);
+            Route::get('reseller/receivables', [ResellerPaymentController::class, 'receivables']);
+        });
+        Route::middleware('permission:reseller.manage')->group(function () {
+            Route::post('reseller/items', [ResellerItemController::class, 'store']);
+            Route::put('reseller/items/{resellerItem}', [ResellerItemController::class, 'update']);
+            Route::delete('reseller/items/{resellerItem}', [ResellerItemController::class, 'destroy']);
+
+            Route::post('reseller/suppliers', [ResellerSupplierController::class, 'store']);
+            Route::put('reseller/suppliers/{resellerSupplier}', [ResellerSupplierController::class, 'update']);
+            Route::post('reseller/suppliers/{resellerSupplier}/pay', [ResellerSupplierController::class, 'pay']);
+            Route::delete('reseller/suppliers/{resellerSupplier}', [ResellerSupplierController::class, 'destroy']);
+
+            Route::post('reseller/purchases', [ResellerPurchaseController::class, 'store']);
+            Route::post('reseller/purchases/{resellerPurchase}/pay', [ResellerPurchaseController::class, 'pay']);
+
+            Route::post('reseller/rentals', [ResellerRentalController::class, 'store']);
+            Route::post('reseller/rentals/{resellerRental}/return', [ResellerRentalController::class, 'return']);
+            Route::post('reseller/rentals/{resellerRental}/collect', [ResellerRentalController::class, 'collect']);
+
+            // POS / sales
+            Route::post('reseller/sales', [ResellerSaleController::class, 'store']);
+            Route::post('reseller/sales/{resellerSale}/receive', [ResellerSaleController::class, 'receive']);
+            Route::delete('reseller/sales/{resellerSale}', [ResellerSaleController::class, 'destroy']);
+            // Dispatch / challan
+            Route::post('reseller/dispatches', [ResellerDispatchController::class, 'store']);
+            // Returns
+            Route::post('reseller/returns', [ResellerSalesReturnController::class, 'store']);
+            // Money hub — receive (customer) / pay driver kiraya
+            Route::post('reseller/payments/receive', [ResellerPaymentController::class, 'receive']);
+            Route::post('reseller/payments/driver/{driver}/pay', [ResellerPaymentController::class, 'payDriver']);
+        });
 
         // Cash book & accounting
         Route::get('cash-book', [CashBookController::class, 'index'])->middleware('permission:accounting.view');

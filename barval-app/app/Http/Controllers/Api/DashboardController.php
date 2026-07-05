@@ -89,9 +89,9 @@ class DashboardController extends Controller
         $pendingDispatch = $this->pendingDispatchCount();
 
         // ---- Low stock: raw materials + finished goods ----
+        // Show when at/below threshold. Threshold 0 => alerts only when empty (qty <= 0).
         $lowMaterials = RawMaterial::where('is_active', true)
             ->whereColumn('current_qty', '<=', 'low_stock_threshold')
-            ->where('low_stock_threshold', '>', 0)
             ->get(['id', 'name', 'unit', 'current_qty', 'low_stock_threshold']);
 
         $lowReady = FinishedGoodsStock::with('product:id,name,low_stock_threshold')

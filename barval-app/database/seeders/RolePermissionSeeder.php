@@ -35,6 +35,8 @@ class RolePermissionSeeder extends Seeder
             'labour.view', 'labour.manage', 'labour.delete',
             'hr.view', 'hr.manage', 'hr.delete',
             'audit.view',
+            // Resellers Point (separate panel + books)
+            'reseller.view', 'reseller.manage',
         ];
 
         foreach ($permissions as $name) {

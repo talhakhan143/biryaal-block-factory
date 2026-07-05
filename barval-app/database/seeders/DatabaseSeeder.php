@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
             RolePermissionSeeder::class,
             ChartOfAccountsSeeder::class,
             CatalogSeeder::class,
+            ResellerCatalogSeeder::class,
         ]);
 
         $superAdmin = User::updateOrCreate(
