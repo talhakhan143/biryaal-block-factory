@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { SquarePen } from 'lucide-react'
 import { api, apiError } from '../lib/api'
+import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
 import { Button, Card, Field, Input, Modal, PageHeader, Spinner } from '../components/ui'
 
@@ -52,6 +53,8 @@ function SectionTitle({ title, note }: { title: string; note?: string }) {
 
 export default function ResellerDashboard() {
   const qc = useQueryClient()
+  const { can } = useAuth()
+  const money = can('accounting.view') // profit/cash sirf Owner/Super Admin/Accountant ko
   const [editItem, setEditItem] = useState<LowItem | null>(null)
   const { data, isLoading } = useQuery({
     queryKey: ['reseller/dashboard'],
@@ -68,48 +71,55 @@ export default function ResellerDashboard() {
     <div>
       <PageHeader title="Resellers Point — Dashboard" subtitle="Alag hisab — aaj ka lain den, payable/receivable, stock, kiraya" />
 
-      <SectionTitle title="Aaj (Today)" note="kitna aya / gaya" />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Stat label="Aaj Aya" hint="Kiraya receipts" value={formatPaisa(data.today.in)} tone="green" to="/reseller/payments" />
-        <Stat label="Aaj Gaya" hint="Supplier payments" value={formatPaisa(data.today.out)} tone="red" to="/reseller/payments" />
-        <Stat label="Aaj Net" hint="Aya − Gaya" value={formatPaisa(data.today.net)} tone={data.today.net >= 0 ? 'green' : 'red'} to="/reseller/payments" />
-      </div>
+      {/* Money / profit — sirf accounts-access wale (Sales User ko nahi) */}
+      {money && (
+        <>
+          <SectionTitle title="Aaj (Today)" note="kitna aya / gaya" />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Stat label="Aaj Aya" hint="Kiraya receipts" value={formatPaisa(data.today.in)} tone="green" to="/reseller/payments" />
+            <Stat label="Aaj Gaya" hint="Supplier payments" value={formatPaisa(data.today.out)} tone="red" to="/reseller/payments" />
+            <Stat label="Aaj Net" hint="Aya − Gaya" value={formatPaisa(data.today.net)} tone={data.today.net >= 0 ? 'green' : 'red'} to="/reseller/payments" />
+          </div>
 
-      <SectionTitle title="Bikri (Sales)" note="revenue aur munafa" />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Aaj Bikri" hint="Aaj ka total sale" value={formatPaisa(data.sales.today)} tone="primary" to="/reseller/pos" />
-        <Stat label="Total Revenue" hint="Ab tak" value={formatPaisa(data.sales.revenue)} tone="text" to="/reseller/sales" />
-        <Stat label="Sale Profit" hint="Revenue − cost (margin)" value={formatPaisa(data.sales.profit)} tone="green" to="/reseller/sales" />
-        <Stat label="Udhaar (sale)" hint="Customers se lena" value={formatPaisa(data.sales.receivable)} tone="amber" to="/reseller/sales" />
-      </div>
+          <SectionTitle title="Bikri (Sales)" note="revenue aur munafa" />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Stat label="Aaj Bikri" hint="Aaj ka total sale" value={formatPaisa(data.sales.today)} tone="primary" to="/reseller/pos" />
+            <Stat label="Total Revenue" hint="Ab tak" value={formatPaisa(data.sales.revenue)} tone="text" to="/reseller/sales" />
+            <Stat label="Sale Profit" hint="Revenue − cost (margin)" value={formatPaisa(data.sales.profit)} tone="green" to="/reseller/sales" />
+            <Stat label="Udhaar (sale)" hint="Customers se lena" value={formatPaisa(data.sales.receivable)} tone="amber" to="/reseller/sales" />
+          </div>
 
-      <SectionTitle title="Baqi Jaat (Outstanding)" note="lena / dena" />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Stat label="Receivable" hint="Customers se lena (sale+kiraya)" value={formatPaisa(data.receivable)} tone="amber" to="/reseller/payments" />
-        <Stat label="Payable" hint="Suppliers+drivers ko dena" value={formatPaisa(data.payable)} tone="red" to="/reseller/payments" />
-        <Stat label="Net Cash" hint="Ab tak: aya − gaya" value={formatPaisa(data.all.net)} tone={data.all.net >= 0 ? 'green' : 'red'} to="/reseller/payments" />
-      </div>
+          <SectionTitle title="Baqi Jaat (Outstanding)" note="lena / dena" />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Stat label="Receivable" hint="Customers se lena (sale+kiraya)" value={formatPaisa(data.receivable)} tone="amber" to="/reseller/payments" />
+            <Stat label="Payable" hint="Suppliers+drivers ko dena" value={formatPaisa(data.payable)} tone="red" to="/reseller/payments" />
+            <Stat label="Net Cash" hint="Ab tak: aya − gaya" value={formatPaisa(data.all.net)} tone={data.all.net >= 0 ? 'green' : 'red'} to="/reseller/payments" />
+          </div>
 
-      <SectionTitle title="Kiraya (Rental)" />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Stat label="Active" hint="Abhi kiraye par" value={String(data.kiraya.active)} tone="primary" to="/reseller/kiraya" />
-        <Stat label="This Month" hint="Is mahine ki income" value={formatPaisa(data.kiraya.this_month)} tone="green" to="/reseller/kiraya" />
-        <Stat label="Kiraya Income" hint="Total banna (earned)" value={formatPaisa(data.kiraya.earned)} tone="green" to="/reseller/kiraya" />
-        <Stat label="Collected" hint="Wasool ho chuka" value={formatPaisa(data.kiraya.collected)} tone="text" to="/reseller/kiraya" />
-        <Stat label="Outstanding" hint="Kiraya lena baqi" value={formatPaisa(data.kiraya.outstanding)} tone="amber" to="/reseller/kiraya" />
-      </div>
+          <SectionTitle title="Kiraya (Rental)" />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <Stat label="Active" hint="Abhi kiraye par" value={String(data.kiraya.active)} tone="primary" to="/reseller/kiraya" />
+            <Stat label="This Month" hint="Is mahine ki income" value={formatPaisa(data.kiraya.this_month)} tone="green" to="/reseller/kiraya" />
+            <Stat label="Kiraya Income" hint="Total banna (earned)" value={formatPaisa(data.kiraya.earned)} tone="green" to="/reseller/kiraya" />
+            <Stat label="Collected" hint="Wasool ho chuka" value={formatPaisa(data.kiraya.collected)} tone="text" to="/reseller/kiraya" />
+            <Stat label="Outstanding" hint="Kiraya lena baqi" value={formatPaisa(data.kiraya.outstanding)} tone="amber" to="/reseller/kiraya" />
+          </div>
+        </>
+      )}
 
       <SectionTitle title="Stock" />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Stat label="Stock Value" hint="Avg cost par" value={formatPaisa(data.stock_value)} tone="primary" to="/reseller/items" />
+        {money && <Stat label="Stock Value" hint="Avg cost par" value={formatPaisa(data.stock_value)} tone="primary" to="/reseller/items" />}
         <Stat label="Items" hint="Total items" value={String(data.items_count)} tone="text" to="/reseller/items" />
         <Stat label="Low Stock" hint="Kam maal wale items" value={String(data.low_stock_count)} tone={data.low_stock_count > 0 ? 'amber' : 'text'} to="/reseller/items" />
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Stat label="Total Profit" hint="Sale margin + kiraya income" value={formatPaisa(data.profit)} tone="green" to="/reseller/payments" />
-        <Stat label="Total Khareed" hint="Ab tak maal khareeda (stock)" value={formatPaisa(data.purchase_total)} tone="text" to="/reseller/purchases" />
-      </div>
+      {money && (
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Stat label="Total Profit" hint="Sale margin + kiraya income" value={formatPaisa(data.profit)} tone="green" to="/reseller/payments" />
+          <Stat label="Total Khareed" hint="Ab tak maal khareeda (stock)" value={formatPaisa(data.purchase_total)} tone="text" to="/reseller/purchases" />
+        </div>
+      )}
 
       <SectionTitle title="Kam Stock Alerts" note="low items" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

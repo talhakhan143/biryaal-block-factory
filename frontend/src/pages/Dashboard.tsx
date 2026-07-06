@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { SquarePen } from 'lucide-react'
 import { api, apiError } from '../lib/api'
+import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
 import { Button, Card, Field, Input, Modal, PageHeader, Spinner } from '../components/ui'
 
@@ -61,6 +62,8 @@ type LowMat = DashboardData['low_stock_alerts'][number]
 
 export default function Dashboard() {
   const qc = useQueryClient()
+  const { can } = useAuth()
+  const money = can('accounting.view') // Owner/Super Admin/Accountant; NOT Sales User
   const [editMat, setEditMat] = useState<LowMat | null>(null)
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard'],
@@ -79,40 +82,48 @@ export default function Dashboard() {
     <div>
       <PageHeader title="Dashboard" subtitle="Poora hisaab — har cheez yahan se control karein" />
 
-      {/* Money position */}
-      <SectionTitle title="Paisa" note="cash position" />
-      <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Total Cash" hint="Bank + haath ka cash (total liquid)" value={formatPaisa(data.total_cash)} tone={data.total_cash < 0 ? 'red' : 'green'} to="/cash-book" />
-        <Stat label="Cash in hand" hint="Cash mojood · click for cash book" value={formatPaisa(data.cash_in_hand)} tone={data.cash_in_hand < 0 ? 'red' : 'green'} to="/cash-book" />
-        <Stat label="Bank balance" hint="Bank me · click for cash book" value={formatPaisa(data.bank_balance)} tone={data.bank_balance < 0 ? 'red' : 'primary'} to="/cash-book" />
-        <Stat label="Receivables" hint={`${d.customers} customers se lene hain · click for list`} value={formatPaisa(data.receivables)} tone="primary" to="/payments" />
-        <Stat label="Payables" hint={`${d.suppliers + d.drivers + d.labourers} ko dene hain · click for list`} value={formatPaisa(data.payables)} tone="red" to="/payments" />
-        {data.advances > 0 && (
-          <Stat label="Advances diye" hint="Mazdoor/driver ko pehle diya · click for list" value={formatPaisa(data.advances)} tone="primary" to="/payments" />
-        )}
-      </div>
+      {/* Money position — sirf accounts-access wale (Sales User ko nahi) */}
+      {money && (
+        <>
+          <SectionTitle title="Paisa" note="cash position" />
+          <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <Stat label="Total Cash" hint="Bank + haath ka cash (total liquid)" value={formatPaisa(data.total_cash)} tone={data.total_cash < 0 ? 'red' : 'green'} to="/cash-book" />
+            <Stat label="Cash in hand" hint="Cash mojood · click for cash book" value={formatPaisa(data.cash_in_hand)} tone={data.cash_in_hand < 0 ? 'red' : 'green'} to="/cash-book" />
+            <Stat label="Bank balance" hint="Bank me · click for cash book" value={formatPaisa(data.bank_balance)} tone={data.bank_balance < 0 ? 'red' : 'primary'} to="/cash-book" />
+            <Stat label="Receivables" hint={`${d.customers} customers se lene hain · click for list`} value={formatPaisa(data.receivables)} tone="primary" to="/payments" />
+            <Stat label="Payables" hint={`${d.suppliers + d.drivers + d.labourers} ko dene hain · click for list`} value={formatPaisa(data.payables)} tone="red" to="/payments" />
+            {data.advances > 0 && (
+              <Stat label="Advances diye" hint="Mazdoor/driver ko pehle diya · click for list" value={formatPaisa(data.advances)} tone="primary" to="/payments" />
+            )}
+          </div>
+        </>
+      )}
 
       {/* Today */}
       <SectionTitle title="Aaj" note="today" />
       <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Today Sales" hint="Aaj ki bikri (Rs)" value={formatPaisa(data.today.sales_total)} tone="green" to="/sales" />
-        <Stat label="Today Expenses" hint="Aaj ke kharchay" value={formatPaisa(data.today.expenses_total)} tone="red" to="/expenses" />
-        <Stat label="Money In" hint="Aaj paisa aaya" value={formatPaisa(data.today.money_in)} tone="green" to="/payments" />
-        <Stat label="Money Out" hint="Aaj paisa gaya" value={formatPaisa(data.today.money_out)} tone="red" to="/payments" />
+        {money && <Stat label="Today Sales" hint="Aaj ki bikri (Rs)" value={formatPaisa(data.today.sales_total)} tone="green" to="/sales" />}
+        {money && <Stat label="Today Expenses" hint="Aaj ke kharchay" value={formatPaisa(data.today.expenses_total)} tone="red" to="/expenses" />}
+        {money && <Stat label="Money In" hint="Aaj paisa aaya" value={formatPaisa(data.today.money_in)} tone="green" to="/payments" />}
+        {money && <Stat label="Money Out" hint="Aaj paisa gaya" value={formatPaisa(data.today.money_out)} tone="red" to="/payments" />}
         <Stat label="Today Production" hint="Aaj banaye blocks" value={`${data.today.production_qty} pcs`} tone="primary" to="/production" />
         <Stat label="Today Blocks Sold" hint="Aaj bik'e blocks" value={`${data.today.blocks_sold} pcs`} tone="green" to="/sales" />
         <Stat label="Pending Dispatch" hint="Order jo deliver hone baqi" value={`${data.pending_dispatch}`} tone={data.pending_dispatch > 0 ? 'amber' : 'green'} to="/dispatch" />
         <Stat label="Ready Stock" hint="Tayar maal · click for list" value={`${data.stock.ready} pcs`} tone="green" to="/inventory" />
       </div>
 
-      {/* Profit & Loss */}
-      <SectionTitle title={`Munafa / Nuksan (${data.month.label})`} note="profit & loss — kharch me expenses + salaries + labour sab" />
-      <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Is mahine Aamdani" hint="Bikri + other income" value={formatPaisa(data.month.income)} tone="green" to="/reports" />
-        <Stat label="Is mahine Kharch" hint="Expenses + salary + labour" value={formatPaisa(data.month.expenses_total)} tone="red" to="/reports" />
-        <Stat label="Net Profit (mahina)" hint={data.month.net_profit < 0 ? 'NUKSAN' : 'Munafa is mahine'} value={formatPaisa(data.month.net_profit)} tone={data.month.net_profit < 0 ? 'red' : 'green'} to="/reports" />
-        <Stat label="Net Profit (ab tak)" hint={data.totals.net_profit < 0 ? 'NUKSAN — lifetime' : 'Lifetime munafa'} value={formatPaisa(data.totals.net_profit)} tone={data.totals.net_profit < 0 ? 'red' : 'green'} to="/reports" />
-      </div>
+      {/* Profit & Loss — sirf accounts-access wale */}
+      {money && (
+        <>
+          <SectionTitle title={`Munafa / Nuksan (${data.month.label})`} note="profit & loss — kharch me expenses + salaries + labour sab" />
+          <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <Stat label="Is mahine Aamdani" hint="Bikri + other income" value={formatPaisa(data.month.income)} tone="green" to="/reports" />
+            <Stat label="Is mahine Kharch" hint="Expenses + salary + labour" value={formatPaisa(data.month.expenses_total)} tone="red" to="/reports" />
+            <Stat label="Net Profit (mahina)" hint={data.month.net_profit < 0 ? 'NUKSAN' : 'Munafa is mahine'} value={formatPaisa(data.month.net_profit)} tone={data.month.net_profit < 0 ? 'red' : 'green'} to="/reports" />
+            <Stat label="Net Profit (ab tak)" hint={data.totals.net_profit < 0 ? 'NUKSAN — lifetime' : 'Lifetime munafa'} value={formatPaisa(data.totals.net_profit)} tone={data.totals.net_profit < 0 ? 'red' : 'green'} to="/reports" />
+          </div>
+        </>
+      )}
 
       {/* Lifetime */}
       <SectionTitle title="Ab tak" note="lifetime totals" />

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
+import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
 import { Button, Card, Field, Input, PageHeader, Select, Spinner } from '../components/ui'
 
@@ -20,10 +21,13 @@ const TYPES = [
   { key: 'expenses', label: 'Expenses (Kharchay)' },
   { key: 'inventory', label: 'Inventory (Stock)' },
   { key: 'labour', label: 'Labour (Mazdoori)' },
-  { key: 'profit-loss', label: 'Profit & Loss (Munafa)' },
+  { key: 'profit-loss', label: 'Profit & Loss (Munafa)', money: true },
 ]
 
 export default function Reports() {
+  const { can } = useAuth()
+  const money = can('accounting.view')
+  const types = TYPES.filter((t) => money || !t.money) // profit reports sirf accounts-access wale ko
   const today = new Date().toISOString().slice(0, 10)
   const monthStart = today.slice(0, 8) + '01'
   const [type, setType] = useState('sales')
@@ -67,7 +71,7 @@ export default function Reports() {
           <div className="min-w-48">
             <Field label="Report">
               <Select value={type} onChange={(e) => setType(e.target.value)}>
-                {TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+                {types.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
               </Select>
             </Field>
           </div>
