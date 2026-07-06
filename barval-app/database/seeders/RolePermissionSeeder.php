@@ -90,6 +90,7 @@ class RolePermissionSeeder extends Seeder
             'transport.view', 'transport.manage',          // vehicles, drivers, trips (no pay/delete)
             'labour.view', 'labour.manage',                // labourers + attendance (no pay/delete)
             'reports.view',                                // operational reports
+            'reseller.view', 'reseller.manage',            // Resellers Point (profit/cash still hidden via accounting.view gate)
             // NOT granted: payments.manage, *.delete, accounting.view (cash book / P&L),
             // hr.*, users.manage, audit.view.
         ]);
