@@ -85,12 +85,12 @@ export default function Sales() {
 
   return (
     <div>
-      <PageHeader title="Sales" subtitle="Saari bikri — cash aur udhaar" />
+      <PageHeader title="Sales" subtitle="Saari farokht — cash aur udhaar" />
       <DataTable
         columns={columns}
         rows={data?.data}
         loading={isLoading}
-        emptyText="Koi bikri nahi."
+        emptyText="Koi farokht nahi."
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1) }}
         searchPlaceholder="Invoice no ya customer se search…"

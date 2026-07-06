@@ -52,7 +52,7 @@ export default function ResellerSales() {
     onError: (e) => alert(apiError(e)),
   })
   const remove = async (s: Sale) => {
-    if (await confirm({ title: 'Bikri delete karein?', message: `${s.invoice_no} delete hogi, stock wapas aayega.`, confirmText: 'Delete' })) del.mutate(s.id)
+    if (await confirm({ title: 'Farokht delete karein?', message: `${s.invoice_no} delete hogi, stock wapas aayega.`, confirmText: 'Delete' })) del.mutate(s.id)
   }
 
   const columns: Column<Sale>[] = [
@@ -76,9 +76,9 @@ export default function ResellerSales() {
 
   return (
     <div>
-      <PageHeader title="Reseller Sales" subtitle="Bikri record, udhaar wasooli — sab alag hisab" />
+      <PageHeader title="Reseller Sales" subtitle="Farokht record, udhaar wasooli — sab alag hisab" />
       <DataTable
-        columns={columns} rows={data?.data} loading={isLoading} emptyText="Koi bikri nahi."
+        columns={columns} rows={data?.data} loading={isLoading} emptyText="Koi farokht nahi."
         search={search} onSearch={(v) => { setSearch(v); setPage(1) }} searchPlaceholder="Invoice ya customer se search…"
         sort={sort} dir={dir} onSort={onSort} meta={data?.meta} page={page} onPage={setPage}
       />

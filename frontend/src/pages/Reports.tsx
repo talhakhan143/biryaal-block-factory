@@ -16,7 +16,7 @@ interface Report {
 }
 
 const TYPES = [
-  { key: 'sales', label: 'Sales (Bikri)' },
+  { key: 'sales', label: 'Sales (Farokht)' },
   { key: 'production', label: 'Production (Block banae)' },
   { key: 'expenses', label: 'Expenses (Kharchay)' },
   { key: 'inventory', label: 'Inventory (Stock)' },

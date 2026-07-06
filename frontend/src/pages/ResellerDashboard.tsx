@@ -81,9 +81,9 @@ export default function ResellerDashboard() {
             <Stat label="Aaj Net" hint="Aya − Gaya" value={formatPaisa(data.today.net)} tone={data.today.net >= 0 ? 'green' : 'red'} to="/reseller/payments" />
           </div>
 
-          <SectionTitle title="Bikri (Sales)" note="revenue aur munafa" />
+          <SectionTitle title="Farokht (Sales)" note="revenue aur munafa" />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label="Aaj Bikri" hint="Aaj ka total sale" value={formatPaisa(data.sales.today)} tone="primary" to="/reseller/pos" />
+            <Stat label="Aaj Farokht" hint="Aaj ka total sale" value={formatPaisa(data.sales.today)} tone="primary" to="/reseller/pos" />
             <Stat label="Total Revenue" hint="Ab tak" value={formatPaisa(data.sales.revenue)} tone="text" to="/reseller/sales" />
             <Stat label="Sale Profit" hint="Revenue − cost (margin)" value={formatPaisa(data.sales.profit)} tone="green" to="/reseller/sales" />
             <Stat label="Udhaar (sale)" hint="Customers se lena" value={formatPaisa(data.sales.receivable)} tone="amber" to="/reseller/sales" />

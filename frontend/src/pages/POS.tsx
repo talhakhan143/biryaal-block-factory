@@ -81,7 +81,7 @@ export default function POS() {
     <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
       {/* Product grid */}
       <div>
-        <h1 className="mb-1 text-xl font-bold" style={{ color: 'var(--text)' }}>New Sale (Nayi Bikri)</h1>
+        <h1 className="mb-1 text-xl font-bold" style={{ color: 'var(--text)' }}>New Sale (Nayi Farokht)</h1>
         <p className="mb-4 text-sm" style={{ color: 'var(--muted)' }}>Product pe tap karke cart me dalein</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {products.data?.data.map((p) => {

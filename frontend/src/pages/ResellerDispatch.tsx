@@ -80,7 +80,7 @@ export default function ResellerDispatch() {
     <div className="space-y-8">
       {manage && (
         <div>
-          <PageHeader title="Pending Orders" subtitle="Bikri jo abhi tak deliver nahi hui" />
+          <PageHeader title="Pending Orders" subtitle="Farokht jo abhi tak deliver nahi hui" />
           {pending.isLoading ? <Spinner /> : pending.data && pending.data.data.length > 0 ? (
             <Table head={['Invoice', 'Date', 'Customer', 'Items', 'Total', '']}>
               {pending.data.data.map((o) => (
@@ -101,7 +101,7 @@ export default function ResellerDispatch() {
       )}
 
       <div>
-        <PageHeader title="Dispatch / Challan" subtitle="Bikri ko deliver karein — challan ka record" />
+        <PageHeader title="Dispatch / Challan" subtitle="Farokht ko deliver karein — challan ka record" />
         <DataTable
           columns={[
             { key: 'reference', label: 'Challan', sortable: true, render: (d) => <span className="font-mono text-xs">{d.reference}</span> },

@@ -102,7 +102,7 @@ export default function Dashboard() {
       {/* Today */}
       <SectionTitle title="Aaj" note="today" />
       <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {money && <Stat label="Today Sales" hint="Aaj ki bikri (Rs)" value={formatPaisa(data.today.sales_total)} tone="green" to="/sales" />}
+        {money && <Stat label="Today Sales" hint="Aaj ki farokht (Rs)" value={formatPaisa(data.today.sales_total)} tone="green" to="/sales" />}
         {money && <Stat label="Today Expenses" hint="Aaj ke kharchay" value={formatPaisa(data.today.expenses_total)} tone="red" to="/expenses" />}
         {money && <Stat label="Money In" hint="Aaj paisa aaya" value={formatPaisa(data.today.money_in)} tone="green" to="/payments" />}
         {money && <Stat label="Money Out" hint="Aaj paisa gaya" value={formatPaisa(data.today.money_out)} tone="red" to="/payments" />}
@@ -117,7 +117,7 @@ export default function Dashboard() {
         <>
           <SectionTitle title={`Munafa / Nuksan (${data.month.label})`} note="profit & loss — kharch me expenses + salaries + labour sab" />
           <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Stat label="Is mahine Aamdani" hint="Bikri + other income" value={formatPaisa(data.month.income)} tone="green" to="/reports" />
+            <Stat label="Is mahine Aamdani" hint="Farokht + other income" value={formatPaisa(data.month.income)} tone="green" to="/reports" />
             <Stat label="Is mahine Kharch" hint="Expenses + salary + labour" value={formatPaisa(data.month.expenses_total)} tone="red" to="/reports" />
             <Stat label="Net Profit (mahina)" hint={data.month.net_profit < 0 ? 'NUKSAN' : 'Munafa is mahine'} value={formatPaisa(data.month.net_profit)} tone={data.month.net_profit < 0 ? 'red' : 'green'} to="/reports" />
             <Stat label="Net Profit (ab tak)" hint={data.totals.net_profit < 0 ? 'NUKSAN — lifetime' : 'Lifetime munafa'} value={formatPaisa(data.totals.net_profit)} tone={data.totals.net_profit < 0 ? 'red' : 'green'} to="/reports" />
