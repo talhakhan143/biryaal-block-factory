@@ -1,0 +1,1 @@
+function e(e,t=!0){let n=(e/100).toLocaleString(`en-PK`,{minimumFractionDigits:2,maximumFractionDigits:2});return t?`Rs ${n}`:n}export{e as t};

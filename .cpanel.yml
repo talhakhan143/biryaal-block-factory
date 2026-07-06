@@ -7,3 +7,5 @@ deployment:
     - /bin/cp -R public_html/. $DEPLOYPATH/public_html/
     # Drop any stale route/config/package caches so new reseller routes register
     - /bin/rm -f $DEPLOYPATH/barval-app/bootstrap/cache/routes-v7.php $DEPLOYPATH/barval-app/bootstrap/cache/config.php $DEPLOYPATH/barval-app/bootstrap/cache/packages.php $DEPLOYPATH/barval-app/bootstrap/cache/services.php
+    # Rebuild config+route+view cache for speed (skipped harmlessly if php path differs)
+    - cd $DEPLOYPATH/barval-app && /opt/cpanel/ea-php84/root/usr/bin/php artisan optimize 2>/dev/null || true
