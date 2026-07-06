@@ -168,12 +168,12 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
           onChange={(e) => {
             const id = e.target.value
             const it = items.data?.data.find((i) => i.id === id)
-            // Cost = item ka avg cost; Retail = item ka sale rate. Dono editable.
+            // Item select karte hi: Cost = avg cost, Retail = item ka rate (hamesha mirror). Editable.
             setForm((f) => ({
               ...f,
               reseller_item_id: id,
               unit_cost: it && it.avg_cost > 0 ? String(it.avg_cost / 100) : f.unit_cost,
-              sale_price: it && it.sale_price > 0 ? String(it.sale_price / 100) : f.sale_price,
+              sale_price: it ? String(it.sale_price / 100) : f.sale_price,
             }))
           }}
           required
