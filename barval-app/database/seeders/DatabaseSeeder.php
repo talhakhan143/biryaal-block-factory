@@ -22,23 +22,6 @@ class DatabaseSeeder extends Seeder
         );
         $superAdmin->syncRoles(['Super Admin']);
 
-        $owner = User::updateOrCreate(
-            ['email' => 'owner@blockfactory.test'],
-            [
-                'name' => 'Factory Owner',
-                'password' => 'password',
-                'phone' => '03000000000',
-                'is_active' => true,
-            ],
-        );
-        $owner->syncRoles(['Owner']);
-
-        $accountant = User::updateOrCreate(
-            ['email' => 'accountant@blockfactory.test'],
-            ['name' => 'Accountant', 'password' => 'password', 'is_active' => true],
-        );
-        $accountant->syncRoles(['Accountant']);
-
         // Baryal — real owner login.
         $baryalOwner = User::updateOrCreate(
             ['email' => 'muhammadali@baryal.pk'],
