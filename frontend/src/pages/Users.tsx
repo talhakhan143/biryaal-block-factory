@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ShieldAlert, SquarePen, TriangleAlert } from 'lucide-react'
+import { Power, ShieldAlert, SquarePen, Trash2, TriangleAlert } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { useAuth } from '../lib/auth'
@@ -20,6 +20,7 @@ export default function Users() {
   const canReset = user?.roles.some((r) => r === 'Super Admin' || r === 'Owner') ?? false
   const qc = useQueryClient()
   const [editing, setEditing] = useState<AppUser | null>(null)
+  const [deleting, setDeleting] = useState<AppUser | null>(null)
   const [creating, setCreating] = useState(false)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -41,9 +42,28 @@ export default function Users() {
     { key: 'role', label: 'Role', render: (u) => u.roles.map((r) => <Badge key={r} color="blue">{r}</Badge>) },
     { key: 'status', label: 'Status', render: (u) => u.is_active ? <Badge color="green">Active</Badge> : <Badge color="red">Disabled</Badge> },
     {
-      key: 'actions', label: '', align: 'right', render: (u) => (
-        <RowActions><IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(u)} /></RowActions>
-      ),
+      key: 'actions', label: '', align: 'right', render: (u) => {
+        const self = u.id === user?.id
+        return (
+          <RowActions>
+            <IconButton
+              icon={Power}
+              label={u.is_active ? 'Deactivate' : 'Activate'}
+              tone={u.is_active ? 'amber' : 'green'}
+              disabled={self || toggle.isPending}
+              onClick={() => toggle.mutate(u)}
+            />
+            <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(u)} />
+            <IconButton
+              icon={Trash2}
+              label="Delete"
+              tone="red"
+              disabled={self}
+              onClick={() => setDeleting(u)}
+            />
+          </RowActions>
+        )
+      },
     },
   ]
 
@@ -54,6 +74,28 @@ export default function Users() {
       qc.invalidateQueries({ queryKey: ['users'] })
       setEditing(null)
       setCreating(false)
+    },
+  })
+
+  // Inline one-click active/inactive flip. Update endpoint needs the full record,
+  // so we resend name/email/role and just invert is_active.
+  const toggle = useMutation({
+    mutationFn: (u: AppUser) =>
+      api.put(`/users/${u.id}`, {
+        name: u.name,
+        email: u.email,
+        phone: u.phone ?? '',
+        role: u.roles[0],
+        is_active: !u.is_active,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+  })
+
+  const del = useMutation({
+    mutationFn: (id: number) => api.delete(`/users/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] })
+      setDeleting(null)
     },
   })
 
@@ -91,6 +133,26 @@ export default function Users() {
             busy={save.isPending}
             error={save.error ? apiError(save.error) : ''}
           />
+        </Modal>
+      )}
+
+      {deleting && (
+        <Modal title="User delete karein?" onClose={() => setDeleting(null)}>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 rounded-lg border p-3" style={{ borderColor: 'var(--red)', background: 'color-mix(in srgb, var(--red) 10%, transparent)' }}>
+              <TriangleAlert size={20} style={{ color: 'var(--red)', flexShrink: 0 }} />
+              <p className="text-sm" style={{ color: 'var(--text)' }}>
+                <strong>{deleting.name}</strong> ({deleting.email}) permanently delete ho jayega. Yeh login phir kaam nahi karega. Wapas nahi aata.
+              </p>
+            </div>
+            {del.error && <p className="text-sm" style={{ color: 'var(--red)' }}>{apiError(del.error)}</p>}
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setDeleting(null)}>Cancel</Button>
+              <Button variant="danger" disabled={del.isPending} onClick={() => del.mutate(deleting.id)}>
+                {del.isPending ? 'Deleting…' : 'Delete'}
+              </Button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>

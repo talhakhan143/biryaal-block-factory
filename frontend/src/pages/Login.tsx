@@ -7,8 +7,8 @@ import { Button, Card, Field, Input } from '../components/ui'
 export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('owner@blockfactory.test')
-  const [password, setPassword] = useState('password')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -31,7 +31,7 @@ export default function Login() {
       <Card className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center text-center">
           <div className="mb-3 rounded-xl bg-white p-3">
-            <img src="/logo.png" alt="Barval Block Factory" className="h-28 w-auto object-contain" />
+            <img src="/logo.png?v=acg" alt="Ali Construction Group" className="h-28 w-auto object-contain" />
           </div>
           <p className="text-sm" style={{ color: 'var(--muted)' }}>Login karein (sign in)</p>
         </div>

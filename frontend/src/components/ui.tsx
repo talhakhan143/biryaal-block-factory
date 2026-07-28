@@ -429,11 +429,13 @@ export function IconButton({
   label,
   tone = 'default',
   onClick,
+  disabled = false,
 }: {
   icon: LucideIcon
   label: string
   tone?: 'default' | 'primary' | 'green' | 'red' | 'amber'
   onClick: () => void
+  disabled?: boolean
 }) {
   const color: Record<string, string> = {
     default: 'var(--muted)',
@@ -447,9 +449,10 @@ export function IconButton({
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       title={label}
       aria-label={label}
-      className="inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition hover:-translate-y-0.5"
+      className="inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-40"
       style={{ borderColor: 'var(--border)', color: c, background: 'var(--surface-2)' }}
       onMouseEnter={(e) => { e.currentTarget.style.background = `color-mix(in srgb, ${c} 16%, transparent)`; e.currentTarget.style.borderColor = c }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.borderColor = 'var(--border)' }}

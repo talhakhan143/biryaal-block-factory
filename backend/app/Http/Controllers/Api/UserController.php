@@ -110,4 +110,21 @@ class UserController extends Controller
 
         return new UserResource($user->load('roles'));
     }
+
+    public function destroy(Request $request, User $user)
+    {
+        // Non-super-admins can't see, let alone delete, a Super Admin account.
+        if ($user->hasRole('Super Admin') && ! $this->isSuperAdmin($request)) {
+            abort(404);
+        }
+
+        // You can never delete your own account from here.
+        if ($request->user()->id === $user->id) {
+            abort(422, 'Apna account yahan se delete nahi hota.');
+        }
+
+        $user->delete();
+
+        return response()->noContent();
+    }
 }
