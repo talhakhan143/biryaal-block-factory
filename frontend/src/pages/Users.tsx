@@ -4,7 +4,7 @@ import { Power, ShieldAlert, SquarePen, Trash2, TriangleAlert } from 'lucide-rea
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, Card, type Column, DataTable, Field, IconButton, Input, Modal, PageHeader, RowActions, Select } from '../components/ui'
+import { Badge, Button, Card, type Column, DataTable, Field, IconButton, Input, Modal, PageHeader, PasswordInput, RowActions, Select } from '../components/ui'
 
 interface AppUser {
   id: number
@@ -183,7 +183,7 @@ function UserForm({ user, roles, onSubmit, busy, error }: { user: AppUser | null
         </Select>
       </Field>
       <Field label={user ? 'New password (khali = na badlo)' : 'Password'}>
-        <Input type="password" value={form.password} onChange={(e) => set('password', e.target.value)} required={!user} />
+        <PasswordInput value={form.password} onChange={(e) => set('password', e.target.value)} required={!user} />
       </Field>
       {user && (
         <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--text)' }}>

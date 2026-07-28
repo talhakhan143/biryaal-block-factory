@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
-import { AlertTriangle, ArrowDown, ArrowUp, ChevronsUpDown, Search, X, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, ChevronsUpDown, Eye, EyeOff, Search, X, type LucideIcon } from 'lucide-react'
 
 export function Button({
   variant = 'primary',
@@ -69,6 +69,26 @@ const inputStyle = { background: 'var(--surface-2)', borderColor: 'var(--border)
 
 export function Input({ className = '', ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={`${inputCls} ${className}`} style={inputStyle} {...props} />
+}
+
+/** Password input with an eye toggle to reveal what's being typed. */
+export function PasswordInput({ className = '', ...props }: InputHTMLAttributes<HTMLInputElement>) {
+  const [show, setShow] = useState(false)
+  return (
+    <div className="relative">
+      <input type={show ? 'text' : 'password'} className={`${inputCls} pr-10 ${className}`} style={inputStyle} {...props} />
+      <button
+        type="button"
+        onClick={() => setShow((s) => !s)}
+        title={show ? 'Hide password' : 'Show password'}
+        aria-label={show ? 'Hide password' : 'Show password'}
+        className="absolute inset-y-0 right-0 flex items-center px-3"
+        style={{ color: 'var(--muted)' }}
+      >
+        {show ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
+    </div>
+  )
 }
 
 // Group the integer part with thousands commas, keep decimals as typed.
