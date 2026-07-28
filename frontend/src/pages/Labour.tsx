@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { BookText, CalendarDays, Coins, Power, PowerOff, Trash2, Wallet } from 'lucide-react'
+import { BookText, CalendarDays, Coins, Power, PowerOff, SquarePen, Trash2, Wallet } from 'lucide-react'
 import { AdvanceForm, Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select, Spinner, Table, useConfirm } from '../components/ui'
 
 interface Labourer {
@@ -21,6 +21,7 @@ export default function Labour() {
   const confirm = useConfirm()
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState<Labourer | null>(null)
   const [marking, setMarking] = useState(false)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -40,6 +41,7 @@ export default function Labour() {
   }
 
   const create = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/labourers', p), onSuccess: () => { invalidate(); setCreating(false) } })
+  const update = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.put(`/labourers/${id}`, payload), onSuccess: () => { invalidate(); setEditing(null) }, onError: (e) => alert(apiError(e)) })
   const mark = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/attendances', p), onSuccess: () => { invalidate(); setMarking(false) } })
   const pay = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/labourers/${id}/pay`, payload), onSuccess: () => { invalidate(); setPayId(null) } })
   const advance = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/labourers/${id}/advance`, payload), onSuccess: () => { invalidate(); setAdvanceId(null) } })
@@ -55,6 +57,7 @@ export default function Labour() {
     {
       key: 'actions', label: '', align: 'right', render: (l) => (
         <RowActions>
+          {can('labour.manage') && <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(l)} />}
           {can('labour.manage') && <IconButton icon={CalendarDays} label="Haazri (calendar)" tone="green" onClick={() => setCalId(l.id)} />}
           <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(l.id)} />
           {can('payments.manage') && <IconButton icon={Wallet} label="Pay mazdoor" tone="primary" onClick={() => setPayId(l.id)} />}
@@ -100,6 +103,16 @@ export default function Labour() {
       {creating && (
         <Modal title="New Labourer" onClose={() => setCreating(false)}>
           <LabourerForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />
+        </Modal>
+      )}
+      {editing && (
+        <Modal title="Edit Labourer" onClose={() => setEditing(null)}>
+          <LabourerForm
+            labourer={editing}
+            onSubmit={(p) => update.mutate({ id: editing.id, payload: { ...p, is_active: editing.is_active } })}
+            busy={update.isPending}
+            error={update.error ? apiError(update.error) : ''}
+          />
         </Modal>
       )}
       {marking && (
@@ -174,8 +187,8 @@ function LedgerModal({ id, onClose }: { id: string; onClose: () => void }) {
   )
 }
 
-function LabourerForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
-  const [form, setForm] = useState({ name: '', phone: '', daily_wage: '' })
+function LabourerForm({ labourer, onSubmit, busy, error }: { labourer?: Labourer; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
+  const [form, setForm] = useState({ name: labourer?.name ?? '', phone: labourer?.phone ?? '', daily_wage: labourer ? String(labourer.daily_wage / 100) : '' })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, daily_wage: Number(form.daily_wage) }) }} className="space-y-3">

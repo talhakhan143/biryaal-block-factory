@@ -58,7 +58,7 @@ export default function Purchases() {
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/purchases', p),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['purchases'] })
+      ['purchases', 'raw-materials', 'suppliers', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setCreating(false)
     },
   })

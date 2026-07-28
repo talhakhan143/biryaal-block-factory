@@ -23,9 +23,9 @@
 <body>
     <div class="head">
         @if (file_exists(public_path('logo.png')))
-            <img src="{{ public_path('logo.png') }}" style="height:70px;" alt="Barval">
+            <img src="{{ public_path('logo.png') }}" style="height:70px;" alt="Ali Construction Group">
         @endif
-        <div class="brand">Barval Block Factory</div>
+        <div class="brand">Ali Construction Group</div>
         <div class="period">Cement Hollow Blocks</div>
         <div class="title">{{ $report['title'] }}</div>
         <div class="period">{{ $report['period'] }} &middot; Generated {{ $generatedAt }}</div>
@@ -66,6 +66,6 @@
         </table>
     @endif
 
-    <div class="footer">Barval Block Factory ERP &middot; Developer: Talha Khan &middot; Phone: 0336-8469404</div>
+    <div class="footer">Ali Construction Group &middot; Developer: Talha Khan &middot; Phone: 0336-8469404</div>
 </body>
 </html>

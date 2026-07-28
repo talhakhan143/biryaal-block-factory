@@ -34,9 +34,9 @@ export default function InvoiceSheet({ subtitle, docType, number, date, customer
           {/* Header */}
           <div className="flex items-start justify-between border-b-2 border-slate-800 pb-4">
             <div className="flex items-center gap-3">
-              <img src="/logo.png" alt="Baryal Block Factory" className="h-20 w-auto object-contain" />
+              <img src="/logo.png?v=acg" alt="Ali Construction Group" className="h-20 w-auto object-contain" />
               <div>
-                <div className="text-2xl font-extrabold leading-tight text-slate-900">Baryal Block Factory</div>
+                <div className="text-2xl font-extrabold leading-tight text-slate-900">Ali Construction Group</div>
                 {subtitle && <div className="text-sm font-semibold text-slate-500">{subtitle}</div>}
               </div>
             </div>

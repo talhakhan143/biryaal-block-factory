@@ -79,6 +79,7 @@ class RolePermissionSeeder extends Seeder
         $sales->syncPermissions([
             'dashboard.view',
             'customers.view', 'customers.manage',         // add/edit customers, no delete
+            'suppliers.view', 'suppliers.manage',         // add/edit suppliers (needed to record purchases), no delete
             'sales.view', 'sales.manage',                 // make sales/returns, no delete
             'payments.view', 'payments.receive',          // take customer cash, NOT pay out
             'production.view', 'production.manage',        // record daily block production

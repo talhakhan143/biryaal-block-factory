@@ -188,7 +188,7 @@ export default function Layout() {
             <X size={18} />
           </button>
           <div className="flex items-center justify-center rounded-2xl bg-white px-3 py-3 shadow-lg shadow-black/20">
-            <img src="/logo.png" alt="Barval Block Factory" className="block h-24 w-auto max-w-full object-contain" />
+            <img src="/logo.png?v=acg" alt="Ali Construction Group" className="block h-24 w-auto max-w-full object-contain" />
           </div>
         </div>
 
