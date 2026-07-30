@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -16,24 +17,56 @@ class DatabaseSeeder extends Seeder
             ResellerCatalogSeeder::class,
         ]);
 
-        $superAdmin = User::updateOrCreate(
-            ['email' => 'mr.talha143@gmail.com'],
-            ['name' => 'Talha (Super Admin)', 'password' => 'Spazio@786', 'is_active' => true],
+        $this->ensureUser(
+            env('SEED_SUPER_ADMIN_EMAIL', 'mr.talha143@gmail.com'),
+            'Talha (Super Admin)',
+            'Super Admin',
+            env('SEED_SUPER_ADMIN_PASSWORD'),
         );
-        $superAdmin->syncRoles(['Super Admin']);
 
-        // Baryal — real owner login.
-        $baryalOwner = User::updateOrCreate(
-            ['email' => 'muhammadali@baryal.pk'],
-            ['name' => 'Muhammad Ali (Owner)', 'password' => 'm_ali_owner@786', 'is_active' => true],
+        $this->ensureUser(
+            env('SEED_OWNER_EMAIL', 'muhammadali@baryal.com.pk'),
+            'Muhammad Ali (Owner)',
+            'Owner',
+            env('SEED_OWNER_PASSWORD'),
         );
-        $baryalOwner->syncRoles(['Owner']);
 
-        // Baryal — sales person login (password managed by Owner).
-        $baryalSales = User::updateOrCreate(
-            ['email' => 'sales@baryal.pk'],
-            ['name' => 'Saleman', 'password' => 'm_ali_sales@786', 'is_active' => true],
+        $this->ensureUser(
+            env('SEED_SALES_EMAIL', 'sales@baryal.com.pk'),
+            'Saleman',
+            'Sales User',
+            env('SEED_SALES_PASSWORD'),
         );
-        $baryalSales->syncRoles(['Sales User']);
+    }
+
+    /**
+     * Create the account if it is missing, never touch an existing one — a reseed
+     * must not reset a password somebody has already changed.
+     *
+     * No password is ever hardcoded here: pass one through the environment
+     * (SEED_*_PASSWORD) or a random one is generated and printed once. This file
+     * lives in a git repo; anything written in it is public.
+     */
+    private function ensureUser(string $email, string $name, string $role, ?string $password): void
+    {
+        $existing = User::where('email', $email)->first();
+
+        if ($existing) {
+            $existing->syncRoles([$role]);
+
+            return;
+        }
+
+        $password = $password ?: Str::password(16);
+
+        $user = User::create([
+            'email' => $email,
+            'name' => $name,
+            'password' => $password,
+            'is_active' => true,
+        ]);
+        $user->syncRoles([$role]);
+
+        $this->command?->warn("Created {$role}: {$email} / {$password}  — note it down, it is not shown again.");
     }
 }

@@ -1,8 +1,11 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home2/baryal
+    # $HOME = cPanel account ka home. Hardcoded path nahi, is liye account
+    # recreate ho ya username/home partition badle, deploy phir bhi chalta hai.
+    - export DEPLOYPATH=$HOME
     - /bin/mkdir -p $DEPLOYPATH/barval-app
+    - /bin/mkdir -p $DEPLOYPATH/public_html
     - /bin/cp -R barval-app/. $DEPLOYPATH/barval-app/
     - /bin/cp -R public_html/. $DEPLOYPATH/public_html/
     # Drop any stale route/config/package caches so new reseller routes register
