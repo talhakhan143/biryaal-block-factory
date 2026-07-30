@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\Admin\SystemResetService;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -34,15 +35,21 @@ class SystemController extends Controller
         (new RolePermissionSeeder)->run();
 
         // 2) Real Baryal logins — only created if missing, otherwise role re-synced.
+        //    A created account gets a random password (this file is in a public
+        //    repo, so no password may be written here); the Owner then sets a real
+        //    one from the Users page. Existing accounts are never touched.
+        $ownerEmail = config('app.owner_email');
+        $salesEmail = config('app.sales_email');
+
         $owner = User::firstOrCreate(
-            ['email' => 'muhammadali@baryal.pk'],
-            ['name' => 'Muhammad Ali (Owner)', 'password' => 'm_ali_owner@786', 'is_active' => true],
+            ['email' => $ownerEmail],
+            ['name' => 'Muhammad Ali (Owner)', 'password' => Str::password(24), 'is_active' => true],
         );
         $owner->syncRoles(['Owner']);
 
         $sales = User::firstOrCreate(
-            ['email' => 'sales@baryal.pk'],
-            ['name' => 'Saleman', 'password' => 'm_ali_sales@786', 'is_active' => true],
+            ['email' => $salesEmail],
+            ['name' => 'Saleman', 'password' => Str::password(24), 'is_active' => true],
         );
         $sales->syncRoles(['Sales User']);
 

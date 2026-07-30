@@ -56,6 +56,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Standing Accounts
+    |--------------------------------------------------------------------------
+    |
+    | The Owner / Sales logins that /system/sync-access keeps in place. Kept in
+    | config (env-overridable) so the domain can change without a code edit.
+    |
+    */
+
+    'owner_email' => env('OWNER_EMAIL', 'muhammadali@baryal.com.pk'),
+
+    'sales_email' => env('SALES_EMAIL', 'sales@baryal.com.pk'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

@@ -35,12 +35,14 @@ export default function Login() {
           </div>
           <p className="text-sm" style={{ color: 'var(--muted)' }}>Login karein (sign in)</p>
         </div>
-        <form onSubmit={submit} className="space-y-4">
+        {/* autoComplete off + new-password: shared office machines must not have a
+            saved Owner login filled in for whoever opens the page next. */}
+        <form onSubmit={submit} className="space-y-4" autoComplete="off">
           <Field label="Email">
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" required />
           </Field>
           <Field label="Password">
-            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required />
           </Field>
           {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
           <Button type="submit" disabled={busy} className="w-full">
