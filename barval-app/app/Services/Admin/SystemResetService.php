@@ -38,6 +38,14 @@ class SystemResetService
         'attendances', 'salaries', 'staff', 'labourers',
         // Master parties / catalog (test data)
         'customers', 'suppliers', 'products', 'raw_materials',
+        // Resellers Point — its own books, wiped on the same terms as above.
+        // Without these a "hard reset" left the reseller panel full of demo
+        // sales, kiraya and stock while the rest of the app read as empty.
+        'reseller_sale_items', 'reseller_sales',
+        'reseller_sales_return_items', 'reseller_sales_returns',
+        'reseller_dispatch_items', 'reseller_dispatches',
+        'reseller_payments', 'reseller_purchases', 'reseller_rentals',
+        'reseller_suppliers', 'reseller_items',
         // Ledger backbone — clearing this zeroes every account balance
         'journal_lines', 'journal_entries',
         // Misc
