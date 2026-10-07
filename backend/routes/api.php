@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\ResellerSupplierController;
 use App\Http\Controllers\Api\SalaryController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SalesReturnController;
+use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\SystemController;
@@ -67,6 +68,10 @@ Route::prefix('v1')->group(function () {
             Route::put('suppliers/{supplier}', [SupplierController::class, 'update']);
         });
         Route::delete('suppliers/{supplier}', [SupplierController::class, 'destroy'])->middleware('permission:suppliers.delete');
+
+        // Aik hi dabbe se poore system me dhoondna. Har group apne apne
+        // permission ke peechay hai, service ke andar check hota hai.
+        Route::get('search', [SearchController::class, 'index']);
 
         // Customers
         Route::middleware('permission:customers.view')->group(function () {

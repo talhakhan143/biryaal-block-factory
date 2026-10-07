@@ -284,6 +284,33 @@ class CustomerAdvanceTest extends TestCase
         $this->assertNotNull(Customer::find($customer->id));
     }
 
+    public function test_a_cash_sale_never_picks_up_a_later_udhaar(): void
+    {
+        $product = $this->readyProduct();
+        $customer = Customer::create(['name' => 'Haji Ashraf']);
+
+        // Purana cash bill: poora paisa counter par mil gaya tha.
+        $cash = app(SaleService::class)->create([
+            'customer_id' => $customer->id, 'sale_date' => '2026-06-01', 'type' => 'cash',
+            'items' => [['product_id' => $product->id, 'quantity' => 100, 'unit_price' => 10000]],
+        ]);
+        // Baad me udhaar par maal.
+        $credit = $this->sell($customer, $product, 200);
+
+        // Koi bhi cheez jo invoices dobara set karti hai.
+        app(PaymentService::class)->receiveFromCustomer([
+            'customer_id' => $customer->id, 'payment_date' => '2026-06-05',
+            'amount' => 500000, 'method' => 'cash',
+        ]);
+
+        $this->assertSame(1000000, (int) $cash->fresh()->paid, 'Cash bill poora hi rehna chahiye.');
+        $this->assertSame(0, (int) $cash->fresh()->balance);
+        $this->assertSame('paid', $cash->fresh()->status);
+        // Baqi udhaar wale bill par baitha hai, jahan uska hona chahiye.
+        $this->assertSame(1500000, (int) $credit->fresh()->balance);
+        $this->assertSame(1500000, (int) $customer->fresh()->balance);
+    }
+
     public function test_advance_needs_the_payments_receive_permission(): void
     {
         $customer = Customer::create(['name' => 'Gated']);

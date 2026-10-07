@@ -12,6 +12,7 @@ import { useWorkspace, type Workspace } from '../lib/workspace'
 import { useLang } from '../lib/lang'
 import { api, apiError } from '../lib/api'
 import { Modal, Field, Input, Button } from './ui'
+import GlobalSearch from './GlobalSearch'
 
 interface NavItem {
   to: string
@@ -276,7 +277,7 @@ export default function Layout() {
           className="no-print flex items-center justify-between gap-2 border-b px-4 py-3 sm:px-6"
           style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
         >
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <button
               type="button"
               onClick={() => setNavOpen(true)}
@@ -286,7 +287,8 @@ export default function Layout() {
             >
               <Menu size={18} />
             </button>
-            <div className="truncate text-sm font-medium" style={{ color: 'var(--muted)' }}>{user?.roles.join(', ')}</div>
+            <div className="hidden truncate text-sm font-medium xl:block" style={{ color: 'var(--muted)' }}>{user?.roles.join(', ')}</div>
+            <GlobalSearch />
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <button

@@ -188,6 +188,76 @@ export function Table({ head, children }: { head: Head[]; children: ReactNode })
   )
 }
 
+/**
+ * Table jiske saath search aur pagination khud ba khud aa jati hai.
+ *
+ * DataTable server se page mangwata hai (jahan list bohat lambi ho sakti hai).
+ * Ye uska chhota bhai hai: jab saara data pehle se haath me ho (detail page ke
+ * tabs, ya wo endpoint jo sab kuch aik sath deta hai), to yahin kaat kar
+ * dikhata hai. Kahin bhi kachi list na rahe, is liye default se chalta hai.
+ */
+export function PagedTable<T>({
+  head,
+  rows,
+  row,
+  pageSize = 15,
+  searchText,
+  searchPlaceholder = 'Dhoondein…',
+  emptyText = 'Koi record nahi.',
+  footer,
+}: {
+  head: Head[]
+  rows: T[]
+  row: (r: T, index: number) => ReactNode
+  pageSize?: number
+  /** Har row ka wo matn jis par search chalay. Na do to search box nahi aata. */
+  searchText?: (r: T) => string
+  searchPlaceholder?: string
+  emptyText?: ReactNode
+  /** Totals ki row, hamesha neeche rehti hai (page badalne par bhi). */
+  footer?: ReactNode
+}) {
+  const [page, setPage] = useState(1)
+  const [q, setQ] = useState('')
+
+  const needle = q.trim().toLowerCase()
+  const filtered = needle && searchText
+    ? rows.filter((r) => searchText(r).toLowerCase().includes(needle))
+    : rows
+
+  const lastPage = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const current = Math.min(page, lastPage)
+  const slice = filtered.slice((current - 1) * pageSize, current * pageSize)
+
+  return (
+    <div>
+      {searchText && (
+        <div className="relative mb-3 max-w-xs">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--muted)' }} />
+          <Input value={q} onChange={(e) => { setQ(e.target.value); setPage(1) }} placeholder={searchPlaceholder} className="!pl-9" />
+        </div>
+      )}
+      <Table head={head}>
+        {slice.length > 0
+          ? slice.map((r, i) => row(r, (current - 1) * pageSize + i))
+          : (
+            <tr>
+              <td colSpan={head.length} className="px-4 py-6 text-center text-sm" style={{ color: 'var(--muted)' }}>
+                {needle ? 'Is naam se kuch nahi mila.' : emptyText}
+              </td>
+            </tr>
+          )}
+        {slice.length > 0 && footer}
+      </Table>
+      <Pagination
+        meta={{ current_page: current, last_page: lastPage, total: filtered.length }}
+        page={current}
+        onPage={setPage}
+      />
+    </div>
+  )
+}
+
 export function Modal({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   return (
     <div className="bf-fade fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>

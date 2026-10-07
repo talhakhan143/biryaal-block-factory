@@ -37,19 +37,44 @@ class InvoiceAllocator
         $pool = max(0, (int) $sales->sum('total') - max((int) $customer->balance, 0));
         $changed = 0;
 
+        // Cash sale ka poora paisa counter par hi mil gaya tha. Wo kabhi udhaar
+        // nahi banti, is liye pehle usay poora nikal lete hain. Warna purani
+        // cash bikri par baad ka udhaar aa baithta hai.
         foreach ($sales as $sale) {
-            $total = (int) $sale->total;
-            $apply = max(0, min($pool, $total));
-            $status = $apply <= 0 ? 'unpaid' : ($apply >= $total ? 'paid' : 'partial');
-
-            if ((int) $sale->paid !== $apply || $sale->status !== $status) {
-                $sale->update(['paid' => $apply, 'balance' => $total - $apply, 'status' => $status]);
-                $changed++;
+            if ($sale->type !== 'cash') {
+                continue;
             }
+            $total = (int) $sale->total;
+            $changed += $this->apply($sale, $total);
+            $pool -= $total;
+        }
+        $pool = max(0, $pool);
 
+        // Baqi paisa udhaar wale bills par, purana pehle.
+        foreach ($sales as $sale) {
+            if ($sale->type === 'cash') {
+                continue;
+            }
+            $apply = max(0, min($pool, (int) $sale->total));
+            $changed += $this->apply($sale, $apply);
             $pool -= $apply;
         }
 
         return $changed;
+    }
+
+    /** @return int 1 agar row waqai badli */
+    private function apply(Sale $sale, int $paid): int
+    {
+        $total = (int) $sale->total;
+        $status = $paid <= 0 ? 'unpaid' : ($paid >= $total ? 'paid' : 'partial');
+
+        if ((int) $sale->paid === $paid && $sale->status === $status) {
+            return 0;
+        }
+
+        $sale->update(['paid' => $paid, 'balance' => $total - $paid, 'status' => $status]);
+
+        return 1;
     }
 }
