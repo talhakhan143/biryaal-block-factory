@@ -20,10 +20,34 @@ class ResellerCustomerController extends Controller
 {
     public function __construct(private ResellerCustomerHistoryService $history) {}
 
-    /** Customers who have any Resellers Point activity, with their dues. */
+    /**
+     * Customers who have any Resellers Point activity, with their dues.
+     *
+     * Rows PHP me bante hain (kiraya roz ka hisaab hai, SQL se nahi aata), is
+     * liye page bhi collection par hi kaata jata hai. `totals` poori list ke
+     * hain, sirf is page ke nahi.
+     */
     public function index(Request $request)
     {
-        return response()->json(['data' => $this->history->dues($request->search)]);
+        $all = $this->history->dues($request->search);
+
+        $perPage = max(1, $request->integer('per_page', 15));
+        $page = max(1, $request->integer('page', 1));
+
+        return response()->json([
+            'data' => $all->forPage($page, $perPage)->values(),
+            'totals' => [
+                'outstanding' => (int) $all->sum('outstanding'),
+                'kiraya_due' => (int) $all->sum('kiraya_due'),
+                'received' => (int) $all->sum('received'),
+                'owing' => $all->where('outstanding', '>', 0)->count(),
+            ],
+            'meta' => [
+                'current_page' => $page,
+                'last_page' => max(1, (int) ceil($all->count() / $perPage)),
+                'total' => $all->count(),
+            ],
+        ]);
     }
 
     public function show(Customer $customer)

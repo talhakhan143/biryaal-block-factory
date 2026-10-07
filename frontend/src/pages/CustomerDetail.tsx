@@ -7,7 +7,7 @@ import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
 import {
   Badge, Button, Card, Field, IconButton, Input, MethodField, Modal, MoneyInput, Note,
-  OutstandingNote, RowActions, Spinner, StatTile, Table, Tabs,
+  OutstandingNote, PagedTable, RowActions, Spinner, StatTile, Tabs,
 } from '../components/ui'
 import SaleInvoiceModal from '../components/SaleInvoiceModal'
 import { MONEY_KEYS } from '../lib/queryKeys'
@@ -207,8 +207,22 @@ function Statement({ rows, balance, cashSales }: { rows: LedgerRow[]; balance: n
   }
   return (
     <div className="space-y-3">
-      <Table head={['Date', 'Kya hua', 'Bill no', { label: 'Charge hua', align: 'right' }, { label: 'Paisa mila', align: 'right' }, { label: 'Baqi raha', align: 'right' }]}>
-        {rows.map((r) => (
+      <PagedTable
+        head={['Date', 'Kya hua', 'Bill no', { label: 'Charge hua', align: 'right' }, { label: 'Paisa mila', align: 'right' }, { label: 'Baqi raha', align: 'right' }]}
+        rows={rows}
+        searchText={(r) => `${r.date} ${r.reference} ${TYPE_LABEL[r.type]}`}
+        searchPlaceholder="Date ya bill no se dhoondein…"
+        footer={(
+          <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
+            <td className="px-4 py-2.5 font-bold" colSpan={5}>
+              {balance < 0 ? 'Advance jama (iska paisa hamare paas)' : 'Ab kitna lena hai'}
+            </td>
+            <td className="px-4 py-2.5 text-right font-bold" style={{ color: balance > 0 ? 'var(--amber)' : 'var(--green)' }}>
+              {formatPaisa(Math.abs(balance))}
+            </td>
+          </tr>
+        )}
+        row={(r) => (
           <tr key={r.journal_ref} style={{ borderTop: '1px solid var(--border)' }}>
             <td className="whitespace-nowrap px-4 py-2">{r.date}</td>
             <td className="px-4 py-2"><Badge color={TYPE_COLOR[r.type]}>{TYPE_LABEL[r.type]}</Badge></td>
@@ -217,16 +231,8 @@ function Statement({ rows, balance, cashSales }: { rows: LedgerRow[]; balance: n
             <td className="px-4 py-2 text-right" style={{ color: r.credit ? 'var(--green)' : undefined }}>{r.credit ? formatPaisa(r.credit) : '·'}</td>
             <td className="px-4 py-2 text-right font-semibold">{formatPaisa(r.running)}</td>
           </tr>
-        ))}
-        <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
-          <td className="px-4 py-2.5 font-bold" colSpan={5}>
-            {balance < 0 ? 'Advance jama (iska paisa hamare paas)' : 'Ab kitna lena hai'}
-          </td>
-          <td className="px-4 py-2.5 text-right font-bold" style={{ color: balance > 0 ? 'var(--amber)' : 'var(--green)' }}>
-            {formatPaisa(Math.abs(balance))}
-          </td>
-        </tr>
-      </Table>
+        )}
+      />
       {cashSales > 0 && (
         <p className="text-xs" style={{ color: 'var(--muted)' }}>
           {cashSales} cash wali bikri khate me nahi aayi kyunki uska paisa usi waqt mil gaya tha. "Sales" me saare bill mojood hain.
@@ -242,8 +248,12 @@ function Sales({ rows }: { rows: Sale[] }) {
   if (rows.length === 0) return <Empty>Is customer ne abhi tak kuch nahi khareeda.</Empty>
   return (
     <>
-    <Table head={['Bill no', 'Date', 'Kaise', { label: 'Bill ka total', align: 'right' }, { label: 'Paisa mila', align: 'right' }, { label: 'Baqi', align: 'right' }, 'Haal', '']}>
-      {rows.map((s) => (
+    <PagedTable
+      head={['Bill no', 'Date', 'Kaise', { label: 'Bill ka total', align: 'right' }, { label: 'Paisa mila', align: 'right' }, { label: 'Baqi', align: 'right' }, 'Haal', '']}
+      rows={rows}
+      searchText={(s) => `${s.invoice_no} ${s.sale_date} ${s.type} ${s.status} ${(s.items ?? []).map((i) => i.product_name ?? '').join(' ')}`}
+      searchPlaceholder="Bill no, date ya maal se dhoondein…"
+      row={(s) => (
         <Fragment key={s.id}>
           <tr style={{ borderTop: '1px solid var(--border)' }}>
             <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{s.invoice_no}</td>
@@ -285,8 +295,8 @@ function Sales({ rows }: { rows: Sale[] }) {
             </tr>
           )}
         </Fragment>
-      ))}
-    </Table>
+      )}
+    />
     {invoiceId && <SaleInvoiceModal id={invoiceId} onClose={() => setInvoiceId(null)} />}
     </>
   )
@@ -296,8 +306,18 @@ function Receipts({ rows }: { rows: Receipt[] }) {
   if (rows.length === 0) return <Empty>Is customer se abhi koi paisa nahi aaya.</Empty>
   const total = rows.reduce((a, r) => a + r.amount, 0)
   return (
-    <Table head={['Ref', 'Date', 'Cash ya bank', 'Bank detail', { label: 'Kitna mila', align: 'right' }]}>
-      {rows.map((r) => (
+    <PagedTable
+      head={['Ref', 'Date', 'Cash ya bank', 'Bank detail', { label: 'Kitna mila', align: 'right' }]}
+      rows={rows}
+      searchText={(r) => `${r.reference} ${r.payment_date} ${r.method} ${r.bank_ref ?? ''}`}
+      searchPlaceholder="Ref ya date se dhoondein…"
+      footer={(
+        <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
+          <td className="px-4 py-2.5 font-bold" colSpan={4}>Kul paisa mila</td>
+          <td className="px-4 py-2.5 text-right font-bold" style={{ color: 'var(--green)' }}>{formatPaisa(total)}</td>
+        </tr>
+      )}
+      row={(r) => (
         <tr key={r.id} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{r.reference}</td>
           <td className="whitespace-nowrap px-4 py-2">{r.payment_date}</td>
@@ -305,12 +325,8 @@ function Receipts({ rows }: { rows: Receipt[] }) {
           <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>{r.bank_ref || '·'}</td>
           <td className="px-4 py-2 text-right font-medium" style={{ color: 'var(--green)' }}>{formatPaisa(r.amount)}</td>
         </tr>
-      ))}
-      <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
-        <td className="px-4 py-2.5 font-bold" colSpan={4}>Kul paisa mila</td>
-        <td className="px-4 py-2.5 text-right font-bold" style={{ color: 'var(--green)' }}>{formatPaisa(total)}</td>
-      </tr>
-    </Table>
+      )}
+    />
   )
 }
 
@@ -321,8 +337,12 @@ function Returns({ returns, adjustments }: { returns: Return[]; adjustments: Adj
       {returns.length > 0 && (
         <div>
           <h3 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Maal wapsi</h3>
-          <Table head={['Ref', 'Date', { label: 'Maal ki qeemat', align: 'right' }, { label: 'Kaata', align: 'right' }, { label: 'Wapas kiya', align: 'right' }, 'Kaise']}>
-            {returns.map((r) => (
+          <PagedTable
+            head={['Ref', 'Date', { label: 'Maal ki qeemat', align: 'right' }, { label: 'Kaata', align: 'right' }, { label: 'Wapas kiya', align: 'right' }, 'Kaise']}
+            rows={returns}
+            searchText={(r) => `${r.reference} ${r.return_date} ${(r.items ?? []).map((i) => i.product_name ?? '').join(' ')}`}
+            searchPlaceholder="Ref, date ya maal se dhoondein…"
+            row={(r) => (
               <tr key={r.id} style={{ borderTop: '1px solid var(--border)' }}>
                 <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{r.reference}</td>
                 <td className="whitespace-nowrap px-4 py-2">{r.return_date}</td>
@@ -335,15 +355,19 @@ function Returns({ returns, adjustments }: { returns: Return[]; adjustments: Adj
                   </Badge>
                 </td>
               </tr>
-            ))}
-          </Table>
+            )}
+          />
         </div>
       )}
       {adjustments.length > 0 && (
         <div>
           <h3 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Hath se ki gayi theek</h3>
-          <Table head={['Ref', 'Date', 'Kya kiya', 'Wajah', { label: 'Kitna', align: 'right' }]}>
-            {adjustments.map((a) => (
+          <PagedTable
+            head={['Ref', 'Date', 'Kya kiya', 'Wajah', { label: 'Kitna', align: 'right' }]}
+            rows={adjustments}
+            searchText={(a) => `${a.reference} ${a.adjustment_date} ${a.reason}`}
+            searchPlaceholder="Ref, date ya wajah se dhoondein…"
+            row={(a) => (
               <tr key={a.id} style={{ borderTop: '1px solid var(--border)' }}>
                 <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{a.reference}</td>
                 <td className="whitespace-nowrap px-4 py-2">{a.adjustment_date}</td>
@@ -355,8 +379,8 @@ function Returns({ returns, adjustments }: { returns: Return[]; adjustments: Adj
                 <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>{a.reason}</td>
                 <td className="px-4 py-2 text-right font-medium">{formatPaisa(a.amount)}</td>
               </tr>
-            ))}
-          </Table>
+            )}
+          />
         </div>
       )}
     </div>
@@ -366,8 +390,12 @@ function Returns({ returns, adjustments }: { returns: Return[]; adjustments: Adj
 function Dispatches({ rows }: { rows: Dispatch[] }) {
   if (rows.length === 0) return <Empty>Abhi koi delivery nahi hui.</Empty>
   return (
-    <Table head={['Ref', 'Date', 'Driver', 'Gaari', 'Kya gaya', 'Haal']}>
-      {rows.map((d) => (
+    <PagedTable
+      head={['Ref', 'Date', 'Driver', 'Gaari', 'Kya gaya', 'Haal']}
+      rows={rows}
+      searchText={(d) => `${d.reference} ${d.dispatch_date} ${d.driver?.name ?? ''} ${d.vehicle?.name ?? ''} ${d.vehicle?.plate ?? ''} ${(d.items ?? []).map((i) => i.product_name ?? '').join(' ')} ${d.status}`}
+      searchPlaceholder="Ref, driver ya gaari se dhoondein…"
+      row={(d) => (
         <tr key={d.id} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{d.reference}</td>
           <td className="whitespace-nowrap px-4 py-2">{d.dispatch_date}</td>
@@ -376,8 +404,8 @@ function Dispatches({ rows }: { rows: Dispatch[] }) {
           <td className="px-4 py-2">{(d.items ?? []).map((i) => `${i.product_name ?? 'Item'} × ${i.quantity}`).join(', ') || '·'}</td>
           <td className="px-4 py-2"><Badge color={d.status === 'delivered' ? 'green' : 'amber'}>{d.status}</Badge></td>
         </tr>
-      ))}
-    </Table>
+      )}
+    />
   )
 }
 

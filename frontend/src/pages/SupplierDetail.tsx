@@ -7,7 +7,7 @@ import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
 import {
   Badge, Button, Card, Field, Input, MethodField, Modal, MoneyInput, Note,
-  OutstandingNote, Spinner, StatTile, Table, Tabs,
+  OutstandingNote, PagedTable, Spinner, StatTile, Tabs,
 } from '../components/ui'
 import { MONEY_KEYS } from '../lib/queryKeys'
 
@@ -169,8 +169,18 @@ function Empty({ children }: { children: React.ReactNode }) {
 function Statement({ rows, balance }: { rows: LedgerRow[]; balance: number }) {
   if (rows.length === 0) return <Note>Is supplier ke sath abhi koi lein dein nahi hua.</Note>
   return (
-    <Table head={['Date', 'Kya hua', 'Ref', { label: 'Dena barha', align: 'right' }, { label: 'Paisa diya', align: 'right' }, { label: 'Baqi raha', align: 'right' }]}>
-      {rows.map((r) => (
+    <PagedTable
+      head={['Date', 'Kya hua', 'Ref', { label: 'Dena barha', align: 'right' }, { label: 'Paisa diya', align: 'right' }, { label: 'Baqi raha', align: 'right' }]}
+      rows={rows}
+      searchText={(r) => `${r.date} ${r.reference} ${TYPE_LABEL[r.type]}`}
+      searchPlaceholder="Date ya ref se dhoondein…"
+      footer={(
+        <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
+          <td className="px-4 py-2.5 font-bold" colSpan={5}>{balance < 0 ? 'Advance diya hua' : 'Ab kitna dena hai'}</td>
+          <td className="px-4 py-2.5 text-right font-bold" style={{ color: balance > 0 ? 'var(--amber)' : 'var(--green)' }}>{formatPaisa(Math.abs(balance))}</td>
+        </tr>
+      )}
+      row={(r) => (
         <tr key={r.journal_ref} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2">{r.date}</td>
           <td className="px-4 py-2"><Badge color={TYPE_COLOR[r.type]}>{TYPE_LABEL[r.type]}</Badge></td>
@@ -179,20 +189,20 @@ function Statement({ rows, balance }: { rows: LedgerRow[]; balance: number }) {
           <td className="px-4 py-2 text-right" style={{ color: r.debit ? 'var(--green)' : undefined }}>{r.debit ? formatPaisa(r.debit) : '·'}</td>
           <td className="px-4 py-2 text-right font-semibold">{formatPaisa(r.running)}</td>
         </tr>
-      ))}
-      <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
-        <td className="px-4 py-2.5 font-bold" colSpan={5}>{balance < 0 ? 'Advance diya hua' : 'Ab kitna dena hai'}</td>
-        <td className="px-4 py-2.5 text-right font-bold" style={{ color: balance > 0 ? 'var(--amber)' : 'var(--green)' }}>{formatPaisa(Math.abs(balance))}</td>
-      </tr>
-    </Table>
+      )}
+    />
   )
 }
 
 function Purchases({ rows }: { rows: Purchase[] }) {
   if (rows.length === 0) return <Empty>Is supplier se abhi kuch nahi khareeda.</Empty>
   return (
-    <Table head={['Ref', 'Date', 'Maal', { label: 'Kitna', align: 'right' }, { label: 'Bill', align: 'right' }, { label: 'Diya', align: 'right' }, 'Laaya', 'Haal']}>
-      {rows.map((p) => (
+    <PagedTable
+      head={['Ref', 'Date', 'Maal', { label: 'Kitna', align: 'right' }, { label: 'Bill', align: 'right' }, { label: 'Diya', align: 'right' }, 'Laaya', 'Haal']}
+      rows={rows}
+      searchText={(p) => `${p.reference} ${p.purchase_date} ${p.raw_material?.name ?? ''} ${p.freight_driver?.driver_name ?? ''} ${p.payment_status}`}
+      searchPlaceholder="Ref, date ya maal se dhoondein…"
+      row={(p) => (
         <tr key={p.id} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{p.reference}</td>
           <td className="whitespace-nowrap px-4 py-2">{p.purchase_date}</td>
@@ -205,8 +215,8 @@ function Purchases({ rows }: { rows: Purchase[] }) {
           </td>
           <td className="px-4 py-2"><Badge color={statusColor[p.payment_status]}>{p.payment_status}</Badge></td>
         </tr>
-      ))}
-    </Table>
+      )}
+    />
   )
 }
 
@@ -214,8 +224,18 @@ function Payments({ rows }: { rows: PaymentRow[] }) {
   if (rows.length === 0) return <Empty>Is supplier ko abhi koi paisa nahi diya.</Empty>
   const total = rows.reduce((a, r) => a + r.amount, 0)
   return (
-    <Table head={['Ref', 'Date', 'Cash ya bank', 'Bank detail', { label: 'Kitna diya', align: 'right' }]}>
-      {rows.map((r) => (
+    <PagedTable
+      head={['Ref', 'Date', 'Cash ya bank', 'Bank detail', { label: 'Kitna diya', align: 'right' }]}
+      rows={rows}
+      searchText={(r) => `${r.reference} ${r.payment_date} ${r.method} ${r.bank_ref ?? ''}`}
+      searchPlaceholder="Ref ya date se dhoondein…"
+      footer={(
+        <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
+          <td className="px-4 py-2.5 font-bold" colSpan={4}>Kul paisa diya</td>
+          <td className="px-4 py-2.5 text-right font-bold" style={{ color: 'var(--green)' }}>{formatPaisa(total)}</td>
+        </tr>
+      )}
+      row={(r) => (
         <tr key={r.id} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{r.reference}</td>
           <td className="whitespace-nowrap px-4 py-2">{r.payment_date}</td>
@@ -223,20 +243,20 @@ function Payments({ rows }: { rows: PaymentRow[] }) {
           <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>{r.bank_ref || '·'}</td>
           <td className="px-4 py-2 text-right font-medium" style={{ color: 'var(--green)' }}>{formatPaisa(r.amount)}</td>
         </tr>
-      ))}
-      <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
-        <td className="px-4 py-2.5 font-bold" colSpan={4}>Kul paisa diya</td>
-        <td className="px-4 py-2.5 text-right font-bold" style={{ color: 'var(--green)' }}>{formatPaisa(total)}</td>
-      </tr>
-    </Table>
+      )}
+    />
   )
 }
 
 function Adjustments({ rows }: { rows: AdjRow[] }) {
   if (rows.length === 0) return <Empty>Koi hath se ki gayi entry nahi.</Empty>
   return (
-    <Table head={['Ref', 'Date', 'Kya kiya', 'Wajah', { label: 'Kitna', align: 'right' }]}>
-      {rows.map((a) => (
+    <PagedTable
+      head={['Ref', 'Date', 'Kya kiya', 'Wajah', { label: 'Kitna', align: 'right' }]}
+      rows={rows}
+      searchText={(a) => `${a.reference} ${a.adjustment_date} ${a.reason}`}
+      searchPlaceholder="Ref, date ya wajah se dhoondein…"
+      row={(a) => (
         <tr key={a.id} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{a.reference}</td>
           <td className="whitespace-nowrap px-4 py-2">{a.adjustment_date}</td>
@@ -248,8 +268,8 @@ function Adjustments({ rows }: { rows: AdjRow[] }) {
           <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>{a.reason}</td>
           <td className="px-4 py-2 text-right font-medium">{formatPaisa(a.amount)}</td>
         </tr>
-      ))}
-    </Table>
+      )}
+    />
   )
 }
 

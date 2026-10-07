@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CustomerResource;
 use App\Http\Resources\PaymentResource;
@@ -18,32 +19,29 @@ use Illuminate\Http\Request;
 
 class PaymentController extends Controller
 {
+    use HasTableQuery;
+
     public function __construct(private PaymentService $service) {}
 
     public function index(Request $request)
     {
-        $sortable = ['payment_date', 'amount', 'direction', 'method', 'reference'];
-        $sort = in_array($request->sort, $sortable, true) ? $request->sort : 'payment_date';
-        $dir = $request->dir === 'asc' ? 'asc' : 'desc';
-
-        $payments = Payment::query()
+        $query = Payment::query()
             ->with('party')
-            ->when($request->search, function ($q, $s) {
-                $q->where('reference', 'like', "%{$s}%")
-                    ->orWhereHasMorph(
-                        'party',
-                        [Customer::class, Supplier::class, Driver::class, Labourer::class, Staff::class],
-                        fn ($q) => $q->where('name', 'like', "%{$s}%"),
-                    );
-            })
             ->when($request->direction, fn ($q, $d) => $q->where('direction', $d))
             ->when($request->from, fn ($q, $d) => $q->whereDate('payment_date', '>=', $d))
-            ->when($request->to, fn ($q, $d) => $q->whereDate('payment_date', '<=', $d))
-            ->orderBy($sort, $dir)
-            ->orderBy('created_at', 'desc')
-            ->paginate($request->integer('per_page', 15));
+            ->when($request->to, fn ($q, $d) => $q->whereDate('payment_date', '<=', $d));
 
-        return PaymentResource::collection($payments);
+        $this->applyTableQuery(
+            $query,
+            $request,
+            ['payment_date', 'amount', 'direction', 'method', 'reference'],
+            ['reference', 'notes'],
+            'payment_date',
+            [],
+            ['party' => [Customer::class, Supplier::class, Driver::class, Labourer::class, Staff::class]],
+        );
+
+        return PaymentResource::collection($query->paginate($request->integer('per_page', 15)));
     }
 
     /**

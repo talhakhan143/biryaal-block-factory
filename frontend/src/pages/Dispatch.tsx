@@ -5,7 +5,7 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { FileText } from 'lucide-react'
-import { Badge, Button, Card, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, PageHeader, RowActions, Select, Spinner, Table } from '../components/ui'
+import { Badge, Button, Card, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, PageHeader, RowActions, Select, Spinner, PagedTable } from '../components/ui'
 import InvoiceSheet from '../components/InvoiceSheet'
 
 interface Dispatch {
@@ -88,8 +88,14 @@ export default function DispatchPage() {
           {pending.isLoading ? (
             <Spinner />
           ) : pending.data && pending.data.data.length > 0 ? (
-            <Table head={['Invoice', 'Date', 'Customer', 'Items', 'Total', '']}>
-              {pending.data.data.map((o) => (
+            <PagedTable
+              head={['Invoice', 'Date', 'Customer', 'Items', { label: 'Total', align: 'right' }, '']}
+              rows={pending.data.data}
+              searchText={(o: PendingOrder) => `${o.invoice_no} ${o.customer_name} ${o.sale_date}`}
+              searchPlaceholder="Invoice ya customer se dhoondein…"
+              emptyText="Koi pending order nahi."
+              row={(o: PendingOrder) => (
+              
                 <tr key={o.sale_id}>
                   <td className="px-4 py-3 font-mono text-xs">{o.invoice_no}</td>
                   <td className="px-4 py-3">{o.sale_date}</td>
@@ -102,8 +108,8 @@ export default function DispatchPage() {
                     <Button onClick={() => openFromOrder(o)} className="!px-3 !py-1 text-xs">Dispatch</Button>
                   </td>
                 </tr>
-              ))}
-            </Table>
+              )}
+            />
           ) : (
             <Card><p className="text-sm" style={{ color: 'var(--muted)' }}>Koi pending order nahi — sab dispatch ho gaye.</p></Card>
           )}

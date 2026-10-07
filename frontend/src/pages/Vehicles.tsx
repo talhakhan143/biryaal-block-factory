@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Button, Field, Input, Modal, MoneyInput, PageHeader, Spinner, Table } from '../components/ui'
+import { Button, type Column, DataTable, Field, Input, Modal, MoneyInput, PageHeader } from '../components/ui'
 
 interface Vehicle {
   id: string
@@ -18,7 +18,17 @@ export default function Vehicles() {
   const { can } = useAuth()
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
-  const { data, isLoading } = useList<Vehicle>('vehicles')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [sort, setSort] = useState('name')
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
+  const { data, isLoading } = useList<Vehicle>('vehicles', { search, page, sort, dir })
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('asc') }
+    setPage(1)
+  }
 
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/vehicles', p),
@@ -28,23 +38,31 @@ export default function Vehicles() {
     },
   })
 
+  const columns: Column<Vehicle>[] = [
+    { key: 'name', label: 'Name', sortable: true, render: (v) => <span className="font-medium">{v.name}</span> },
+    { key: 'plate', label: 'Plate', sortable: true, render: (v) => v.plate ?? '·' },
+    { key: 'type', label: 'Type', sortable: true, render: (v) => v.type ?? '·' },
+    { key: 'default_trip_rate', label: 'Default Rate', sortable: true, align: 'right', render: (v) => formatPaisa(v.default_trip_rate) },
+  ]
+
   return (
     <div>
       <PageHeader title="Vehicles" subtitle="Gaariyan aur trip rate" actions={can('transport.manage') && <Button onClick={() => setCreating(true)}>+ Vehicle</Button>} />
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Table head={['Name', 'Plate', 'Type', 'Default Rate']}>
-          {data?.data.map((v) => (
-            <tr key={v.id}>
-              <td className="px-4 py-3 font-medium">{v.name}</td>
-              <td className="px-4 py-3">{v.plate ?? '—'}</td>
-              <td className="px-4 py-3">{v.type ?? '—'}</td>
-              <td className="px-4 py-3">{formatPaisa(v.default_trip_rate)}</td>
-            </tr>
-          ))}
-        </Table>
-      )}
+      <DataTable
+        columns={columns}
+        rows={data?.data}
+        loading={isLoading}
+        emptyText="Koi gaari nahi."
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Naam, plate ya type se dhoondein…"
+        sort={sort}
+        dir={dir}
+        onSort={onSort}
+        meta={data?.meta}
+        page={page}
+        onPage={setPage}
+      />
       {creating && (
         <Modal title="New Vehicle" onClose={() => setCreating(false)}>
           <VehicleForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />

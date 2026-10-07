@@ -7,7 +7,7 @@ import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
 import {
   Badge, Button, Card, Field, IconButton, Input, MethodField, Modal, MoneyInput, Note,
-  OutstandingNote, RowActions, Spinner, StatTile, Table, Tabs,
+  OutstandingNote, PagedTable, RowActions, Spinner, StatTile, Tabs,
 } from '../components/ui'
 import SaleInvoiceModal from '../components/SaleInvoiceModal'
 import { RESELLER_MONEY_KEYS } from '../lib/queryKeys'
@@ -155,8 +155,12 @@ function Empty({ children }: { children: React.ReactNode }) {
 function Sales({ rows, onInvoice }: { rows: Sale[]; onInvoice: (id: string) => void }) {
   if (rows.length === 0) return <Empty>Is customer ne yahan se abhi kuch nahi khareeda.</Empty>
   return (
-    <Table head={['Bill no', 'Date', 'Kaise', { label: 'Bill ka total', align: 'right' }, { label: 'Paisa mila', align: 'right' }, { label: 'Baqi', align: 'right' }, 'Haal', '']}>
-      {rows.map((s) => (
+    <PagedTable
+      head={['Bill no', 'Date', 'Kaise', { label: 'Bill ka total', align: 'right' }, { label: 'Paisa mila', align: 'right' }, { label: 'Baqi', align: 'right' }, 'Haal', '']}
+      rows={rows}
+      searchText={(s) => `${s.invoice_no} ${s.sale_date} ${s.type} ${s.status} ${(s.items ?? []).map((i) => i.item_name ?? '').join(' ')}`}
+      searchPlaceholder="Bill no, date ya maal se dhoondein…"
+      row={(s) => (
         <tr key={s.id} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{s.invoice_no}</td>
           <td className="whitespace-nowrap px-4 py-2">{s.sale_date}</td>
@@ -169,8 +173,8 @@ function Sales({ rows, onInvoice }: { rows: Sale[]; onInvoice: (id: string) => v
             <RowActions><IconButton icon={FileText} label="Invoice" tone="primary" onClick={() => onInvoice(s.id)} /></RowActions>
           </td>
         </tr>
-      ))}
-    </Table>
+      )}
+    />
   )
 }
 
@@ -178,8 +182,18 @@ function Receipts({ rows }: { rows: Receipt[] }) {
   if (rows.length === 0) return <Empty>Is customer se abhi koi paisa nahi aaya.</Empty>
   const total = rows.reduce((a, r) => a + r.amount, 0)
   return (
-    <Table head={['Ref', 'Date', 'Cash ya bank', 'Bank detail', { label: 'Kitna mila', align: 'right' }]}>
-      {rows.map((r) => (
+    <PagedTable
+      head={['Ref', 'Date', 'Cash ya bank', 'Bank detail', { label: 'Kitna mila', align: 'right' }]}
+      rows={rows}
+      searchText={(r) => `${r.reference} ${r.payment_date} ${r.method} ${r.bank_ref ?? ''}`}
+      searchPlaceholder="Ref ya date se dhoondein…"
+      footer={(
+        <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
+          <td className="px-4 py-2.5 font-bold" colSpan={4}>Kul paisa mila</td>
+          <td className="px-4 py-2.5 text-right font-bold" style={{ color: 'var(--green)' }}>{formatPaisa(total)}</td>
+        </tr>
+      )}
+      row={(r) => (
         <tr key={r.id} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{r.reference}</td>
           <td className="whitespace-nowrap px-4 py-2">{r.payment_date}</td>
@@ -187,20 +201,20 @@ function Receipts({ rows }: { rows: Receipt[] }) {
           <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>{r.bank_ref || '·'}</td>
           <td className="px-4 py-2 text-right font-medium" style={{ color: 'var(--green)' }}>{formatPaisa(r.amount)}</td>
         </tr>
-      ))}
-      <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
-        <td className="px-4 py-2.5 font-bold" colSpan={4}>Kul paisa mila</td>
-        <td className="px-4 py-2.5 text-right font-bold" style={{ color: 'var(--green)' }}>{formatPaisa(total)}</td>
-      </tr>
-    </Table>
+      )}
+    />
   )
 }
 
 function Rentals({ rows }: { rows: Rental[] }) {
   if (rows.length === 0) return <Empty>Is customer ne kuch kiraye par nahi liya.</Empty>
   return (
-    <Table head={['Ref', 'Cheez', { label: 'Kitni', align: 'right' }, { label: 'Ek din ka', align: 'right' }, 'Kab se', { label: 'Din', align: 'right' }, { label: 'Kul bana', align: 'right' }, { label: 'Paisa mila', align: 'right' }, { label: 'Baqi', align: 'right' }, 'Haal']}>
-      {rows.map((r) => (
+    <PagedTable
+      head={['Ref', 'Cheez', { label: 'Kitni', align: 'right' }, { label: 'Ek din ka', align: 'right' }, 'Kab se', { label: 'Din', align: 'right' }, { label: 'Kul bana', align: 'right' }, { label: 'Paisa mila', align: 'right' }, { label: 'Baqi', align: 'right' }, 'Haal']}
+      rows={rows}
+      searchText={(r) => `${r.reference} ${r.item_name} ${r.start_date} ${r.status === 'returned' ? 'Wapas aa gaya' : 'Abhi uske paas'}`}
+      searchPlaceholder="Ref ya cheez ke naam se dhoondein…"
+      row={(r) => (
         <tr key={r.id} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{r.reference}</td>
           <td className="px-4 py-2">{r.item_name}</td>
@@ -213,16 +227,20 @@ function Rentals({ rows }: { rows: Rental[] }) {
           <td className="px-4 py-2 text-right font-medium" style={{ color: r.due > 0 ? 'var(--amber)' : undefined }}>{formatPaisa(r.due)}</td>
           <td className="px-4 py-2"><Badge color={r.status === 'returned' ? 'green' : 'amber'}>{r.status === 'returned' ? 'Wapas aa gaya' : 'Abhi uske paas'}</Badge></td>
         </tr>
-      ))}
-    </Table>
+      )}
+    />
   )
 }
 
 function Returns({ rows }: { rows: Return[] }) {
   if (rows.length === 0) return <Empty>Koi maal wapas nahi aaya.</Empty>
   return (
-    <Table head={['Ref', 'Date', { label: 'Maal ki qeemat', align: 'right' }, { label: 'Kaata', align: 'right' }, { label: 'Wapas kiya', align: 'right' }, 'Kaise']}>
-      {rows.map((r) => (
+    <PagedTable
+      head={['Ref', 'Date', { label: 'Maal ki qeemat', align: 'right' }, { label: 'Kaata', align: 'right' }, { label: 'Wapas kiya', align: 'right' }, 'Kaise']}
+      rows={rows}
+      searchText={(r) => `${r.reference} ${r.return_date}`}
+      searchPlaceholder="Ref ya date se dhoondein…"
+      row={(r) => (
         <tr key={r.id} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{r.reference}</td>
           <td className="whitespace-nowrap px-4 py-2">{r.return_date}</td>
@@ -235,8 +253,8 @@ function Returns({ rows }: { rows: Return[] }) {
             </Badge>
           </td>
         </tr>
-      ))}
-    </Table>
+      )}
+    />
   )
 }
 

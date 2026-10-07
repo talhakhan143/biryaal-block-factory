@@ -5,7 +5,7 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { Trash2, Wallet } from 'lucide-react'
-import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select, Spinner, Table, useConfirm } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select, useConfirm } from '../components/ui'
 
 interface Staff {
   id: string
@@ -39,7 +39,9 @@ export default function StaffPage() {
   const [dir, setDir] = useState<'asc' | 'desc'>('asc')
   const staff = useList<Staff>('staff', { page, search, sort, dir })
   const allStaff = useList<Staff>('staff', { per_page: 200 }) // full list for the salary dropdown
-  const salaries = useList<Salary>('salaries')
+  const [salPage, setSalPage] = useState(1)
+  const [salSearch, setSalSearch] = useState('')
+  const salaries = useList<Salary>('salaries', { page: salPage, search: salSearch })
   const refresh = () => { qc.invalidateQueries({ queryKey: ['staff'] }); qc.invalidateQueries({ queryKey: ['salaries'] }) }
 
   const onSort = (key: string) => {
@@ -70,6 +72,22 @@ export default function StaffPage() {
   const generate = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/salaries', p), onSuccess: () => { refresh(); setGenSalary(false) } })
   const pay = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/salaries/${id}/pay`, payload), onSuccess: () => { refresh(); setPayId(null) } })
 
+  const salaryColumns: Column<Salary>[] = [
+    { key: 'reference', label: 'Ref', render: (s) => <span className="font-mono text-xs">{s.reference}</span> },
+    { key: 'staff_name', label: 'Staff', render: (s) => s.staff_name },
+    { key: 'month', label: 'Mahina', render: (s) => s.month },
+    { key: 'amount', label: 'Tankha', align: 'right', render: (s) => formatPaisa(s.amount) },
+    { key: 'paid', label: 'Diya', align: 'right', render: (s) => formatPaisa(s.paid) },
+    { key: 'balance', label: 'Baqi', align: 'right', render: (s) => formatPaisa(s.balance) },
+    { key: 'status', label: 'Haal', render: (s) => <Badge color={statusColor[s.status]}>{s.status}</Badge> },
+    {
+      key: 'actions', label: '', align: 'right',
+      render: (s) => (can('hr.manage') && s.status !== 'paid'
+        ? <RowActions><IconButton icon={Wallet} label="Tankha dein" tone="primary" onClick={() => setPayId(s.id)} /></RowActions>
+        : null),
+    },
+  ]
+
   return (
     <div className="space-y-8">
       <div>
@@ -93,28 +111,18 @@ export default function StaffPage() {
 
       <div>
         <PageHeader title="Salaries" subtitle="Tankha banayein aur ada karein" actions={can('hr.manage') && <Button onClick={() => setGenSalary(true)}>Generate Salary</Button>} />
-        {salaries.isLoading ? <Spinner /> : (
-          <Table head={['Ref', 'Staff', 'Month', 'Amount', 'Paid', 'Balance', 'Status', '']}>
-            {salaries.data?.data.map((s) => (
-              <tr key={s.id}>
-                <td className="px-4 py-3 font-mono text-xs">{s.reference}</td>
-                <td className="px-4 py-3">{s.staff_name}</td>
-                <td className="px-4 py-3">{s.month}</td>
-                <td className="px-4 py-3">{formatPaisa(s.amount)}</td>
-                <td className="px-4 py-3">{formatPaisa(s.paid)}</td>
-                <td className="px-4 py-3">{formatPaisa(s.balance)}</td>
-                <td className="px-4 py-3"><Badge color={statusColor[s.status]}>{s.status}</Badge></td>
-                <td className="px-4 py-3">
-                  {can('hr.manage') && s.status !== 'paid' && (
-                    <RowActions>
-                      <IconButton icon={Wallet} label="Pay salary" tone="primary" onClick={() => setPayId(s.id)} />
-                    </RowActions>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </Table>
-        )}
+        <DataTable
+          columns={salaryColumns}
+          rows={salaries.data?.data}
+          loading={salaries.isLoading}
+          emptyText="Abhi koi tankha nahi bani."
+          search={salSearch}
+          onSearch={(v) => { setSalSearch(v); setSalPage(1) }}
+          searchPlaceholder="Ref, staff ya mahine se dhoondein…"
+          meta={salaries.data?.meta}
+          page={salPage}
+          onPage={setSalPage}
+        />
       </div>
 
       {addStaff && (

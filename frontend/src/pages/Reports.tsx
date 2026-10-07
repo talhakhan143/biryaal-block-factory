@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
-import { Button, Card, Field, Input, PageHeader, Select, Spinner } from '../components/ui'
+import { Button, Card, Field, Input, PageHeader, Select, Spinner, PagedTable } from '../components/ui'
 
 interface Column { key: string; label: string; money?: boolean; align?: string }
 interface Summary { label: string; value: number | string; money?: boolean }
@@ -100,31 +100,23 @@ export default function Reports() {
             <h2 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{data.title}</h2>
             <span className="text-sm" style={{ color: 'var(--muted)' }}>{data.period}</span>
           </div>
-          <div className="overflow-x-auto rounded-xl border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs uppercase tracking-wide" style={{ background: 'var(--surface-2)', color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
-                  {data.columns.map((col) => (
-                    <th key={col.key} className={`px-4 py-3 font-semibold ${col.align === 'right' ? 'text-right' : 'text-left'}`}>{col.label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody style={{ color: 'var(--text)' }}>
-                {data.rows.map((row, i) => (
-                  <tr key={i}>
-                    {data.columns.map((col) => (
-                      <td key={col.key} className={`px-4 py-2 ${col.align === 'right' ? 'text-right' : 'text-left'}`}>
-                        {cell(col, row)}
-                      </td>
-                    ))}
-                  </tr>
+          <PagedTable
+            head={data.columns.map((col) => (col.align === 'right' ? { label: col.label, align: 'right' as const } : col.label))}
+            rows={data.rows}
+            pageSize={25}
+            searchText={(row) => data.columns.map((col) => String(row[col.key] ?? '')).join(' ')}
+            searchPlaceholder="Is report me dhoondein…"
+            emptyText="Is arse ka koi record nahi."
+            row={(row, i) => (
+              <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                {data.columns.map((col) => (
+                  <td key={col.key} className={`px-4 py-2 ${col.align === 'right' ? 'text-right' : 'text-left'}`}>
+                    {cell(col, row)}
+                  </td>
                 ))}
-                {data.rows.length === 0 && (
-                  <tr><td colSpan={data.columns.length} className="px-4 py-6 text-center" style={{ color: 'var(--muted)' }}>No data.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+              </tr>
+            )}
+          />
 
           {data.summary.length > 0 && (
             <div className="mt-4 flex justify-end">

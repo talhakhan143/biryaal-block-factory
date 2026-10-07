@@ -31,11 +31,11 @@ trait HasTableQuery
         $sort = in_array($request->sort, $sortable, true) ? $request->sort : $defaultSort;
         $dir = $request->dir === 'asc' ? 'asc' : 'desc';
 
-        $query->when($request->search, function (Builder $q, $s) use ($searchable, $searchRelations) {
+        $query->when($request->search, function (Builder $q, $s) use ($searchable, $searchRelations, $searchMorphs) {
             // LIKE ke wildcards ko aam harf bana dete hain, warna "%" likhne
             // par poori list aa jati hai.
             $like = Search::like((string) $s);
-            $q->where(function (Builder $q) use ($like, $searchable, $searchRelations) {
+            $q->where(function (Builder $q) use ($like, $searchable, $searchRelations, $searchMorphs) {
                 foreach ($searchable as $col) {
                     $q->orWhere($col, 'like', $like);
                 }
@@ -43,6 +43,10 @@ trait HasTableQuery
                     foreach ($cols as $col) {
                         $q->orWhereHas($rel, fn (Builder $q) => $q->where($col, 'like', $like));
                     }
+                }
+                // morphTo par whereHas nahi chalta, is liye whereHasMorph
+                foreach ($searchMorphs as $rel => $types) {
+                    $q->orWhereHasMorph($rel, $types, fn (Builder $q) => $q->where('name', 'like', $like));
                 }
             });
         });

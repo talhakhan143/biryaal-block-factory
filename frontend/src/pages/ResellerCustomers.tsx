@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
@@ -27,17 +27,17 @@ export default function ResellerCustomers() {
   const [page, setPage] = useState(1)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['reseller/customers', { search }],
-    queryFn: async () => (await api.get<{ data: ResellerCustomer[] }>('/reseller/customers', { params: { search: search || undefined } })).data.data,
+    queryKey: ['reseller/customers', { search, page }],
+    queryFn: async () => (await api.get<{
+      data: ResellerCustomer[]
+      totals: { outstanding: number; kiraya_due: number; received: number; owing: number }
+      meta: { current_page: number; last_page: number; total: number }
+    }>('/reseller/customers', { params: { search: search || undefined, page } })).data,
   })
 
-  const rows = data ?? []
-  const totals = useMemo(() => ({
-    due: rows.reduce((a, r) => a + r.outstanding, 0),
-    kiraya: rows.reduce((a, r) => a + r.kiraya_due, 0),
-    received: rows.reduce((a, r) => a + r.received, 0),
-    owing: rows.filter((r) => r.outstanding > 0).length,
-  }), [rows])
+  const rows = data?.data ?? []
+  // Tiles server se aate hain: ye poori list ke hain, sirf is page ke nahi.
+  const totals = data?.totals ?? { outstanding: 0, kiraya_due: 0, received: 0, owing: 0 }
 
   const columns: Column<ResellerCustomer>[] = [
     { key: 'name', label: 'Naam', render: (c) => <span className="font-medium">{c.name}</span> },
@@ -70,10 +70,10 @@ export default function ResellerCustomers() {
       </div>
 
       <div className="bf-stagger mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Kul lena hai" value={formatPaisa(totals.due)} hint={`${totals.owing} customers se`} tone={totals.due > 0 ? 'red' : 'green'} />
-        <StatTile label="Is me kiraya" value={formatPaisa(totals.kiraya)} hint="Rental ka baqi" tone="amber" />
+        <StatTile label="Kul lena hai" value={formatPaisa(totals.outstanding)} hint={`${totals.owing} customers se`} tone={totals.outstanding > 0 ? 'red' : 'green'} />
+        <StatTile label="Is me kiraya" value={formatPaisa(totals.kiraya_due)} hint="Rental ka baqi" tone="amber" />
         <StatTile label="Ab tak paisa mila" value={formatPaisa(totals.received)} tone="green" />
-        <StatTile label="Customers" value={String(rows.length)} hint="Jinhon ne yahan se kuch liya" tone="primary" />
+        <StatTile label="Customers" value={String(data?.meta.total ?? 0)} hint="Jinhon ne yahan se kuch liya" tone="primary" />
       </div>
 
       <DataTable
@@ -84,6 +84,7 @@ export default function ResellerCustomers() {
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1) }}
         searchPlaceholder="Naam ya phone se dhoondein…"
+        meta={data?.meta}
         page={page}
         onPage={setPage}
         onRowClick={(c) => navigate(`/reseller/customers/${c.id}`)}

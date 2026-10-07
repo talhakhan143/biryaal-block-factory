@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Driver;
@@ -21,16 +22,27 @@ use Illuminate\Http\Request;
  */
 class ResellerPaymentController extends Controller
 {
+    use HasTableQuery;
+
     public function __construct(private ResellerService $service) {}
 
     /** Money in/out history. */
     public function index(Request $request)
     {
-        $payments = ResellerPayment::query()
+        $query = ResellerPayment::query()
             ->with(['supplier', 'customer'])
-            ->when($request->direction, fn ($q, $d) => $q->where('direction', $d))
-            ->orderByDesc('payment_date')->orderByDesc('created_at')
-            ->paginate($request->integer('per_page', 15));
+            ->when($request->direction, fn ($q, $d) => $q->where('direction', $d));
+
+        $this->applyTableQuery(
+            $query,
+            $request,
+            ['payment_date', 'amount', 'direction', 'method', 'reference'],
+            ['reference', 'notes'],
+            'payment_date',
+            ['supplier' => ['name'], 'customer' => ['name']],
+        );
+
+        $payments = $query->paginate($request->integer('per_page', 15));
 
         return response()->json([
             'data' => $payments->map(fn (ResellerPayment $p) => [

@@ -2,22 +2,36 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Models\Adjustment;
+use App\Models\Customer;
+use App\Models\Supplier;
 use App\Services\Accounting\AdjustmentService;
 use App\Support\Money;
 use Illuminate\Http\Request;
 
 class AdjustmentController extends Controller
 {
+    use HasTableQuery;
+
     public function __construct(private AdjustmentService $service) {}
 
     public function index(Request $request)
     {
-        $rows = Adjustment::query()
-            ->with('party')
-            ->latest('adjustment_date')
-            ->paginate($request->integer('per_page', 15));
+        $query = Adjustment::query()->with('party');
+
+        $this->applyTableQuery(
+            $query,
+            $request,
+            ['adjustment_date', 'amount', 'mode', 'method', 'reference'],
+            ['reference', 'reason', 'mode'],
+            'adjustment_date',
+            [],
+            ['party' => [Customer::class, Supplier::class]],
+        );
+
+        $rows = $query->paginate($request->integer('per_page', 15));
 
         $rows->getCollection()->transform(fn (Adjustment $a) => [
             'id' => $a->id,
@@ -30,7 +44,10 @@ class AdjustmentController extends Controller
             'reason' => $a->reason,
         ]);
 
-        return response()->json($rows);
+        return response()->json([
+            'data' => $rows->items(),
+            'meta' => ['current_page' => $rows->currentPage(), 'last_page' => $rows->lastPage(), 'total' => $rows->total()],
+        ]);
     }
 
     public function store(Request $request)

@@ -7,7 +7,7 @@ import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
 import {
   Badge, Button, Card, Field, Input, MethodField, Modal, MoneyInput, Note,
-  OutstandingNote, Spinner, StatTile, Table, Tabs,
+  OutstandingNote, PagedTable, Spinner, StatTile, Tabs,
 } from '../components/ui'
 import { MONEY_KEYS } from '../lib/queryKeys'
 
@@ -170,8 +170,18 @@ function Statement({ rows, balance, settledAtOnce }: { rows: LedgerRow[]; balanc
   }
   return (
     <>
-    <Table head={['Date', 'Kya hua', 'Ref', { label: 'Kiraya bana', align: 'right' }, { label: 'Paisa diya', align: 'right' }, { label: 'Baqi raha', align: 'right' }]}>
-      {rows.map((r) => (
+    <PagedTable
+      head={['Date', 'Kya hua', 'Ref', { label: 'Kiraya bana', align: 'right' }, { label: 'Paisa diya', align: 'right' }, { label: 'Baqi raha', align: 'right' }]}
+      rows={rows}
+      searchText={(r) => `${r.date} ${r.reference} ${r.type === 'trip' ? 'Trip ka kiraya' : 'Paisa diya'}`}
+      searchPlaceholder="Date ya ref se dhoondein…"
+      footer={(
+        <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
+          <td className="px-4 py-2.5 font-bold" colSpan={5}>{balance < 0 ? 'Advance diya hua' : 'Ab kitna dena hai'}</td>
+          <td className="px-4 py-2.5 text-right font-bold" style={{ color: balance > 0 ? 'var(--amber)' : 'var(--green)' }}>{formatPaisa(Math.abs(balance))}</td>
+        </tr>
+      )}
+      row={(r) => (
         <tr key={r.journal_ref} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2">{r.date}</td>
           <td className="px-4 py-2"><Badge color={r.type === 'trip' ? 'blue' : 'green'}>{r.type === 'trip' ? 'Trip ka kiraya' : 'Paisa diya'}</Badge></td>
@@ -180,12 +190,8 @@ function Statement({ rows, balance, settledAtOnce }: { rows: LedgerRow[]; balanc
           <td className="px-4 py-2 text-right" style={{ color: r.debit ? 'var(--green)' : undefined }}>{r.debit ? formatPaisa(r.debit) : '·'}</td>
           <td className="px-4 py-2 text-right font-semibold">{formatPaisa(r.running)}</td>
         </tr>
-      ))}
-      <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
-        <td className="px-4 py-2.5 font-bold" colSpan={5}>{balance < 0 ? 'Advance diya hua' : 'Ab kitna dena hai'}</td>
-        <td className="px-4 py-2.5 text-right font-bold" style={{ color: balance > 0 ? 'var(--amber)' : 'var(--green)' }}>{formatPaisa(Math.abs(balance))}</td>
-      </tr>
-    </Table>
+      )}
+    />
     {settledAtOnce > 0 && (
       <p className="mt-2 text-xs" style={{ color: 'var(--muted)' }}>
         {settledAtOnce} trip khate me nahi aayi kyunki uska kiraya usi waqt poora de diya gaya tha.
@@ -198,8 +204,12 @@ function Statement({ rows, balance, settledAtOnce }: { rows: LedgerRow[]; balanc
 function Trips({ rows, empty }: { rows: Trip[]; empty: string }) {
   if (rows.length === 0) return <Empty>{empty}</Empty>
   return (
-    <Table head={['Ref', 'Date', 'Gaari', 'Tafseel', { label: 'Kiraya', align: 'right' }, { label: 'Diya', align: 'right' }, { label: 'Baqi', align: 'right' }, 'Haal']}>
-      {rows.map((t) => (
+    <PagedTable
+      head={['Ref', 'Date', 'Gaari', 'Tafseel', { label: 'Kiraya', align: 'right' }, { label: 'Diya', align: 'right' }, { label: 'Baqi', align: 'right' }, 'Haal']}
+      rows={rows}
+      searchText={(t) => `${t.reference} ${t.trip_date} ${t.vehicle_label ?? ''} ${t.notes ?? ''} ${t.status}`}
+      searchPlaceholder="Ref, date ya gaari se dhoondein…"
+      row={(t) => (
         <tr key={t.id} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{t.reference}</td>
           <td className="whitespace-nowrap px-4 py-2">{t.trip_date}</td>
@@ -210,8 +220,8 @@ function Trips({ rows, empty }: { rows: Trip[]; empty: string }) {
           <td className="px-4 py-2 text-right" style={{ color: t.balance > 0 ? 'var(--amber)' : undefined }}>{t.balance ? formatPaisa(t.balance) : '·'}</td>
           <td className="px-4 py-2"><Badge color={statusColor[t.status]}>{t.status}</Badge></td>
         </tr>
-      ))}
-    </Table>
+      )}
+    />
   )
 }
 
@@ -219,8 +229,18 @@ function Payments({ rows }: { rows: PaymentRow[] }) {
   if (rows.length === 0) return <Empty>Is driver ko abhi koi paisa nahi diya.</Empty>
   const total = rows.reduce((a, r) => a + r.amount, 0)
   return (
-    <Table head={['Ref', 'Date', 'Cash ya bank', 'Tafseel', { label: 'Kitna diya', align: 'right' }]}>
-      {rows.map((r) => (
+    <PagedTable
+      head={['Ref', 'Date', 'Cash ya bank', 'Tafseel', { label: 'Kitna diya', align: 'right' }]}
+      rows={rows}
+      searchText={(r) => `${r.reference} ${r.payment_date} ${r.method} ${r.notes ?? ''} ${r.bank_ref ?? ''}`}
+      searchPlaceholder="Ref ya date se dhoondein…"
+      footer={(
+        <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
+          <td className="px-4 py-2.5 font-bold" colSpan={4}>Kul paisa diya</td>
+          <td className="px-4 py-2.5 text-right font-bold" style={{ color: 'var(--green)' }}>{formatPaisa(total)}</td>
+        </tr>
+      )}
+      row={(r) => (
         <tr key={r.id} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{r.reference}</td>
           <td className="whitespace-nowrap px-4 py-2">{r.payment_date}</td>
@@ -228,12 +248,8 @@ function Payments({ rows }: { rows: PaymentRow[] }) {
           <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>{r.notes || r.bank_ref || '·'}</td>
           <td className="px-4 py-2 text-right font-medium" style={{ color: 'var(--green)' }}>{formatPaisa(r.amount)}</td>
         </tr>
-      ))}
-      <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
-        <td className="px-4 py-2.5 font-bold" colSpan={4}>Kul paisa diya</td>
-        <td className="px-4 py-2.5 text-right font-bold" style={{ color: 'var(--green)' }}>{formatPaisa(total)}</td>
-      </tr>
-    </Table>
+      )}
+    />
   )
 }
 

@@ -247,7 +247,8 @@ export function PagedTable<T>({
               </td>
             </tr>
           )}
-        {slice.length > 0 && footer}
+        {/* Totals poori list ke hain, is liye khali page par bhi rehte hain. */}
+        {footer}
       </Table>
       <Pagination
         meta={{ current_page: current, last_page: lastPage, total: filtered.length }}

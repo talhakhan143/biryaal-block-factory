@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Button, Field, Input, MethodField, Modal, MoneyInput, PageHeader, Select, Spinner, Table } from '../components/ui'
+import { Button, type Column, DataTable, Field, Input, MethodField, Modal, MoneyInput, PageHeader, Select } from '../components/ui'
 
 interface Adjustment {
   id: string
@@ -31,42 +31,54 @@ export default function Adjustments() {
   const { can } = useAuth()
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
-  const { data, isLoading } = useQuery({
-    queryKey: ['adjustments'],
-    queryFn: async () => (await api.get<{ data: Adjustment[] }>('/adjustments')).data,
-  })
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [sort, setSort] = useState('adjustment_date')
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc')
+  const { data, isLoading } = useList<Adjustment>('adjustments', { search, page, sort, dir })
+
+  const onSort = (key: string) => {
+    if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
+    else { setSort(key); setDir('desc') }
+    setPage(1)
+  }
 
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/adjustments', p),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['adjustments'] }); setCreating(false) },
   })
 
+  const columns: Column<Adjustment>[] = [
+    { key: 'reference', label: 'Ref', sortable: true, render: (a) => <span className="font-mono text-xs">{a.reference}</span> },
+    { key: 'adjustment_date', label: 'Date', sortable: true, render: (a) => a.adjustment_date },
+    { key: 'mode', label: 'Type', sortable: true, render: (a) => <span className="text-xs">{modeLabel(a.mode)}</span> },
+    { key: 'party_name', label: 'Party', render: (a) => a.party_name ?? '·' },
+    { key: 'amount', label: 'Amount', sortable: true, align: 'right', render: (a) => formatPaisa(a.amount) },
+    { key: 'reason', label: 'Reason', render: (a) => <span className="text-xs" style={{ color: 'var(--muted)' }}>{a.reason}</span> },
+  ]
+
   return (
     <div>
       <PageHeader
         title="Adjustments"
-        subtitle="Bill/dues ya cash ka adjustment — sab jaga balanced plus-minus"
+        subtitle="Bill/dues ya cash ka adjustment, sab jaga balanced plus-minus"
         actions={can('payments.manage') && <Button onClick={() => setCreating(true)}>+ Adjustment</Button>}
       />
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Table head={['Ref', 'Date', 'Type', 'Party', 'Amount', 'Reason']}>
-          {data?.data.map((a) => (
-            <tr key={a.id}>
-              <td className="px-4 py-3 font-mono text-xs">{a.reference}</td>
-              <td className="px-4 py-3">{a.adjustment_date}</td>
-              <td className="px-4 py-3 text-xs">{modeLabel(a.mode)}</td>
-              <td className="px-4 py-3">{a.party_name ?? '—'}</td>
-              <td className="px-4 py-3">{formatPaisa(a.amount)}</td>
-              <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)' }}>{a.reason}</td>
-            </tr>
-          ))}
-          {data?.data.length === 0 && (
-            <tr><td colSpan={6} className="px-4 py-6 text-center" style={{ color: 'var(--muted)' }}>Koi adjustment nahi.</td></tr>
-          )}
-        </Table>
-      )}
+      <DataTable
+        columns={columns}
+        rows={data?.data}
+        loading={isLoading}
+        emptyText="Koi adjustment nahi."
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Ref, wajah ya party se dhoondein…"
+        sort={sort}
+        dir={dir}
+        onSort={onSort}
+        meta={data?.meta}
+        page={page}
+        onPage={setPage}
+      />
       {creating && (
         <Modal title="New Adjustment" onClose={() => setCreating(false)}>
           <AdjForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />

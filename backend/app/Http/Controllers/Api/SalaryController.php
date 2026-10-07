@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PaymentResource;
 use App\Http\Resources\SalaryResource;
@@ -9,22 +10,32 @@ use App\Models\Salary;
 use App\Services\Payroll\PayrollService;
 use App\Support\Money;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class SalaryController extends Controller
 {
+    use HasTableQuery;
+
     public function __construct(private PayrollService $service) {}
 
     public function index(Request $request)
     {
-        $salaries = Salary::query()
+        $query = Salary::query()
             ->with('staff')
             ->when($request->staff_id, fn ($q, $id) => $q->where('staff_id', $id))
             ->when($request->month, fn ($q, $m) => $q->where('month', $m))
-            ->when($request->status, fn ($q, $s) => $q->where('status', $s))
-            ->latest('month')
-            ->paginate($request->integer('per_page', 15));
+            ->when($request->status, fn ($q, $s) => $q->where('status', $s));
 
-        return SalaryResource::collection($salaries);
+        $this->applyTableQuery(
+            $query,
+            $request,
+            ['month', 'amount', 'paid', 'balance', 'status', 'reference'],
+            ['reference', 'month', 'status', 'notes'],
+            'month',
+            ['staff' => ['name', 'phone']],
+        );
+
+        return SalaryResource::collection($query->paginate($request->integer('per_page', 15)));
     }
 
     /** Generate (accrue) a monthly salary for a staff member. */
@@ -58,12 +69,12 @@ class SalaryController extends Controller
         $paisa = Money::toPaisa($data['amount']);
         $outstanding = (int) $salary->balance;
         if ($outstanding <= 0) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'amount' => 'Is tankha ka koi baqi nahi — sab clear hai.',
             ]);
         }
         if ($paisa > $outstanding) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'amount' => 'Baqi tankha sirf '.Money::format($outstanding).' hai — us se zyada nahi de sakte.',
             ]);
         }

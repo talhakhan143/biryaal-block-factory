@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { formatPaisa } from '../lib/money'
-import { Badge, Card, PageHeader, Spinner, Table } from '../components/ui'
+import { Badge, Card, PageHeader, PagedTable, Spinner } from '../components/ui'
 
 interface TBRow {
   code: string
@@ -30,12 +30,14 @@ export default function TrialBalance() {
 
   if (tb.isLoading || !tb.data) return <Spinner />
 
+  const data = tb.data
+
   return (
     <div>
       <PageHeader
         title="Trial Balance"
-        subtitle="Accounts ki summary — sab barabar hona chahiye"
-        actions={tb.data.balanced ? <Badge color="green">Balanced</Badge> : <Badge color="red">Out of balance!</Badge>}
+        subtitle="Accounts ki summary, sab barabar hona chahiye"
+        actions={data.balanced ? <Badge color="green">Balanced</Badge> : <Badge color="red">Out of balance!</Badge>}
       />
 
       {pl.data && (
@@ -46,22 +48,30 @@ export default function TrialBalance() {
         </div>
       )}
 
-      <Table head={['Code', 'Account', 'Type', 'Debit', 'Credit']}>
-        {tb.data.rows.map((r) => (
-          <tr key={r.code}>
+      <PagedTable
+        head={['Code', 'Account', 'Type', { label: 'Debit', align: 'right' }, { label: 'Credit', align: 'right' }]}
+        rows={data.rows}
+        searchText={(r) => `${r.code} ${r.name} ${r.type}`}
+        searchPlaceholder="Code ya account ke naam se dhoondein…"
+        emptyText="Koi account nahi."
+        // Jor poore khate ka hai, is liye search ya page badalne par badalta nahi.
+        footer={(
+          <tr className="font-bold" style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
+            <td className="px-4 py-2.5" colSpan={3}>Total (saare accounts)</td>
+            <td className="px-4 py-2.5 text-right">{formatPaisa(data.total_debit)}</td>
+            <td className="px-4 py-2.5 text-right">{formatPaisa(data.total_credit)}</td>
+          </tr>
+        )}
+        row={(r) => (
+          <tr key={r.code} style={{ borderTop: '1px solid var(--border)' }}>
             <td className="px-4 py-2 font-mono text-xs">{r.code}</td>
             <td className="px-4 py-2 font-medium">{r.name}</td>
-            <td className="px-4 py-2 capitalize text-slate-500">{r.type}</td>
-            <td className="px-4 py-2">{r.debit ? formatPaisa(r.debit) : '—'}</td>
-            <td className="px-4 py-2">{r.credit ? formatPaisa(r.credit) : '—'}</td>
+            <td className="px-4 py-2 capitalize" style={{ color: 'var(--muted)' }}>{r.type}</td>
+            <td className="px-4 py-2 text-right">{r.debit ? formatPaisa(r.debit) : '·'}</td>
+            <td className="px-4 py-2 text-right">{r.credit ? formatPaisa(r.credit) : '·'}</td>
           </tr>
-        ))}
-        <tr className="border-t-2 border-slate-300 font-bold">
-          <td className="px-4 py-2" colSpan={3}>Total</td>
-          <td className="px-4 py-2">{formatPaisa(tb.data.total_debit)}</td>
-          <td className="px-4 py-2">{formatPaisa(tb.data.total_credit)}</td>
-        </tr>
-      </Table>
+        )}
+      />
     </div>
   )
 }
