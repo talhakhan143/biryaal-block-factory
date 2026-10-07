@@ -63,9 +63,22 @@ class SaleService
             $total = $goodsNet + $fare;
 
             $type = $data['type'] ?? 'cash';
-            $paid = $type === 'cash' ? $total : (int) ($data['paid'] ?? 0);
-            $paid = min($paid, $total);
+            // Cash jo abhi counter par mila.
+            $cashPaid = $type === 'cash' ? $total : (int) ($data['paid'] ?? 0);
+            $cashPaid = min($cashPaid, $total);
+
+            // Agar customer ka advance pada hai to baqi usi me se kat jata hai.
+            // customers.balance minus me ho = utna paisa hum ne pakad rakha hai.
+            $advanceHeld = $customer ? max(-(int) $customer->balance, 0) : 0;
+            $advanceUsed = min($advanceHeld, $total - $cashPaid);
+
+            $paid = $cashPaid + $advanceUsed;
             $balance = $total - $paid;
+
+            // Receivable utna hi hilta hai jitna cash nahi mila. Advance usi
+            // control account me credit para tha, is liye ye ghat usay khapa
+            // deti hai aur bacha hua hissa naya udhaar ban jata hai.
+            $receivableDelta = $total - $cashPaid;
 
             $sale = Sale::create([
                 'invoice_no' => Sequence::next('INV'),
@@ -97,18 +110,18 @@ class SaleService
                 $this->inventory->consumeReady($line['product'], $line['qty'], $sale);
             }
 
-            if ($balance > 0 && $customer) {
-                $customer->increment('balance', $balance);
+            if ($receivableDelta > 0 && $customer) {
+                $customer->increment('balance', $receivableDelta);
             }
 
-            // journal: Dr Cash/Bank (paid) + Dr Receivable (balance); Cr Sales (total)
+            // journal: Dr Cash/Bank (jo abhi mila) + Dr Receivable (baqi, advance samet); Cr Sales
             $cashAccount = CashAccountResolver::code($data['payment_method'] ?? 'cash');
             $lines = [];
-            if ($paid > 0) {
-                $lines[] = ['account' => $cashAccount, 'debit' => $paid];
+            if ($cashPaid > 0) {
+                $lines[] = ['account' => $cashAccount, 'debit' => $cashPaid];
             }
-            if ($balance > 0) {
-                $lines[] = ['account' => Account::RECEIVABLE, 'debit' => $balance, 'memo' => $customer?->name];
+            if ($receivableDelta > 0) {
+                $lines[] = ['account' => Account::RECEIVABLE, 'debit' => $receivableDelta, 'memo' => $customer?->name];
             }
             $lines[] = ['account' => Account::SALES, 'credit' => $goodsNet, 'memo' => 'Block sale'];
             if ($fare > 0) {
@@ -155,19 +168,26 @@ class SaleService
                 }
             }
 
-            // reverse the receivable that was added to the customer at sale time
-            if ((int) $sale->balance > 0 && $sale->customer) {
-                $sale->customer->decrement('balance', (int) $sale->balance);
+            $entries = JournalEntry::where('source_type', $sale->getMorphClass())
+                ->where('source_id', $sale->id)
+                ->with('lines.account')
+                ->get();
+
+            // Reverse exactly what the sale put on the receivable. Sale.balance
+            // alone is not that number: an advance may have paid part of this
+            // invoice, and that part still moved the control account.
+            $receivableDelta = (int) $entries->flatMap->lines
+                ->filter(fn ($l) => $l->account?->code === Account::RECEIVABLE)
+                ->sum(fn ($l) => (int) $l->debit - (int) $l->credit);
+            if ($receivableDelta > 0 && $sale->customer) {
+                $sale->customer->decrement('balance', $receivableDelta);
             }
 
             // remove the sale's journal entry (+ lines) so the books net to zero
-            JournalEntry::where('source_type', $sale->getMorphClass())
-                ->where('source_id', $sale->id)
-                ->get()
-                ->each(function (JournalEntry $entry) {
-                    $entry->lines()->delete();
-                    $entry->delete();
-                });
+            $entries->each(function (JournalEntry $entry) {
+                $entry->lines()->delete();
+                $entry->delete();
+            });
 
             $sale->items()->delete();
             $sale->delete();

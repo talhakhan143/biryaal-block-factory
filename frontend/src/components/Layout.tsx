@@ -125,11 +125,12 @@ const RESELLER_GROUPS: NavGroup[] = [
     ],
   },
   {
-    // Shared across both panels — same records
+    // Customer/driver ka naam aur phone dono panels me aik hi hai. Paisa nahi:
+    // reseller ki customer screen sirf reseller ka hisaab dikhati hai.
     en: 'Shared', ur: 'مشترکہ',
     items: [
       { to: '/reseller/dispatch', en: 'Dispatch', ur: 'چالان', permission: 'reseller.view', icon: Truck },
-      { to: '/customers', en: 'Customers', ur: 'کسٹمر', permission: 'customers.view', icon: Users },
+      { to: '/reseller/customers', en: 'Customers', ur: 'کسٹمر', permission: 'customers.view', icon: Users },
       { to: '/drivers', en: 'Drivers', ur: 'ڈرائیور', permission: 'transport.view', icon: UserRound },
       // Vehicles hata diya — driver add karte waqt gaadi wahin add hoti hai
     ],

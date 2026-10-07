@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { UserPlus, Wallet } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
-import { Button, Card, Field, Input, MethodField, MoneyInput, OutstandingNote, Select } from '../components/ui'
+import { Button, Card, Field, Input, MethodField, Modal, MoneyInput, Note, OutstandingNote, Select } from '../components/ui'
+import CustomerForm, { type CustomerPayload } from '../components/CustomerForm'
 import InvoiceSheet from '../components/InvoiceSheet'
 
 interface Product {
@@ -17,9 +19,14 @@ interface CartLine {
   qty: number
 }
 
+// Sale ya advance ke baad jo bhi screen is paise ko dikhati hai, sab refresh.
+const MONEY_KEYS = ['customers', 'customer-history', 'sales', 'payments', 'payables',
+  'dashboard', 'cash-book', 'accounting', 'expenses/summary', 'dispatches-pending', 'products']
+
 export default function POS() {
+  const qc = useQueryClient()
   const products = useList<Product>('products', { per_page: 100, active_only: true })
-  const customers = useList<{ id: string; name: string; balance: number }>('customers', { per_page: 100 })
+  const customers = useList<{ id: string; name: string; balance: number; advance: number }>('customers', { per_page: 100 })
   const [cart, setCart] = useState<CartLine[]>([])
   const [customerId, setCustomerId] = useState('')
   const [discount, setDiscount] = useState('0')
@@ -28,14 +35,29 @@ export default function POS() {
   const [method, setMethod] = useState('cash')
   const [bankRef, setBankRef] = useState('')
   const [receipt, setReceipt] = useState<Record<string, unknown> | null>(null)
+  const [addingCustomer, setAddingCustomer] = useState(false)
+  const [takingAdvance, setTakingAdvance] = useState(false)
+  const [advanceSlip, setAdvanceSlip] = useState<{ reference: string; date: string; name: string; amount: number; held: number; method: string } | null>(null)
 
   const subtotal = useMemo(() => cart.reduce((s, l) => s + l.product.sale_price * l.qty, 0), [cart])
   const goodsNet = Math.max(0, subtotal - Number(discount) * 100)
   const total = goodsNet + Number(transport) * 100
-  // Paid: khali = poora paisa; kam likho to baqi udhaar (customer zaroori).
-  const paidVal = paid.trim() === '' ? total : Math.min(Math.round(Number(paid) * 100), total)
+  const selected = customers.data?.data.find((c) => c.id === customerId)
+  // Jo advance pehle se jama hai.
+  const advanceHeld = selected?.advance ?? 0
+
+  // Paid now khali chhodne ka matlab:
+  //   advance pada hai  -> kuch cash nahi liya, bill advance me se katega
+  //   advance nahi hai  -> poora paisa mauqe par mil gaya (cash sale)
+  // Warna jo likha hai wahi cash hai.
+  const paidVal = paid.trim() === ''
+    ? (advanceHeld > 0 ? 0 : total)
+    : Math.min(Math.round(Number(paid) * 100), total)
   const balance = Math.max(0, total - paidVal)
   const isCredit = balance > 0
+  // Backend bhi yehi karta hai: pehle cash, phir advance, phir udhaar.
+  const advanceUse = isCredit ? Math.min(advanceHeld, balance) : 0
+  const afterAdvance = balance - advanceUse
 
   const addToCart = (p: Product) => {
     setCart((c) => {
@@ -48,6 +70,33 @@ export default function POS() {
     setCart((c) => c.map((l) => (l.product.id === id ? { ...l, qty: Math.max(1, qty) } : l)))
   const removeLine = (id: string) => setCart((c) => c.filter((l) => l.product.id !== id))
 
+  const newCustomer = useMutation({
+    mutationFn: async (payload: CustomerPayload) => (await api.post('/customers', payload)).data,
+    onSuccess: async (res) => {
+      await customers.refetch()
+      setCustomerId(res.data.id) // seedha select ho jaye, dobara dhoondna na pare
+      setAddingCustomer(false)
+    },
+  })
+
+  const advance = useMutation({
+    mutationFn: async (payload: Record<string, unknown>) =>
+      (await api.post(`/customers/${customerId}/advance`, payload)).data,
+    onSuccess: (res) => {
+      MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+      customers.refetch()
+      setAdvanceSlip({
+        reference: res.data.reference,
+        date: res.data.payment_date,
+        name: res.customer.name,
+        amount: res.data.amount,
+        held: res.customer.advance,
+        method: res.data.method,
+      })
+      setTakingAdvance(false)
+    },
+  })
+
   const sale = useMutation({
     mutationFn: (payload: Record<string, unknown>) => api.post('/sales', payload),
     onSuccess: (res) => {
@@ -59,7 +108,10 @@ export default function POS() {
       setMethod('cash')
       setBankRef('')
       setCustomerId('')
+      // Advance aur stock dono abhi badle hain, refresh ke bina sahi dikhein.
+      MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       products.refetch()
+      customers.refetch()
     },
   })
 
@@ -132,16 +184,38 @@ export default function POS() {
         <div className="mt-4 space-y-3 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
           {/* Customer: cash (poora paisa) me optional, udhaar me zaroori */}
           <Field label={isCredit ? 'Customer (Grahak) — zaroori (udhaar)' : 'Customer (Grahak) — optional'}>
-            <Select value={customerId} onChange={(e) => setCustomerId(e.target.value)} required={isCredit}>
-              <option value="">{isCredit ? 'Select…' : 'Walk-in (bina naam)'}</option>
-              {customers.data?.data.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select value={customerId} onChange={(e) => setCustomerId(e.target.value)} required={isCredit} className="flex-1">
+                <option value="">{isCredit ? 'Select…' : 'Walk-in (bina naam)'}</option>
+                {customers.data?.data.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </Select>
+              <button
+                type="button"
+                onClick={() => setAddingCustomer(true)}
+                title="Naya customer add karein"
+                className="shrink-0 rounded-lg border px-2.5 py-2 transition hover:brightness-95"
+                style={{ background: 'var(--surface-2)', borderColor: 'var(--border)', color: 'var(--primary)' }}
+              >
+                <UserPlus size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setTakingAdvance(true)}
+                disabled={!customerId}
+                title="Advance payment lein (paisa pehle, maal baad me)"
+                className="shrink-0 rounded-lg border px-2.5 py-2 transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
+                style={{ background: 'var(--surface-2)', borderColor: 'var(--border)', color: 'var(--green)' }}
+              >
+                <Wallet size={16} />
+              </button>
+            </div>
           </Field>
-          {customerId && (
-            <OutstandingNote
-              label="Pichla baqi (previous due)"
-              amount={customers.data?.data.find((c) => c.id === customerId)?.balance ?? 0}
-            />
+          {customerId && <OutstandingNote label="Pichla baqi (previous due)" amount={selected?.balance ?? 0} />}
+          {advanceHeld > 0 && (
+            <Note>
+              Is customer ka advance jama hai, is liye bill khud isi me se kat jayega. Agar wo abhi cash
+              bhi de raha hai to "Paid now" me utni raqam likh dein.
+            </Note>
           )}
           <Field label="Discount (Rs)">
             <MoneyInput value={discount} onChange={setDiscount} />
@@ -150,8 +224,8 @@ export default function POS() {
             <MoneyInput value={transport} onChange={setTransport} />
           </Field>
           {/* Paid now hamesha — khali = poora paisa; kam likho to baqi udhaar */}
-          <Field label="Paid now (Rs) — khali = poora">
-            <MoneyInput value={paid} onChange={setPaid} placeholder={String(total / 100)} />
+          <Field label={advanceHeld > 0 ? 'Paid now (Rs) — khali = advance se' : 'Paid now (Rs) — khali = poora'}>
+            <MoneyInput value={paid} onChange={setPaid} placeholder={advanceHeld > 0 ? '0 (advance se)' : String(total / 100)} />
           </Field>
 
           {paidVal > 0 && (
@@ -162,7 +236,13 @@ export default function POS() {
           {Number(transport) > 0 && <div className="flex justify-between text-sm"><span>Transport (kiraya)</span><span>{formatPaisa(Number(transport) * 100)}</span></div>}
           <div className="flex justify-between text-lg font-bold"><span>Total</span><span>{formatPaisa(total)}</span></div>
           <div className="flex justify-between text-sm"><span>Paid now</span><span>{formatPaisa(paidVal)}</span></div>
-          {balance > 0 && <div className="flex justify-between text-sm font-semibold"><span>Baqi (udhaar)</span><span style={{ color: 'var(--amber)' }}>{formatPaisa(balance)}</span></div>}
+          {advanceUse > 0 && (
+            <div className="flex justify-between text-sm"><span>Advance se katega</span><span style={{ color: 'var(--green)' }}>{formatPaisa(advanceUse)}</span></div>
+          )}
+          {afterAdvance > 0 && <div className="flex justify-between text-sm font-semibold"><span>Baqi (udhaar)</span><span style={{ color: 'var(--amber)' }}>{formatPaisa(afterAdvance)}</span></div>}
+          {advanceUse > 0 && afterAdvance === 0 && (
+            <div className="flex justify-between text-sm font-semibold"><span>Baqi</span><span style={{ color: 'var(--green)' }}>Kuch nahi, advance se poora</span></div>
+          )}
 
           {sale.error && <p className="text-sm text-red-600">{apiError(sale.error)}</p>}
           <Button
@@ -170,10 +250,35 @@ export default function POS() {
             disabled={cart.length === 0 || sale.isPending || (isCredit && !customerId)}
             className="w-full"
           >
-            {sale.isPending ? 'Processing…' : isCredit ? 'Complete (Udhaar)' : 'Complete Sale'}
+            {sale.isPending ? 'Processing…' : advanceUse > 0 && afterAdvance === 0 ? 'Complete (Advance se)' : isCredit ? 'Complete (Udhaar)' : 'Complete Sale'}
           </Button>
         </div>
       </Card>
+
+      {addingCustomer && (
+        <Modal title="Naya Customer" onClose={() => setAddingCustomer(false)}>
+          <CustomerForm
+            onSubmit={(p) => newCustomer.mutate(p)}
+            busy={newCustomer.isPending}
+            error={newCustomer.error ? apiError(newCustomer.error) : ''}
+            submitLabel="Add aur select karein"
+            autoFocus
+          />
+        </Modal>
+      )}
+
+      {takingAdvance && selected && (
+        <Modal title={`Advance lein: ${selected.name}`} onClose={() => setTakingAdvance(false)}>
+          <AdvanceForm
+            held={advanceHeld}
+            onSubmit={(p) => advance.mutate(p)}
+            busy={advance.isPending}
+            error={advance.error ? apiError(advance.error) : ''}
+          />
+        </Modal>
+      )}
+
+      {advanceSlip && <AdvanceSlip slip={advanceSlip} onClose={() => setAdvanceSlip(null)} />}
 
       {receipt && <Receipt sale={receipt} onClose={() => setReceipt(null)} />}
     </div>
@@ -198,6 +303,43 @@ function Receipt({ sale, onClose }: { sale: Record<string, unknown>; onClose: ()
         { label: 'Total', value: Number(sale.total), strong: true },
         { label: 'Paid', value: Number(sale.paid) },
         { label: 'Balance', value: Number(sale.balance) },
+      ]}
+      onClose={onClose}
+    />
+  )
+}
+
+function AdvanceForm({ held, onSubmit, busy, error }: { held: number; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
+  const [form, setForm] = useState({ payment_date: new Date().toISOString().slice(0, 10), amount: '', method: 'cash', bank_ref: '', notes: '' })
+  const set = (k: string, v: string) => setForm({ ...form, [k]: v })
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, amount: Number(form.amount) }) }} className="space-y-3">
+      <Note>
+        Paisa pehle, maal baad me. Jo bhi bill is customer ka banega, wo khud is advance me se katta jayega.
+      </Note>
+      {held > 0 && <OutstandingNote label="" amount={-held} />}
+      <Field label="Date"><Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} required /></Field>
+      <Field label="Advance (Rs)"><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} required /></Field>
+      <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
+      <Field label="Note (marzi se)"><Input value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Kis kaam ke liye" /></Field>
+      {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
+      <Button type="submit" disabled={busy || !form.amount} className="w-full">{busy ? 'Saving…' : 'Advance jama karein'}</Button>
+    </form>
+  )
+}
+
+function AdvanceSlip({ slip, onClose }: { slip: { reference: string; date: string; name: string; amount: number; held: number; method: string }; onClose: () => void }) {
+  return (
+    <InvoiceSheet
+      docType="Advance Receipt"
+      number={slip.reference}
+      date={slip.date}
+      customer={slip.name}
+      meta={`Received via ${slip.method.toUpperCase()}`}
+      lines={[{ name: 'Advance payment (paisa pehle, maal baad me)', qty: '1', total: slip.amount }]}
+      totals={[
+        { label: 'Aaj mila advance', value: slip.amount, strong: true },
+        { label: 'Kul advance jama', value: slip.held },
       ]}
       onClose={onClose}
     />

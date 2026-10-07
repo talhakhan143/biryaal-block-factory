@@ -16,6 +16,8 @@ class CustomerResource extends JsonResource
             'address' => $this->address,
             'notes' => $this->notes,
             'balance' => (int) $this->balance,
+            // Minus balance ka matlab customer ka paisa hamare paas pada hai.
+            'advance' => max(-(int) $this->balance, 0),
             'created_at' => $this->created_at,
         ];
     }

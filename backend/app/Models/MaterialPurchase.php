@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
@@ -38,5 +39,26 @@ class MaterialPurchase extends Model implements AuditableContract
     public function rawMaterial(): BelongsTo
     {
         return $this->belongsTo(RawMaterial::class);
+    }
+
+    /** Inbound freight trip, when a driver was assigned to bring this material. */
+    public function trip(): HasOne
+    {
+        return $this->hasOne(TransportTrip::class);
+    }
+
+    /**
+     * What the SUPPLIER is owed, which is not always the landed cost.
+     *
+     * `total_cost` always carries the full landed cost (material + kiraya +
+     * loading) because that is what the material really cost us. But when a
+     * driver was assigned, the kiraya is owed to that driver, not to the
+     * supplier, so it comes out of the supplier's bill.
+     */
+    public function supplierBill(): int
+    {
+        $freightToDriver = $this->relationLoaded('trip') ? $this->trip !== null : $this->trip()->exists();
+
+        return (int) $this->total_cost - ($freightToDriver ? (int) $this->transport_cost : 0);
     }
 }

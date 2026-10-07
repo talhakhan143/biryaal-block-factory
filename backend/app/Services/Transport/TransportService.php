@@ -18,7 +18,7 @@ class TransportService
      * Record a transport trip. The trip cost is a transport expense; any unpaid
      * portion becomes a payable owed to the driver.
      *
-     * @param  array{vehicle_id?:string,driver_id?:string,dispatch_id?:string,trip_date:string,from_location?:string,to_location?:string,rate:int,paid?:int,method?:string,notes?:string}  $data
+     * @param  array{vehicle_id?:string,driver_id?:string,dispatch_id?:string,material_purchase_id?:string,trip_date:string,from_location?:string,to_location?:string,rate:int,paid?:int,method?:string,notes?:string}  $data
      */
     public function recordTrip(array $data): TransportTrip
     {
@@ -33,6 +33,7 @@ class TransportService
                 'vehicle_label' => $data['vehicle_label'] ?? null,
                 'driver_id' => $data['driver_id'] ?? null,
                 'dispatch_id' => $data['dispatch_id'] ?? null,
+                'material_purchase_id' => $data['material_purchase_id'] ?? null,
                 'trip_date' => $data['trip_date'],
                 'from_location' => $data['from_location'] ?? null,
                 'to_location' => $data['to_location'] ?? null,

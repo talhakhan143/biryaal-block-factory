@@ -23,6 +23,10 @@ class StorePurchaseRequest extends FormRequest
             'loading_cost' => ['nullable', 'numeric', 'min:0'],
             'unloading_cost' => ['nullable', 'numeric', 'min:0'],
             'paid_amount' => ['nullable', 'numeric', 'min:0'],
+            // Maal laane wala driver. Diya ho to kiraya usay dena banta hai,
+            // supplier ko nahi, aur Transport me uski trip ban jati hai.
+            'driver_id' => ['nullable', 'uuid', 'exists:drivers,id'],
+            'trip_paid' => ['nullable', 'numeric', 'min:0'],
             'method' => ['nullable', 'in:cash,bank'],
             'bank_ref' => ['nullable', 'string', 'max:255', 'required_if:method,bank'],
             'notes' => ['nullable', 'string'],
@@ -33,6 +37,7 @@ class StorePurchaseRequest extends FormRequest
     {
         return [
             'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
+            'driver_id.exists' => 'Ye driver mojood nahi.',
         ];
     }
 }

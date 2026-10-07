@@ -39,7 +39,7 @@ function Stat({ label, hint, value, tone = 'text', to }: { label: string; hint: 
   }
   const accent = tone === 'text' ? undefined : (tone as 'green' | 'red' | 'primary' | 'amber')
   return (
-    <Card hover accent={accent} onClick={to ? () => navigate(to) : undefined} className="pl-6">
+    <Card hover={!!to} accent={accent} onClick={to ? () => navigate(to) : undefined} className="pl-6">
       <div className="flex items-center justify-between">
         <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{label}</div>
         {to && <span className="text-lg leading-none" style={{ color: 'var(--muted)' }}>›</span>}
@@ -77,6 +77,15 @@ export default function Dashboard() {
   if (isLoading || !data) return <Spinner />
 
   const d = data.due_counts
+  // Kharch wale cards apna scope sath le kar jaate hain, warna list page
+  // card ka number kabhi explain nahi kar paata.
+  const now = new Date()
+  const iso = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+  const today = iso(now)
+  const monthFrom = iso(new Date(now.getFullYear(), now.getMonth(), 1))
+  const monthTo = iso(new Date(now.getFullYear(), now.getMonth() + 1, 0))
+  const expensesToday = `/expenses?from=${today}&to=${today}`
+  const expensesMonth = `/expenses?from=${monthFrom}&to=${monthTo}`
 
   return (
     <div>
@@ -103,7 +112,7 @@ export default function Dashboard() {
       <SectionTitle title="Aaj" note="today" />
       <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
         {money && <Stat label="Today Sales" hint="Aaj ki farokht (Rs)" value={formatPaisa(data.today.sales_total)} tone="green" to="/sales" />}
-        {money && <Stat label="Today Expenses" hint="Aaj ke kharchay" value={formatPaisa(data.today.expenses_total)} tone="red" to="/expenses" />}
+        {money && <Stat label="Today Expenses" hint="Aaj ke kharchay · click for details" value={formatPaisa(data.today.expenses_total)} tone="red" to={expensesToday} />}
         {money && <Stat label="Money In" hint="Aaj paisa aaya" value={formatPaisa(data.today.money_in)} tone="green" to="/payments" />}
         {money && <Stat label="Money Out" hint="Aaj paisa gaya" value={formatPaisa(data.today.money_out)} tone="red" to="/payments" />}
         <Stat label="Today Production" hint="Aaj banaye blocks" value={`${data.today.production_qty} pcs`} tone="primary" to="/production" />
@@ -118,9 +127,9 @@ export default function Dashboard() {
           <SectionTitle title={`Munafa / Nuksan (${data.month.label})`} note="profit & loss — kharch me expenses + salaries + labour sab" />
           <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
             <Stat label="Is mahine Aamdani" hint="Farokht + other income" value={formatPaisa(data.month.income)} tone="green" to="/reports" />
-            <Stat label="Is mahine Kharch" hint="Expenses + salary + labour" value={formatPaisa(data.month.expenses_total)} tone="red" to="/reports" />
-            <Stat label="Net Profit (mahina)" hint={data.month.net_profit < 0 ? 'NUKSAN' : 'Munafa is mahine'} value={formatPaisa(data.month.net_profit)} tone={data.month.net_profit < 0 ? 'red' : 'green'} to="/reports" />
-            <Stat label="Net Profit (ab tak)" hint={data.totals.net_profit < 0 ? 'NUKSAN — lifetime' : 'Lifetime munafa'} value={formatPaisa(data.totals.net_profit)} tone={data.totals.net_profit < 0 ? 'red' : 'green'} to="/reports" />
+            <Stat label="Is mahine Kharch" hint="Expenses + salary + labour · click for breakdown" value={formatPaisa(data.month.expenses_total)} tone="red" to={expensesMonth} />
+            <Stat label="Net Profit (mahina)" hint={data.month.net_profit < 0 ? 'NUKSAN' : 'Munafa is mahine'} value={formatPaisa(data.month.net_profit)} tone={data.month.net_profit < 0 ? 'red' : 'green'} />
+            <Stat label="Net Profit (ab tak)" hint={data.totals.net_profit < 0 ? 'NUKSAN — lifetime' : 'Lifetime munafa'} value={formatPaisa(data.totals.net_profit)} tone={data.totals.net_profit < 0 ? 'red' : 'green'} />
           </div>
         </>
       )}

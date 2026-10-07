@@ -167,15 +167,19 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   )
 }
 
-export function Table({ head, children }: { head: string[]; children: ReactNode }) {
+/** A heading is either plain text, or text plus the alignment its column uses. */
+export type Head = string | { label: string; align?: 'left' | 'right' }
+
+export function Table({ head, children }: { head: Head[]; children: ReactNode }) {
   return (
     <div className="overflow-x-auto rounded-xl border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs uppercase tracking-wide" style={{ background: 'var(--surface-2)', color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
-            {head.map((h, i) => (
-              <th key={i} className="px-4 py-3 font-semibold">{h}</th>
-            ))}
+            {head.map((h, i) => {
+              const { label, align } = typeof h === 'string' ? { label: h, align: 'left' as const } : h
+              return <th key={i} className={`px-4 py-3 font-semibold ${align === 'right' ? 'text-right' : ''}`}>{label}</th>
+            })}
           </tr>
         </thead>
         <tbody style={{ color: 'var(--text)' }}>{children}</tbody>
@@ -361,11 +365,12 @@ export function DataTable<T>({
   page,
   onPage,
   actions,
+  onRowClick,
 }: {
   columns: Column<T>[]
   rows: T[] | undefined
   loading?: boolean
-  emptyText?: string
+  emptyText?: ReactNode
   search?: string
   onSearch?: (v: string) => void
   searchPlaceholder?: string
@@ -376,6 +381,8 @@ export function DataTable<T>({
   page: number
   onPage: (p: number) => void
   actions?: ReactNode
+  /** Makes each row clickable. Clicks that land on a control inside the row are ignored. */
+  onRowClick?: (row: T) => void
 }) {
   return (
     <div>
@@ -418,7 +425,16 @@ export function DataTable<T>({
               <tr><td colSpan={columns.length} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--muted)' }}>Loading…</td></tr>
             ) : rows && rows.length > 0 ? (
               rows.map((row, i) => (
-                <tr key={i} className="transition hover:bg-[var(--surface-hover)]" style={{ borderTop: '1px solid var(--border)' }}>
+                <tr
+                  key={i}
+                  onClick={onRowClick ? (e) => {
+                    // Row actions (buttons, inputs, links) keep their own click.
+                    if ((e.target as HTMLElement).closest('button, a, input, select, textarea, label')) return
+                    onRowClick(row)
+                  } : undefined}
+                  className={`transition hover:bg-[var(--surface-hover)] ${onRowClick ? 'cursor-pointer' : ''}`}
+                  style={{ borderTop: '1px solid var(--border)' }}
+                >
                   {columns.map((c) => (
                     <td key={c.key} className={`px-4 py-3 ${c.align === 'right' ? 'text-right' : ''}`}>{c.render(row)}</td>
                   ))}
@@ -431,6 +447,65 @@ export function DataTable<T>({
         </table>
       </div>
       <Pagination meta={meta} page={page} onPage={onPage} />
+    </div>
+  )
+}
+
+/** Simple in-page tab switcher. Keeps the active tab in the parent's state. */
+export function Tabs<T extends string>({ tabs, active, onChange }: { tabs: { key: T; label: string; count?: number }[]; active: T; onChange: (k: T) => void }) {
+  return (
+    <div className="mb-4 flex flex-wrap gap-1 overflow-x-auto border-b pb-px" style={{ borderColor: 'var(--border)' }}>
+      {tabs.map((t) => {
+        const on = t.key === active
+        return (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => onChange(t.key)}
+            className="whitespace-nowrap rounded-t-lg px-3.5 py-2 text-sm font-medium transition"
+            style={{
+              color: on ? 'var(--primary)' : 'var(--muted)',
+              background: on ? 'color-mix(in srgb, var(--primary) 8%, transparent)' : 'transparent',
+              boxShadow: on ? 'inset 0 -2px 0 0 var(--primary)' : 'none',
+            }}
+          >
+            {t.label}
+            {t.count !== undefined && (
+              <span
+                className="ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                style={{ background: on ? 'color-mix(in srgb, var(--primary) 16%, transparent)' : 'var(--surface-hover)', color: on ? 'var(--primary)' : 'var(--muted)' }}
+              >
+                {t.count}
+              </span>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Compact KPI tile. Same look as the dashboard stats, without the navigation. */
+export function StatTile({ label, value, hint, tone = 'text' }: { label: string; value: ReactNode; hint?: string; tone?: 'text' | 'green' | 'red' | 'primary' | 'amber' }) {
+  const color = { text: 'var(--text)', green: 'var(--green)', red: 'var(--red)', primary: 'var(--primary)', amber: 'var(--amber)' }[tone]
+  return (
+    <div className="rounded-xl border p-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+      <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{label}</div>
+      <div className="mt-1 text-xl font-bold tracking-tight" style={{ color }}>{value}</div>
+      {hint && <div className="mt-0.5 text-[10px]" style={{ color: 'var(--muted)' }}>{hint}</div>}
+    </div>
+  )
+}
+
+/** Short-lived info strip. Used for empty states that need explaining. */
+export function Note({ tone = 'muted', children }: { tone?: 'muted' | 'amber' | 'red'; children: ReactNode }) {
+  const color = { muted: 'var(--muted)', amber: 'var(--amber)', red: 'var(--red)' }[tone]
+  return (
+    <div
+      className="rounded-xl border px-4 py-3 text-sm"
+      style={{ borderColor: color, background: `color-mix(in srgb, ${color} 8%, transparent)`, color: tone === 'muted' ? 'var(--text)' : color }}
+    >
+      {children}
     </div>
   )
 }

@@ -128,7 +128,8 @@ class PaymentService
     public function payForPurchase(MaterialPurchase $purchase, array $data): Payment
     {
         return DB::transaction(function () use ($purchase, $data) {
-            $remaining = (int) $purchase->total_cost - (int) $purchase->paid_amount;
+            // Kiraya driver ko gaya ho to wo supplier ke bill me nahi hai.
+            $remaining = $purchase->supplierBill() - (int) $purchase->paid_amount;
             $amount = min((int) $data['amount'], $remaining);
             $this->assertPositive($amount);
 
@@ -150,7 +151,7 @@ class PaymentService
             $paid = (int) $purchase->paid_amount + $amount;
             $purchase->update([
                 'paid_amount' => $paid,
-                'payment_status' => $paid >= (int) $purchase->total_cost ? 'paid' : 'partial',
+                'payment_status' => $paid >= $purchase->supplierBill() ? 'paid' : 'partial',
             ]);
             $supplier->decrement('balance', $amount);
 
@@ -310,6 +311,56 @@ class PaymentService
                 [
                     ['account' => Account::PAYABLE, 'debit' => $amount, 'memo' => $name],
                     ['account' => $cashAccount, 'credit' => $amount],
+                ],
+                $payment,
+            );
+
+            return $payment;
+        });
+    }
+
+    /**
+     * Take an ADVANCE from a customer: paisa pehle, maal baad me.
+     *
+     * The customer's balance goes NEGATIVE, which is exactly what a credit
+     * balance on the receivable control account means: we are holding their
+     * money. Every later sale to them draws it down automatically, because a
+     * sale debits the same account.
+     *
+     * Reference prefix is ADV so an advance is tellable from an ordinary
+     * receipt anywhere it is listed, without a new column.
+     *
+     * @param  array{payment_date:string,amount:int,method?:string,bank_ref?:string,notes?:string}  $data
+     */
+    public function advanceFromCustomer(Customer $customer, array $data): Payment
+    {
+        return DB::transaction(function () use ($customer, $data) {
+            $amount = (int) $data['amount'];
+            $this->assertPositive($amount);
+
+            $payment = Payment::create([
+                'reference' => Sequence::next('ADV'),
+                'direction' => Payment::RECEIPT,
+                'party_type' => $customer->getMorphClass(),
+                'party_id' => $customer->id,
+                'payment_date' => $data['payment_date'],
+                'amount' => $amount,
+                'method' => $data['method'] ?? 'cash',
+                'bank_ref' => $data['bank_ref'] ?? null,
+                'notes' => trim('Advance. '.($data['notes'] ?? '')),
+                'created_by' => Auth::id(),
+            ]);
+
+            // Minus balance = jo paisa hum ne pakad rakha hai.
+            $customer->decrement('balance', $amount);
+
+            $cashAccount = CashAccountResolver::code($data['method'] ?? 'cash');
+            $this->ledger->post(
+                $data['payment_date'],
+                "Advance {$payment->reference} from {$customer->name}",
+                [
+                    ['account' => $cashAccount, 'debit' => $amount],
+                    ['account' => Account::RECEIVABLE, 'credit' => $amount, 'memo' => $customer->name],
                 ],
                 $payment,
             );

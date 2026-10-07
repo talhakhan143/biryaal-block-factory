@@ -1,21 +1,26 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { BookText, HandCoins } from 'lucide-react'
+import { ArrowRight, BookText, HandCoins } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, Table } from '../components/ui'
+import CustomerForm from '../components/CustomerForm'
 
 interface Customer {
   id: string
   name: string
   phone?: string
   balance: number
+  /** Minus balance = customer ka paisa hamare paas pada hai. */
+  advance: number
 }
 
 export default function Customers() {
   const { can } = useAuth()
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -51,13 +56,24 @@ export default function Customers() {
   const columns: Column<Customer>[] = [
     { key: 'name', label: 'Name', sortable: true, render: (c) => <span className="font-medium">{c.name}</span> },
     { key: 'phone', label: 'Phone', sortable: true, render: (c) => c.phone ?? '—' },
-    { key: 'balance', label: 'Balance (owes us)', sortable: true, align: 'right', render: (c) => (c.balance > 0 ? <Badge color="amber">{formatPaisa(c.balance)}</Badge> : <Badge color="green">Settled</Badge>) },
+    {
+      key: 'balance', label: 'Haal', sortable: true, align: 'right',
+      render: (c) => (
+        c.balance > 0 ? <Badge color="amber">Lena hai {formatPaisa(c.balance)}</Badge>
+          : c.advance > 0 ? <Badge color="green">Advance jama {formatPaisa(c.advance)}</Badge>
+            : <Badge color="green">Sab clear</Badge>
+      ),
+    },
     {
       key: 'actions', label: '', align: 'right', render: (c) => (
-        <RowActions>
-          {can('payments.receive') && c.balance > 0 && <IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => setReceiveFor(c)} />}
-          <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(c.id)} />
-        </RowActions>
+        // Apna click rakhte hain, warna row wala click bhi chal jata hai.
+        <div onClick={(e) => e.stopPropagation()}>
+          <RowActions>
+            {can('payments.receive') && c.balance > 0 && <IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => setReceiveFor(c)} />}
+            <IconButton icon={BookText} label="Khata (quick)" onClick={() => setLedgerId(c.id)} />
+            <IconButton icon={ArrowRight} label="Poori history" tone="primary" onClick={() => navigate(`/customers/${c.id}`)} />
+          </RowActions>
+        </div>
       ),
     },
   ]
@@ -66,7 +82,7 @@ export default function Customers() {
     <div>
       <PageHeader
         title="Customers"
-        subtitle="Grahak — jo humse maal lete hain"
+        subtitle="Grahak. Kisi bhi naam par click karein, uski poori history khul jayegi"
         actions={can('customers.manage') && <Button onClick={() => setCreating(true)}>+ Customer</Button>}
       />
 
@@ -84,6 +100,7 @@ export default function Customers() {
         meta={data?.meta}
         page={page}
         onPage={setPage}
+        onRowClick={(c) => navigate(`/customers/${c.id}`)}
       />
 
       {creating && (
@@ -123,25 +140,6 @@ function ReceiveForm({ outstanding, onSubmit, busy, error }: { outstanding: numb
   )
 }
 
-function CustomerForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, string>) => void; busy: boolean; error: string }) {
-  const [form, setForm] = useState({ name: '', phone: '', address: '' })
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        onSubmit(form)
-      }}
-      className="space-y-3"
-    >
-      <Field label="Name"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></Field>
-      <Field label="Phone"><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
-      <Field label="Address"><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Save'}</Button>
-    </form>
-  )
-}
-
 function LedgerModal({ id, onClose }: { id: string; onClose: () => void }) {
   const { data, isLoading } = useQuery({
     queryKey: ['customer-ledger', id],
@@ -156,7 +154,7 @@ function LedgerModal({ id, onClose }: { id: string; onClose: () => void }) {
           <div className="mb-3 text-sm">
             {data.customer.name} — Balance: <strong>{formatPaisa(data.balance)}</strong>
           </div>
-          <Table head={['Date', 'Ref', 'Desc', 'Debit', 'Credit']}>
+          <Table head={['Date', 'Ref', 'Desc', { label: 'Debit', align: 'right' }, { label: 'Credit', align: 'right' }]}>
             {data.rows.map((r: Record<string, string | number>, i: number) => (
               <tr key={i}>
                 <td className="px-4 py-2">{r.date}</td>

@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { FileText, HandCoins, Trash2 } from 'lucide-react'
-import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, useConfirm } from '../components/ui'
-import InvoiceSheet from '../components/InvoiceSheet'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, useConfirm } from '../components/ui'
+import SaleInvoiceModal from '../components/SaleInvoiceModal'
 
 interface Sale {
   id: string
@@ -87,46 +87,8 @@ export default function ResellerSales() {
           <ReceiveForm outstanding={payFor.balance} onSubmit={(payload) => pay.mutate({ id: payFor.id, payload })} busy={pay.isPending} error={pay.error ? apiError(pay.error) : ''} />
         </Modal>
       )}
-      {invoiceId && <InvoiceModal id={invoiceId} onClose={() => setInvoiceId(null)} />}
+      {invoiceId && <SaleInvoiceModal id={invoiceId} source="reseller" onClose={() => setInvoiceId(null)} />}
     </div>
-  )
-}
-
-interface SaleDetail extends Sale {
-  discount: number
-  subtotal: number
-  transport_fare: number
-  payment_method?: string
-  items: { item_name: string; unit: string; quantity: number; unit_price: number; line_total: number }[]
-}
-
-function InvoiceModal({ id, onClose }: { id: string; onClose: () => void }) {
-  const { data, isLoading } = useQuery({
-    queryKey: ['reseller/sales', id],
-    queryFn: async () => (await api.get<{ data: SaleDetail }>(`/reseller/sales/${id}`)).data.data,
-  })
-  if (isLoading || !data) {
-    return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}><Spinner /></div>
-  }
-  return (
-    <InvoiceSheet
-      subtitle="Resellers Point"
-      docType="Sales Invoice"
-      number={data.invoice_no}
-      date={data.sale_date}
-      customer={data.customer?.name ?? 'Walk-in'}
-      meta={data.payment_method ? `Paid via ${String(data.payment_method).toUpperCase()}` : String(data.type).toUpperCase()}
-      lines={data.items.map((it) => ({ name: it.item_name, qty: `${it.quantity} ${it.unit}`, rate: it.unit_price, total: it.line_total }))}
-      totals={[
-        { label: 'Subtotal', value: data.subtotal },
-        ...(data.discount > 0 ? [{ label: 'Discount', value: data.discount, sign: '−' }] : []),
-        ...(data.transport_fare > 0 ? [{ label: 'Transport', value: data.transport_fare }] : []),
-        { label: 'Total', value: data.total, strong: true },
-        { label: 'Paid', value: data.paid },
-        { label: 'Balance', value: data.balance },
-      ]}
-      onClose={onClose}
-    />
   )
 }
 

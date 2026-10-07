@@ -23,8 +23,21 @@ class MaterialPurchaseResource extends JsonResource
             'loading_cost' => (int) $this->loading_cost,
             'unloading_cost' => (int) $this->unloading_cost,
             'total_cost' => (int) $this->total_cost,
+            // Supplier ko sirf maal ka bill. Kiraya agar driver ko gaya to wo
+            // is me se nikal jata hai aur driver ke khate me chala jata hai.
+            'supplier_bill' => $this->supplierBill(),
             'paid_amount' => (int) $this->paid_amount,
             'payment_status' => $this->payment_status,
+            'freight_driver' => $this->when($this->relationLoaded('trip'), fn () => $this->trip ? [
+                'trip_reference' => $this->trip->reference,
+                'driver_id' => $this->trip->driver_id,
+                'driver_name' => $this->trip->driver?->name,
+                'vehicle' => $this->trip->vehicle_label,
+                'rate' => (int) $this->trip->rate,
+                'paid' => (int) $this->trip->paid,
+                'balance' => (int) $this->trip->balance,
+                'status' => $this->trip->status,
+            ] : null),
             'bank_ref' => $this->bank_ref,
             'notes' => $this->notes,
             'created_at' => $this->created_at,

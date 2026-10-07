@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { Eye, HandCoins, Trash2 } from 'lucide-react'
-import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, useConfirm } from '../components/ui'
-import InvoiceSheet from '../components/InvoiceSheet'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, useConfirm } from '../components/ui'
+import SaleInvoiceModal from '../components/SaleInvoiceModal'
 
 interface Sale {
   id: string
@@ -101,7 +101,7 @@ export default function Sales() {
         page={page}
         onPage={setPage}
       />
-      {viewId && <InvoiceModal id={viewId} onClose={() => setViewId(null)} />}
+      {viewId && <SaleInvoiceModal id={viewId} onClose={() => setViewId(null)} />}
       {receiveFor && (
         <Modal title={`Receive — ${receiveFor.invoice_no}`} onClose={() => setReceiveFor(null)}>
           <ReceiveForm
@@ -128,35 +128,5 @@ function ReceiveForm({ outstanding, onSubmit, busy, error }: { outstanding: numb
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
       <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Receive'}</Button>
     </form>
-  )
-}
-
-function InvoiceModal({ id, onClose }: { id: string; onClose: () => void }) {
-  const { data, isLoading } = useQuery({
-    queryKey: ['sale', id],
-    queryFn: async () => (await api.get(`/sales/${id}`)).data.data,
-  })
-  if (isLoading || !data) {
-    return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}><Spinner /></div>
-  }
-  const items = (data.items as { product_name: string; quantity: number; unit_price: number; line_total: number }[]) ?? []
-  return (
-    <InvoiceSheet
-      docType="Sales Invoice"
-      number={String(data.invoice_no)}
-      date={data.sale_date}
-      customer={data.customer?.name ?? 'Walk-in'}
-      meta={data.payment_method ? `Paid via ${String(data.payment_method).toUpperCase()}${data.bank_ref ? ` (${data.bank_ref})` : ''}` : String(data.type).toUpperCase()}
-      lines={items.map((it) => ({ name: it.product_name, qty: String(it.quantity), rate: it.unit_price, total: it.line_total }))}
-      totals={[
-        { label: 'Subtotal', value: Number(data.subtotal) },
-        ...(Number(data.discount) > 0 ? [{ label: 'Discount', value: Number(data.discount), sign: '−' }] : []),
-        ...(Number(data.transport_fare) > 0 ? [{ label: 'Transport (kiraya)', value: Number(data.transport_fare) }] : []),
-        { label: 'Total', value: Number(data.total), strong: true },
-        { label: 'Paid', value: Number(data.paid) },
-        { label: 'Balance', value: Number(data.balance) },
-      ]}
-      onClose={onClose}
-    />
   )
 }

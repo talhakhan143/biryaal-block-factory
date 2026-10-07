@@ -13,7 +13,7 @@ class TransportTrip extends Model implements AuditableContract
     use Auditable, HasUuids;
 
     protected $fillable = [
-        'reference', 'vehicle_id', 'vehicle_label', 'driver_id', 'dispatch_id', 'trip_date',
+        'reference', 'vehicle_id', 'vehicle_label', 'driver_id', 'dispatch_id', 'material_purchase_id', 'trip_date',
         'from_location', 'to_location', 'rate', 'paid', 'balance', 'status',
         'notes', 'created_by',
     ];
@@ -33,5 +33,11 @@ class TransportTrip extends Model implements AuditableContract
     public function driver(): BelongsTo
     {
         return $this->belongsTo(Driver::class);
+    }
+
+    /** Inbound trip: the purchase whose material this driver brought in. */
+    public function materialPurchase(): BelongsTo
+    {
+        return $this->belongsTo(MaterialPurchase::class);
     }
 }

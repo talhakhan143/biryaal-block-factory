@@ -170,7 +170,7 @@ function LedgerModal({ id, onClose }: { id: string; onClose: () => void }) {
                 ? <>Advance jama: <strong style={{ color: 'var(--primary)' }}>{formatPaisa(-bal)}</strong></>
                 : <strong style={{ color: 'var(--green)' }}>Sab clear</strong>}
           </div>
-          <Table head={['Date', 'Ref', 'Desc', 'Mazdoori', 'Diya']}>
+          <Table head={['Date', 'Ref', 'Desc', { label: 'Mazdoori', align: 'right' }, { label: 'Diya', align: 'right' }]}>
             {data.rows.map((r: Record<string, string | number>, i: number) => (
               <tr key={i}>
                 <td className="px-4 py-2">{r.date}</td>

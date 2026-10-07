@@ -7,6 +7,15 @@ import { useAuth } from '../lib/auth'
 import { Wallet } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select } from '../components/ui'
 
+interface FreightDriver {
+  trip_reference: string
+  driver_name?: string
+  vehicle?: string | null
+  rate: number
+  paid: number
+  balance: number
+  status: string
+}
 interface Purchase {
   id: string
   reference: string
@@ -15,8 +24,11 @@ interface Purchase {
   purchase_date: string
   quantity: number
   total_cost: number
+  /** Supplier ko kitna dena. Kiraya driver ko gaya ho to wo is me nahi. */
+  supplier_bill: number
   paid_amount: number
   payment_status: string
+  freight_driver?: FreightDriver | null
 }
 
 const statusColor: Record<string, string> = { paid: 'green', partial: 'amber', unpaid: 'red' }
@@ -44,7 +56,17 @@ export default function Purchases() {
     { key: 'supplier', label: 'Supplier', render: (p) => p.supplier?.name ?? '—' },
     { key: 'material', label: 'Material', render: (p) => p.raw_material?.name ?? '—' },
     { key: 'quantity', label: 'Qty', sortable: true, align: 'right', render: (p) => p.quantity },
-    { key: 'total_cost', label: 'Total', sortable: true, align: 'right', render: (p) => formatPaisa(p.total_cost) },
+    { key: 'total_cost', label: 'Maal ki lagat', sortable: true, align: 'right', render: (p) => formatPaisa(p.total_cost) },
+    {
+      key: 'freight', label: 'Laane wala driver',
+      render: (p) => (p.freight_driver
+        ? <span className="text-xs">
+            {p.freight_driver.driver_name}
+            <span style={{ color: 'var(--muted)' }}> · kiraya {formatPaisa(p.freight_driver.rate)}</span>
+            {p.freight_driver.balance > 0 && <Badge color="amber">baqi {formatPaisa(p.freight_driver.balance)}</Badge>}
+          </span>
+        : <span style={{ color: 'var(--muted)' }}>·</span>),
+    },
     { key: 'payment_status', label: 'Status', sortable: true, render: (p) => <Badge color={statusColor[p.payment_status]}>{p.payment_status}</Badge> },
     {
       key: 'actions', label: '', align: 'right', render: (p) => (
@@ -58,7 +80,7 @@ export default function Purchases() {
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/purchases', p),
     onSuccess: () => {
-      ['purchases', 'raw-materials', 'suppliers', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+      ;['purchases', 'raw-materials', 'suppliers', 'payables', 'dashboard', 'drivers', 'transport-trips', 'cash-book', 'accounting'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setCreating(false)
     },
   })
@@ -66,7 +88,7 @@ export default function Purchases() {
   const pay = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/purchases/${id}/pay`, payload),
     onSuccess: () => {
-      ['purchases', 'suppliers', 'payments', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+      ;['purchases', 'suppliers', 'payments', 'payables', 'dashboard', 'cash-book', 'accounting'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setPayFor(null)
     },
   })
@@ -96,7 +118,7 @@ export default function Purchases() {
       {payFor && (
         <Modal title={`Pay — ${payFor.reference}`} onClose={() => setPayFor(null)}>
           <PayBillForm
-            outstanding={payFor.total_cost - payFor.paid_amount}
+            outstanding={payFor.supplier_bill - payFor.paid_amount}
             onSubmit={(payload) => pay.mutate({ id: payFor.id, payload })}
             busy={pay.isPending}
             error={pay.error ? apiError(pay.error) : ''}
@@ -130,9 +152,11 @@ function PayBillForm({ outstanding, onSubmit, busy, error }: { outstanding: numb
 function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
   const suppliers = useList<{ id: string; name: string }>('suppliers', { per_page: 100 })
   const materials = useList<{ id: string; name: string; unit: string }>('raw-materials', { per_page: 100 })
+  const drivers = useList<{ id: string; name: string; vehicle_name?: string }>('drivers', { per_page: 100 })
   const [form, setForm] = useState({
     supplier_id: '', raw_material_id: '', purchase_date: new Date().toISOString().slice(0, 10),
-    quantity: '', unit_cost: '', transport_cost: '0', loading_cost: '0', unloading_cost: '0', paid_amount: '0', method: 'cash', bank_ref: '',
+    quantity: '', unit_cost: '', transport_cost: '0', loading_cost: '0', unloading_cost: '0', paid_amount: '0',
+    driver_id: '', trip_paid: '0', method: 'cash', bank_ref: '',
   })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
 
@@ -143,9 +167,12 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
   const goods = qty * unit
   const extras = (Number(form.transport_cost) || 0) + (Number(form.loading_cost) || 0) + (Number(form.unloading_cost) || 0)
   const total = goods + extras
+  // Driver diya ho to kiraya uska, supplier ka bill utna kam.
+  const toDriver = form.driver_id ? (Number(form.transport_cost) || 0) : 0
+  const supplierBill = total - toDriver
   const paid = Number(form.paid_amount) || 0
-  const remaining = total - paid
-  const overpaid = paid > total && total > 0
+  const remaining = supplierBill - paid
+  const overpaid = paid > supplierBill && supplierBill > 0
 
   return (
     <form
@@ -160,6 +187,8 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
           loading_cost: Number(form.loading_cost),
           unloading_cost: Number(form.unloading_cost),
           paid_amount: Number(form.paid_amount),
+          driver_id: form.driver_id || null,
+          trip_paid: form.driver_id ? Number(form.trip_paid) : undefined,
         })
       }}
       className="space-y-3"
@@ -186,13 +215,38 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
         <Field label="Paid now (Rs)"><MoneyInput value={form.paid_amount} onChange={(v) => set('paid_amount', v)} /></Field>
       </div>
 
+      {/* Maal laane wala driver. Dispatch ki tarah yahan bhi uska kiraya chalta hai. */}
+      <div className="rounded-lg border p-3" style={{ borderColor: 'var(--border)' }}>
+        <Field label="Maal kaun laaya? (marzi se)">
+          <Select value={form.driver_id} onChange={(e) => set('driver_id', e.target.value)}>
+            <option value="">Koi driver nahi, kiraya supplier ke bill me</option>
+            {drivers.data?.data.map((d) => <option key={d.id} value={d.id}>{d.name}{d.vehicle_name ? ` (${d.vehicle_name})` : ''}</option>)}
+          </Select>
+        </Field>
+        {form.driver_id && (
+          <div className="mt-3 space-y-2">
+            <Field label="Driver ko abhi diya (Rs)"><MoneyInput value={form.trip_paid} onChange={(v) => set('trip_paid', v)} /></Field>
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>
+              Upar wala <strong>Transport (Rs, total)</strong> hi is driver ka kiraya hai. Baqi uske khate me
+              chala jayega aur Drivers ya Transport se kabhi bhi diya ja sakta hai. Supplier ke bill me kiraya nahi jayega.
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Live bill total */}
       <div className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
         <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Maal ({qty || 0} × {rs(unit)})</span><span>{rs(goods)}</span></div>
         <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Transport + loading + unloading</span><span>{rs(extras)}</span></div>
         <div className="mt-1 flex justify-between border-t pt-1 text-base font-bold" style={{ borderColor: 'var(--border)' }}>
-          <span>Total bill</span><span style={{ color: 'var(--primary)' }}>{rs(total)}</span>
+          <span>Maal ki kul lagat</span><span style={{ color: 'var(--primary)' }}>{rs(total)}</span>
         </div>
+        {toDriver > 0 && (
+          <>
+            <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Is me se driver ka kiraya</span><span>{rs(toDriver)}</span></div>
+            <div className="flex justify-between font-semibold"><span>Supplier ko dena</span><span>{rs(supplierBill)}</span></div>
+          </>
+        )}
         {paid > 0 && (
           <>
             <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Abhi diya</span><span>{rs(paid)}</span></div>
@@ -200,7 +254,7 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
           </>
         )}
       </div>
-      {overpaid && <p className="text-sm" style={{ color: 'var(--red)' }}>Diya hua amount bill ({rs(total)}) se zyada hai — kam karein.</p>}
+      {overpaid && <p className="text-sm" style={{ color: 'var(--red)' }}>Supplier ko diya hua amount uske bill ({rs(supplierBill)}) se zyada hai. Kam karein.</p>}
 
       <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
       {error && <p className="text-sm text-red-600">{error}</p>}

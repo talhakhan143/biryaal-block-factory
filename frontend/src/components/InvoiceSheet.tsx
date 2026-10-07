@@ -78,7 +78,7 @@ export default function InvoiceSheet({ subtitle, docType, number, date, customer
                   <td className="px-3 py-2 text-slate-400">{i + 1}</td>
                   <td className="px-3 py-2 font-medium text-slate-800">{l.name}</td>
                   <td className="px-3 py-2 text-right">{l.qty}</td>
-                  {showRates && <td className="px-3 py-2 text-right">{formatPaisa(l.rate ?? 0)}</td>}
+                  {showRates && <td className="px-3 py-2 text-right">{l.rate === undefined ? '' : formatPaisa(l.rate)}</td>}
                   {showRates && <td className="px-3 py-2 text-right font-medium">{formatPaisa(l.total ?? 0)}</td>}
                 </tr>
               ))}

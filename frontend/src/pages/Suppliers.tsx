@@ -146,7 +146,7 @@ function LedgerModal({ id, onClose }: { id: string; onClose: () => void }) {
           <div className="mb-3 text-sm">
             {data.supplier.name} — Balance: <strong>{formatPaisa(data.balance)}</strong>
           </div>
-          <Table head={['Date', 'Ref', 'Desc', 'Debit', 'Credit']}>
+          <Table head={['Date', 'Ref', 'Desc', { label: 'Debit', align: 'right' }, { label: 'Credit', align: 'right' }]}>
             {data.rows.map((r: Record<string, string | number>, i: number) => (
               <tr key={i}>
                 <td className="px-4 py-2">{r.date}</td>

@@ -19,6 +19,7 @@ const Purchases = lazy(() => import('./pages/Purchases'))
 const RawMaterials = lazy(() => import('./pages/RawMaterials'))
 const Suppliers = lazy(() => import('./pages/Suppliers'))
 const Customers = lazy(() => import('./pages/Customers'))
+const CustomerDetail = lazy(() => import('./pages/CustomerDetail'))
 const Payments = lazy(() => import('./pages/Payments'))
 const Expenses = lazy(() => import('./pages/Expenses'))
 const CashBook = lazy(() => import('./pages/CashBook'))
@@ -45,6 +46,8 @@ const ResellerSales = lazy(() => import('./pages/ResellerSales'))
 const ResellerDispatch = lazy(() => import('./pages/ResellerDispatch'))
 const ResellerReturns = lazy(() => import('./pages/ResellerReturns'))
 const ResellerPayments = lazy(() => import('./pages/ResellerPayments'))
+const ResellerCustomers = lazy(() => import('./pages/ResellerCustomers'))
+const ResellerCustomerDetail = lazy(() => import('./pages/ResellerCustomerDetail'))
 
 const Loading = () => <div className="flex h-full items-center justify-center"><Spinner /></div>
 
@@ -87,6 +90,7 @@ export default function App() {
           <Route path="/materials" element={<RawMaterials />} />
           <Route path="/suppliers" element={<Suppliers />} />
           <Route path="/customers" element={<Customers />} />
+          <Route path="/customers/:id" element={<CustomerDetail />} />
           <Route path="/payments" element={<Payments />} />
           <Route path="/expenses" element={<Expenses />} />
           <Route path="/cash-book" element={<CashBook />} />
@@ -108,6 +112,8 @@ export default function App() {
           <Route path="/reseller/suppliers" element={<ResellerSuppliers />} />
           <Route path="/reseller/purchases" element={<ResellerPurchases />} />
           <Route path="/reseller/kiraya" element={<ResellerKiraya />} />
+          <Route path="/reseller/customers" element={<ResellerCustomers />} />
+          <Route path="/reseller/customers/:id" element={<ResellerCustomerDetail />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
