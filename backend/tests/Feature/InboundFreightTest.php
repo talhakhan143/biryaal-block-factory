@@ -143,6 +143,76 @@ class InboundFreightTest extends TestCase
         $this->assertSame((int) JournalLine::sum('debit'), (int) JournalLine::sum('credit'));
     }
 
+    public function test_a_lump_supplier_payment_cannot_eat_the_drivers_kiraya(): void
+    {
+        $purchase = $this->buy(['driver_id' => $this->driver->id, 'trip_paid' => 0]);
+        $this->assertSame(5000000, (int) $this->supplier->fresh()->balance);
+
+        // Lump payment of the FULL landed cost. Only the supplier's own bill
+        // may be settled; the rest must be refused, not quietly handed over.
+        $this->postJson('/api/v1/payments/supplier', [
+            'supplier_id' => $this->supplier->id,
+            'payment_date' => '2026-06-11',
+            'amount' => 58000,
+            'method' => 'cash',
+        ])->assertStatus(422);
+
+        // The right amount goes through and closes the bill exactly.
+        $this->postJson('/api/v1/payments/supplier', [
+            'supplier_id' => $this->supplier->id,
+            'payment_date' => '2026-06-11',
+            'amount' => 50000,
+            'method' => 'cash',
+        ])->assertCreated();
+
+        $purchase->refresh();
+        $this->assertSame(5000000, (int) $purchase->paid_amount);
+        $this->assertSame('paid', $purchase->payment_status);
+        $this->assertSame(0, (int) $this->supplier->fresh()->balance);
+        $this->assertSame(800000, (int) $this->driver->fresh()->balance, 'Kiraya abhi bhi driver ka.');
+    }
+
+    public function test_the_supplier_statement_agrees_with_the_supplier_balance(): void
+    {
+        $this->buy(['driver_id' => $this->driver->id, 'trip_paid' => 0]);
+
+        $body = $this->getJson("/api/v1/suppliers/{$this->supplier->id}/ledger")->assertOk()->json();
+
+        $credit = array_sum(array_column($body['rows'], 'credit'));
+        $debit = array_sum(array_column($body['rows'], 'debit'));
+        $this->assertSame((int) $this->supplier->fresh()->balance, $credit - $debit);
+        $this->assertSame(5000000, $credit, 'Kiraya supplier ke khate me nahi aana chahiye.');
+    }
+
+    public function test_the_reconcile_tool_does_not_corrupt_a_freight_purchase(): void
+    {
+        $purchase = $this->buy(['driver_id' => $this->driver->id, 'trip_paid' => 0]);
+        $this->postJson("/api/v1/purchases/{$purchase->id}/pay", [
+            'payment_date' => '2026-06-11', 'amount' => 50000, 'method' => 'cash',
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/system/reconcile-transport')->assertOk();
+
+        $purchase->refresh();
+        $this->assertSame(5000000, (int) $purchase->paid_amount, 'Reconcile ne landed cost nahi likhni.');
+        $this->assertSame('paid', $purchase->payment_status);
+    }
+
+    public function test_cash_handed_to_a_driver_with_no_kiraya_is_refused(): void
+    {
+        // Warna wo paisa kisi record me aata hi nahi.
+        $this->postJson('/api/v1/purchases', [
+            'supplier_id' => $this->supplier->id,
+            'raw_material_id' => $this->material->id,
+            'purchase_date' => '2026-06-10',
+            'quantity' => 10, 'unit_cost' => 5000,
+            'transport_cost' => 0, 'paid_amount' => 0, 'method' => 'cash',
+            'driver_id' => $this->driver->id, 'trip_paid' => 2000,
+        ])->assertStatus(422);
+
+        $this->assertSame(0, TransportTrip::count());
+    }
+
     public function test_a_purchase_with_no_kiraya_creates_no_trip_even_with_a_driver(): void
     {
         $purchase = $this->buy(['transport_cost' => 0, 'driver_id' => $this->driver->id]);

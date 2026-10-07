@@ -482,24 +482,28 @@ class PaymentService
     {
         $remaining = $amount;
 
-        $purchases = MaterialPurchase::where('supplier_id', $supplier->getKey())
-            ->whereColumn('paid_amount', '<', 'total_cost')
+        // Filter PHP me, SQL me nahi: jis purchase ka kiraya driver ko gaya hai
+        // us ka supplier bill total_cost se kam hai, aur wo SQL column nahi.
+        $purchases = MaterialPurchase::with('trip')
+            ->where('supplier_id', $supplier->getKey())
             ->orderBy('purchase_date')
             ->orderBy('created_at')
-            ->get();
+            ->get()
+            ->filter(fn (MaterialPurchase $p) => (int) $p->paid_amount < $p->supplierBill());
 
         foreach ($purchases as $purchase) {
             if ($remaining <= 0) {
                 break;
             }
 
-            $due = (int) $purchase->total_cost - (int) $purchase->paid_amount;
+            $bill = $purchase->supplierBill();
+            $due = $bill - (int) $purchase->paid_amount;
             $apply = min($remaining, $due);
             $paid = (int) $purchase->paid_amount + $apply;
 
             $purchase->update([
                 'paid_amount' => $paid,
-                'payment_status' => $paid >= (int) $purchase->total_cost ? 'paid' : ($paid > 0 ? 'partial' : 'unpaid'),
+                'payment_status' => $paid >= $bill ? 'paid' : ($paid > 0 ? 'partial' : 'unpaid'),
             ]);
 
             $remaining -= $apply;

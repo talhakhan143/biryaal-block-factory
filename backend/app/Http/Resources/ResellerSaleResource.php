@@ -12,7 +12,7 @@ class ResellerSaleResource extends JsonResource
         return [
             'id' => $this->id,
             'invoice_no' => $this->invoice_no,
-            'customer' => new CustomerResource($this->whenLoaded('customer')),
+            'customer' => new ResellerCustomerResource($this->whenLoaded('customer')),
             'customer_id' => $this->customer_id,
             'sale_date' => $this->sale_date?->toDateString(),
             'type' => $this->type,

@@ -13,7 +13,7 @@ class ResellerSalesReturnResource extends JsonResource
             'id' => $this->id,
             'reference' => $this->reference,
             'reseller_sale_id' => $this->reseller_sale_id,
-            'customer' => new CustomerResource($this->whenLoaded('customer')),
+            'customer' => new ResellerCustomerResource($this->whenLoaded('customer')),
             'customer_id' => $this->customer_id,
             'return_date' => $this->return_date?->toDateString(),
             'return_value' => (int) $this->return_value,

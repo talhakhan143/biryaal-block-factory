@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\CustomerResource;
+use App\Http\Resources\ResellerCustomerResource;
 use App\Http\Resources\ResellerSaleResource;
 use App\Models\Customer;
 use App\Services\Reseller\ResellerCustomerHistoryService;
@@ -31,7 +31,7 @@ class ResellerCustomerController extends Controller
         $data = $this->history->history($customer);
 
         return response()->json([
-            'customer' => new CustomerResource($data['customer']),
+            'customer' => new ResellerCustomerResource($data['customer']),
             'summary' => $data['summary'],
             'sales' => ResellerSaleResource::collection($data['sales']),
             'receipts' => $data['receipts']->map(fn ($p) => [

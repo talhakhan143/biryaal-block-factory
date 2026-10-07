@@ -172,17 +172,22 @@ class SystemController extends Controller
         $fixed = 0;
 
         Supplier::query()->get()->each(function (Supplier $supplier) use (&$fixed) {
-            $purchases = MaterialPurchase::where('supplier_id', $supplier->getKey())
+            $purchases = MaterialPurchase::with('trip')
+                ->where('supplier_id', $supplier->getKey())
                 ->orderBy('purchase_date')->orderBy('created_at')->get();
             if ($purchases->isEmpty()) {
                 return;
             }
 
-            $remaining = max(0, (int) $purchases->sum('total_cost') - (int) $supplier->balance);
+            // Supplier ko sirf apna bill dena hai. Jis purchase ka kiraya driver
+            // ko gaya, wo supplier ke hisaab me ginna galat hai.
+            $billed = (int) $purchases->sum(fn (MaterialPurchase $p) => $p->supplierBill());
+            $remaining = max(0, $billed - (int) $supplier->balance);
 
             foreach ($purchases as $purchase) {
-                $apply = min($remaining, (int) $purchase->total_cost);
-                $status = $apply <= 0 ? 'unpaid' : ($apply >= (int) $purchase->total_cost ? 'paid' : 'partial');
+                $bill = $purchase->supplierBill();
+                $apply = min($remaining, $bill);
+                $status = $apply <= 0 ? 'unpaid' : ($apply >= $bill ? 'paid' : 'partial');
                 if ((int) $purchase->paid_amount !== $apply || $purchase->payment_status !== $status) {
                     $purchase->update(['paid_amount' => $apply, 'payment_status' => $status]);
                     $fixed++;

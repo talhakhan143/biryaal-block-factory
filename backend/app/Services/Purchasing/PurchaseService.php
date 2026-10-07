@@ -13,6 +13,7 @@ use App\Services\Transport\TransportService;
 use App\Support\Sequence;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 class PurchaseService
 {
@@ -44,6 +45,10 @@ class PurchaseService
             $freight = (int) ($data['transport_cost'] ?? 0);
             $driverId = $data['driver_id'] ?? null;
             $freightToDriver = $driverId && $freight > 0;
+            if ($driverId && $freight <= 0 && (int) ($data['trip_paid'] ?? 0) > 0) {
+                // Warna driver ko diya hua cash kahin record hi nahi hota.
+                throw new InvalidArgumentException('Driver ko paisa dena hai to pehle Transport (kiraya) likhein.');
+            }
             $supplierBill = $totalCost - ($freightToDriver ? $freight : 0);
 
             $paid = min((int) ($data['paid_amount'] ?? 0), $supplierBill);

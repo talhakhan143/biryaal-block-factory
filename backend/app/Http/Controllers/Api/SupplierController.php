@@ -55,14 +55,24 @@ class SupplierController extends Controller
     /** Combined statement: purchases (debit to us) and payments (credit). */
     public function ledger(Supplier $supplier)
     {
-        $purchases = $supplier->purchases()->get()->map(fn (MaterialPurchase $p) => [
-            'date' => $p->purchase_date->toDateString(),
-            'type' => 'purchase',
-            'reference' => $p->reference,
-            'description' => 'Material purchase',
-            'credit' => (int) $p->total_cost,   // increases payable
-            'debit' => 0,
-        ]);
+        // Supplier ke khate me sirf wahi raqam jo usay deni hai. Agar kiraya
+        // driver ko gaya to wo is me se nikal jata hai, warna khate ka jorh
+        // upar likhe balance se match hi nahi karta.
+        $purchases = $supplier->purchases()->with('trip')->get()->map(function (MaterialPurchase $p) {
+            $bill = $p->supplierBill();
+            $freight = (int) $p->total_cost - $bill;
+
+            return [
+                'date' => $p->purchase_date->toDateString(),
+                'type' => 'purchase',
+                'reference' => $p->reference,
+                'description' => $freight > 0
+                    ? 'Material purchase (kiraya driver ko gaya)'
+                    : 'Material purchase',
+                'credit' => $bill,   // increases payable
+                'debit' => 0,
+            ];
+        });
 
         $payments = $supplier->payments()->get()->map(fn (Payment $p) => [
             'date' => $p->payment_date->toDateString(),
