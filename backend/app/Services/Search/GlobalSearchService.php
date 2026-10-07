@@ -17,6 +17,7 @@ use App\Models\Staff;
 use App\Models\Supplier;
 use App\Models\TransportTrip;
 use App\Support\Money;
+use App\Support\Search;
 use Illuminate\Contracts\Auth\Access\Gate;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -44,10 +45,11 @@ class GlobalSearchService
         if (mb_strlen($term) < 2) {
             return [];
         }
+        $like = Search::like($term);
 
         $groups = [
             $this->group('customers', 'Customers', 'customers.view', fn () => Customer::query()
-                ->where(fn (Builder $q) => $q->where('name', 'like', "%{$term}%")->orWhere('phone', 'like', "%{$term}%"))
+                ->where(fn (Builder $q) => $q->where('name', 'like', $like)->orWhere('phone', 'like', $like))
                 ->orderBy('name')->limit(self::PER_GROUP)->get()
                 ->map(fn (Customer $c) => [
                     'title' => $c->name,
@@ -58,8 +60,8 @@ class GlobalSearchService
 
             $this->group('sales', 'Sales (bills)', 'sales.view', fn () => Sale::query()
                 ->with('customer:id,name')
-                ->where(fn (Builder $q) => $q->where('invoice_no', 'like', "%{$term}%")
-                    ->orWhereHas('customer', fn (Builder $q) => $q->where('name', 'like', "%{$term}%")))
+                ->where(fn (Builder $q) => $q->where('invoice_no', 'like', $like)
+                    ->orWhereHas('customer', fn (Builder $q) => $q->where('name', 'like', $like)))
                 ->orderByDesc('sale_date')->limit(self::PER_GROUP)->get()
                 ->map(fn (Sale $s) => [
                     'title' => $s->invoice_no,
@@ -69,7 +71,7 @@ class GlobalSearchService
                 ])),
 
             $this->group('suppliers', 'Suppliers', 'suppliers.view', fn () => Supplier::query()
-                ->where(fn (Builder $q) => $q->where('name', 'like', "%{$term}%")->orWhere('phone', 'like', "%{$term}%"))
+                ->where(fn (Builder $q) => $q->where('name', 'like', $like)->orWhere('phone', 'like', $like))
                 ->orderBy('name')->limit(self::PER_GROUP)->get()
                 ->map(fn (Supplier $s) => [
                     'title' => $s->name,
@@ -80,9 +82,9 @@ class GlobalSearchService
 
             $this->group('purchases', 'Purchases', 'purchases.view', fn () => MaterialPurchase::query()
                 ->with(['supplier:id,name', 'rawMaterial:id,name'])
-                ->where(fn (Builder $q) => $q->where('reference', 'like', "%{$term}%")
-                    ->orWhereHas('supplier', fn (Builder $q) => $q->where('name', 'like', "%{$term}%"))
-                    ->orWhereHas('rawMaterial', fn (Builder $q) => $q->where('name', 'like', "%{$term}%")))
+                ->where(fn (Builder $q) => $q->where('reference', 'like', $like)
+                    ->orWhereHas('supplier', fn (Builder $q) => $q->where('name', 'like', $like))
+                    ->orWhereHas('rawMaterial', fn (Builder $q) => $q->where('name', 'like', $like)))
                 ->orderByDesc('purchase_date')->limit(self::PER_GROUP)->get()
                 ->map(fn (MaterialPurchase $p) => [
                     'title' => $p->reference,
@@ -92,10 +94,10 @@ class GlobalSearchService
                 ])),
 
             $this->group('drivers', 'Drivers', 'transport.view', fn () => Driver::query()
-                ->where(fn (Builder $q) => $q->where('name', 'like', "%{$term}%")
-                    ->orWhere('phone', 'like', "%{$term}%")
-                    ->orWhere('vehicle_name', 'like', "%{$term}%")
-                    ->orWhere('vehicle_plate', 'like', "%{$term}%"))
+                ->where(fn (Builder $q) => $q->where('name', 'like', $like)
+                    ->orWhere('phone', 'like', $like)
+                    ->orWhere('vehicle_name', 'like', $like)
+                    ->orWhere('vehicle_plate', 'like', $like))
                 ->orderBy('name')->limit(self::PER_GROUP)->get()
                 ->map(fn (Driver $d) => [
                     'title' => $d->name,
@@ -106,7 +108,7 @@ class GlobalSearchService
 
             $this->group('trips', 'Kiraya (trips)', 'transport.view', fn () => TransportTrip::query()
                 ->with('driver:id,name')
-                ->where('reference', 'like', "%{$term}%")
+                ->where('reference', 'like', $like)
                 ->orderByDesc('trip_date')->limit(self::PER_GROUP)->get()
                 ->map(fn (TransportTrip $t) => [
                     'title' => $t->reference,
@@ -116,7 +118,7 @@ class GlobalSearchService
                 ])),
 
             $this->group('products', 'Products', 'inventory.view', fn () => Product::query()
-                ->where(fn (Builder $q) => $q->where('name', 'like', "%{$term}%")->orWhere('sku', 'like', "%{$term}%"))
+                ->where(fn (Builder $q) => $q->where('name', 'like', $like)->orWhere('sku', 'like', $like))
                 ->orderBy('name')->limit(self::PER_GROUP)->get()
                 ->map(fn (Product $p) => [
                     'title' => $p->name,
@@ -126,7 +128,7 @@ class GlobalSearchService
                 ])),
 
             $this->group('materials', 'Raw materials', 'materials.view', fn () => RawMaterial::query()
-                ->where('name', 'like', "%{$term}%")
+                ->where('name', 'like', $like)
                 ->orderBy('name')->limit(self::PER_GROUP)->get()
                 ->map(fn (RawMaterial $m) => [
                     'title' => $m->name,
@@ -136,9 +138,9 @@ class GlobalSearchService
                 ])),
 
             $this->group('expenses', 'Kharchay', 'expenses.view', fn () => Expense::query()
-                ->where(fn (Builder $q) => $q->where('reference', 'like', "%{$term}%")
-                    ->orWhere('title', 'like', "%{$term}%")
-                    ->orWhere('category', 'like', "%{$term}%"))
+                ->where(fn (Builder $q) => $q->where('reference', 'like', $like)
+                    ->orWhere('title', 'like', $like)
+                    ->orWhere('category', 'like', $like))
                 ->orderByDesc('expense_date')->limit(self::PER_GROUP)->get()
                 ->map(fn (Expense $e) => [
                     'title' => $e->title,
@@ -148,7 +150,7 @@ class GlobalSearchService
                 ])),
 
             $this->group('labour', 'Mazdoor', 'labour.view', fn () => Labourer::query()
-                ->where(fn (Builder $q) => $q->where('name', 'like', "%{$term}%")->orWhere('phone', 'like', "%{$term}%"))
+                ->where(fn (Builder $q) => $q->where('name', 'like', $like)->orWhere('phone', 'like', $like))
                 ->orderBy('name')->limit(self::PER_GROUP)->get()
                 ->map(fn (Labourer $l) => [
                     'title' => $l->name,
@@ -158,7 +160,7 @@ class GlobalSearchService
                 ])),
 
             $this->group('staff', 'Staff', 'hr.view', fn () => Staff::query()
-                ->where(fn (Builder $q) => $q->where('name', 'like', "%{$term}%")->orWhere('phone', 'like', "%{$term}%"))
+                ->where(fn (Builder $q) => $q->where('name', 'like', $like)->orWhere('phone', 'like', $like))
                 ->orderBy('name')->limit(self::PER_GROUP)->get()
                 ->map(fn (Staff $st) => [
                     'title' => $st->name,
@@ -171,8 +173,8 @@ class GlobalSearchService
             // utna hi zaroori hai. Links usi portal ke andar jaate hain.
             $this->group('reseller_sales', 'Resellers Point: bills', 'reseller.view', fn () => ResellerSale::query()
                 ->with('customer:id,name')
-                ->where(fn (Builder $q) => $q->where('invoice_no', 'like', "%{$term}%")
-                    ->orWhereHas('customer', fn (Builder $q) => $q->where('name', 'like', "%{$term}%")))
+                ->where(fn (Builder $q) => $q->where('invoice_no', 'like', $like)
+                    ->orWhereHas('customer', fn (Builder $q) => $q->where('name', 'like', $like)))
                 ->orderByDesc('sale_date')->limit(self::PER_GROUP)->get()
                 ->map(fn (ResellerSale $s) => [
                     'title' => $s->invoice_no,
@@ -182,7 +184,7 @@ class GlobalSearchService
                 ])),
 
             $this->group('reseller_items', 'Resellers Point: maal', 'reseller.view', fn () => ResellerItem::query()
-                ->where('name', 'like', "%{$term}%")
+                ->where('name', 'like', $like)
                 ->orderBy('name')->limit(self::PER_GROUP)->get()
                 ->map(fn (ResellerItem $i) => [
                     'title' => $i->name,
@@ -192,7 +194,7 @@ class GlobalSearchService
                 ])),
 
             $this->group('reseller_suppliers', 'Resellers Point: suppliers', 'reseller.view', fn () => ResellerSupplier::query()
-                ->where(fn (Builder $q) => $q->where('name', 'like', "%{$term}%")->orWhere('phone', 'like', "%{$term}%"))
+                ->where(fn (Builder $q) => $q->where('name', 'like', $like)->orWhere('phone', 'like', $like))
                 ->orderBy('name')->limit(self::PER_GROUP)->get()
                 ->map(fn (ResellerSupplier $s) => [
                     'title' => $s->name,
