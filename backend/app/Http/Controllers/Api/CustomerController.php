@@ -11,7 +11,9 @@ use App\Http\Resources\SaleResource;
 use App\Http\Resources\SalesReturnResource;
 use App\Models\Customer;
 use App\Services\Customers\CustomerHistoryService;
+use App\Support\Money;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class CustomerController extends Controller
 {
@@ -50,6 +52,20 @@ class CustomerController extends Controller
 
     public function destroy(Customer $customer)
     {
+        // Balance par kuch para ho to delete nahi. Minus balance ka matlab is
+        // ka paisa hamare paas hai; usay list se gayab karna sab se bura hai.
+        $balance = (int) $customer->balance;
+        if ($balance > 0) {
+            throw ValidationException::withMessages([
+                'customer' => 'Is customer se '.Money::format($balance).' lena baqi hai. Pehle hisaab saaf karein, phir delete.',
+            ]);
+        }
+        if ($balance < 0) {
+            throw ValidationException::withMessages([
+                'customer' => 'Is customer ka '.Money::format(-$balance).' advance hamare paas jama hai. Pehle wo adjust ya wapas karein, phir delete.',
+            ]);
+        }
+
         $customer->delete();
 
         return response()->noContent();

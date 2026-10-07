@@ -6,6 +6,7 @@ import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { Wallet } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select } from '../components/ui'
+import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface FreightDriver {
   trip_reference: string
@@ -80,7 +81,7 @@ export default function Purchases() {
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/purchases', p),
     onSuccess: () => {
-      ;['purchases', 'raw-materials', 'suppliers', 'payables', 'dashboard', 'drivers', 'transport-trips', 'cash-book', 'accounting'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+      MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setCreating(false)
     },
   })
@@ -88,7 +89,7 @@ export default function Purchases() {
   const pay = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/purchases/${id}/pay`, payload),
     onSuccess: () => {
-      ;['purchases', 'suppliers', 'payments', 'payables', 'dashboard', 'cash-book', 'accounting'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+      MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setPayFor(null)
     },
   })

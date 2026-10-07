@@ -10,6 +10,7 @@ import {
   OutstandingNote, RowActions, Spinner, StatTile, Table, Tabs,
 } from '../components/ui'
 import SaleInvoiceModal from '../components/SaleInvoiceModal'
+import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface LedgerRow {
   date: string
@@ -86,8 +87,7 @@ export default function CustomerDetail() {
   const receive = useMutation({
     mutationFn: (payload: Record<string, unknown>) => api.post('/payments/receipt', { ...payload, customer_id: id }),
     onSuccess: () => {
-      ;['customer-history', 'customers', 'customer-ledger', 'sales', 'payments', 'payables', 'dashboard', 'accounting', 'cash-book']
-        .forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+      MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setReceiving(false)
     },
   })
@@ -155,8 +155,8 @@ export default function CustomerDetail() {
       {!s.reconciled && (
         <div className="mb-4">
           <Note tone="red">
-            Khate ka jorh (<strong>{formatPaisa(s.ledger_balance)}</strong>) aur customer ka baqi
-            (<strong>{formatPaisa(s.factory.outstanding)}</strong>) aapas me match nahi kar rahe. Munshi ko dikhayein.
+            Khate ka jorh (<strong>{formatPaisa(s.ledger_balance)}</strong>) aur customer ka apna hisaab
+            (<strong>{formatPaisa(s.factory.balance)}</strong>) aapas me match nahi kar rahe. Munshi ko dikhayein.
           </Note>
         </div>
       )}

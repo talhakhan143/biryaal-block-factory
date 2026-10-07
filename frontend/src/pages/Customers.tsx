@@ -8,6 +8,7 @@ import { useAuth } from '../lib/auth'
 import { ArrowRight, BookText, HandCoins } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, Table } from '../components/ui'
 import CustomerForm from '../components/CustomerForm'
+import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface Customer {
   id: string
@@ -48,7 +49,7 @@ export default function Customers() {
   const receive = useMutation({
     mutationFn: (payload: Record<string, unknown>) => api.post('/payments/receipt', payload),
     onSuccess: () => {
-      ['customers', 'sales', 'payments', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+      MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setReceiveFor(null)
     },
   })

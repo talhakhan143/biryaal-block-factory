@@ -11,6 +11,7 @@ use App\Models\Supplier;
 use App\Models\TransportTrip;
 use App\Models\User;
 use App\Services\Admin\SystemResetService;
+use App\Services\Sales\InvoiceAllocator;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -144,24 +145,11 @@ class SystemController extends Controller
     {
         $fixed = 0;
 
-        Customer::query()->get()->each(function (Customer $customer) use (&$fixed) {
-            $sales = Sale::where('customer_id', $customer->getKey())
-                ->orderBy('sale_date')->orderBy('created_at')->get();
-            if ($sales->isEmpty()) {
-                return;
-            }
-
-            $remaining = max(0, (int) $sales->sum('total') - (int) $customer->balance);
-
-            foreach ($sales as $sale) {
-                $apply = min($remaining, (int) $sale->total);
-                $status = $apply <= 0 ? 'unpaid' : ($apply >= (int) $sale->total ? 'paid' : 'partial');
-                if ((int) $sale->paid !== $apply || $sale->status !== $status) {
-                    $sale->update(['paid' => $apply, 'balance' => (int) $sale->total - $apply, 'status' => $status]);
-                    $fixed++;
-                }
-                $remaining -= $apply;
-            }
+        // Wahi allocator jo advance aur void ke baad chalta hai, taake teenon
+        // raaste aik hi tareeqe se hisaab banayein.
+        $allocator = app(InvoiceAllocator::class);
+        Customer::query()->get()->each(function (Customer $customer) use (&$fixed, $allocator) {
+            $fixed += $allocator->rebuild($customer);
         });
 
         return $fixed;

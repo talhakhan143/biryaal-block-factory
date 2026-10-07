@@ -7,6 +7,7 @@ import { formatPaisa } from '../lib/money'
 import { Button, Card, Field, Input, MethodField, Modal, MoneyInput, Note, OutstandingNote, Select } from '../components/ui'
 import CustomerForm, { type CustomerPayload } from '../components/CustomerForm'
 import InvoiceSheet from '../components/InvoiceSheet'
+import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface Product {
   id: string
@@ -18,10 +19,6 @@ interface CartLine {
   product: Product
   qty: number
 }
-
-// Sale ya advance ke baad jo bhi screen is paise ko dikhati hai, sab refresh.
-const MONEY_KEYS = ['customers', 'customer-history', 'sales', 'payments', 'payables',
-  'dashboard', 'cash-book', 'accounting', 'expenses/summary', 'dispatches-pending', 'products']
 
 export default function POS() {
   const qc = useQueryClient()
@@ -39,9 +36,21 @@ export default function POS() {
   const [takingAdvance, setTakingAdvance] = useState(false)
   const [advanceSlip, setAdvanceSlip] = useState<{ reference: string; date: string; name: string; amount: number; held: number; method: string } | null>(null)
 
+  // MoneyInput akela "." ya "-" bhi rehne deta hai, aur Number('.') NaN hai.
+  // Bina guard ke poora bill NaN ban jata tha aur "Rs NaN" dikhane ke bawajood
+  // Complete button chalta tha, jo poore rate par asli sale bana deta tha.
+  const rsToPaisa = (v: string) => {
+    const n = Number(v)
+    return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null
+  }
   const subtotal = useMemo(() => cart.reduce((s, l) => s + l.product.sale_price * l.qty, 0), [cart])
-  const goodsNet = Math.max(0, subtotal - Number(discount) * 100)
-  const total = goodsNet + Number(transport) * 100
+  const discountP = rsToPaisa(discount)
+  const transportP = rsToPaisa(transport)
+  const badDiscount = discountP === null
+  const badTransport = transportP === null
+  const overDiscount = discountP !== null && discountP > subtotal
+  const goodsNet = Math.max(0, subtotal - (discountP ?? 0))
+  const total = goodsNet + (transportP ?? 0)
   const selected = customers.data?.data.find((c) => c.id === customerId)
   // Jo advance pehle se jama hai.
   const advanceHeld = selected?.advance ?? 0
@@ -50,9 +59,11 @@ export default function POS() {
   //   advance pada hai  -> kuch cash nahi liya, bill advance me se katega
   //   advance nahi hai  -> poora paisa mauqe par mil gaya (cash sale)
   // Warna jo likha hai wahi cash hai.
-  const paidVal = paid.trim() === ''
+  const paidEntered = paid.trim() === '' ? null : rsToPaisa(paid)
+  const badPaid = paid.trim() !== '' && paidEntered === null
+  const paidVal = paidEntered === null
     ? (advanceHeld > 0 ? 0 : total)
-    : Math.min(Math.round(Number(paid) * 100), total)
+    : Math.min(paidEntered, total)
   const balance = Math.max(0, total - paidVal)
   const isCredit = balance > 0
   // Backend bhi yehi karta hai: pehle cash, phir advance, phir udhaar.
@@ -115,13 +126,22 @@ export default function POS() {
     },
   })
 
+  const blocked = badDiscount || badTransport || badPaid || overDiscount || total <= 0
+  const blockedWhy = badDiscount ? 'Discount theek nahi likha.'
+    : badTransport ? 'Transport theek nahi likha.'
+    : badPaid ? '"Paid now" theek nahi likha.'
+    : overDiscount ? 'Discount bill se zyada hai.'
+    : cart.length > 0 && total <= 0 ? 'Bill sifar ka hai, sale nahi ban sakti.'
+    : ''
+
   const checkout = () => {
+    if (blocked) return
     sale.mutate({
       customer_id: customerId || null,
       sale_date: new Date().toISOString().slice(0, 10),
       type: isCredit ? 'credit' : 'cash',
-      discount: Number(discount),
-      transport_fare: Number(transport),
+      discount: (discountP ?? 0) / 100,
+      transport_fare: (transportP ?? 0) / 100,
       paid: isCredit ? paidVal / 100 : undefined, // rupees; backend paisa karega
       payment_method: paidVal > 0 ? method : undefined,
       bank_ref: method === 'bank' ? bankRef : undefined,
@@ -244,10 +264,11 @@ export default function POS() {
             <div className="flex justify-between text-sm font-semibold"><span>Baqi</span><span style={{ color: 'var(--green)' }}>Kuch nahi, advance se poora</span></div>
           )}
 
+          {blockedWhy && <p className="text-sm" style={{ color: 'var(--red)' }}>{blockedWhy}</p>}
           {sale.error && <p className="text-sm text-red-600">{apiError(sale.error)}</p>}
           <Button
             onClick={checkout}
-            disabled={cart.length === 0 || sale.isPending || (isCredit && !customerId)}
+            disabled={cart.length === 0 || sale.isPending || blocked || (isCredit && !customerId)}
             className="w-full"
           >
             {sale.isPending ? 'Processing…' : advanceUse > 0 && afterAdvance === 0 ? 'Complete (Advance se)' : isCredit ? 'Complete (Udhaar)' : 'Complete Sale'}

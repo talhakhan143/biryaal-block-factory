@@ -12,6 +12,7 @@ use App\Models\Supplier;
 use App\Models\TransportTrip;
 use App\Services\Accounting\CashAccountResolver;
 use App\Services\Accounting\LedgerService;
+use App\Services\Sales\InvoiceAllocator;
 use App\Support\Money;
 use App\Support\Sequence;
 use Illuminate\Database\Eloquent\Model;
@@ -22,7 +23,7 @@ use InvalidArgumentException;
 
 class PaymentService
 {
-    public function __construct(private LedgerService $ledger) {}
+    public function __construct(private LedgerService $ledger, private InvoiceAllocator $allocator) {}
 
     /**
      * Record money received from a customer (settles receivable).
@@ -134,6 +135,13 @@ class PaymentService
             $this->assertPositive($amount);
 
             $supplier = $purchase->supplier;
+            // Doosri layer: bill par baqi dikhe magar supplier ka khata saaf ho
+            // to paisa bahar nahi jana chahiye.
+            if ($amount > (int) $supplier->balance) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Is supplier ka baqi sirf '.Money::format(max((int) $supplier->balance, 0)).' hai, us se zyada nahi diya ja sakta.',
+                ]);
+            }
             $payment = Payment::create([
                 'reference' => Sequence::next('PAY'),
                 'direction' => Payment::PAYMENT,
@@ -354,6 +362,11 @@ class PaymentService
             // Minus balance = jo paisa hum ne pakad rakha hai.
             $customer->decrement('balance', $amount);
 
+            // Agar is waqt koi bill khula para hai to advance usi par lagta hai,
+            // warna customers.balance aur sales.balance alag alag kahani kehte
+            // hain aur beech ka paisa na wasool hota hai na wapas.
+            $this->allocator->rebuild($customer->refresh());
+
             $cashAccount = CashAccountResolver::code($data['method'] ?? 'cash');
             $this->ledger->post(
                 $data['payment_date'],
@@ -486,6 +499,9 @@ class PaymentService
         // us ka supplier bill total_cost se kam hai, aur wo SQL column nahi.
         $purchases = MaterialPurchase::with('trip')
             ->where('supplier_id', $supplier->getKey())
+            // supplierBill() hamesha total_cost se kam ya barabar hoti hai, is
+            // liye ye sasta SQL filter kuch chhorta nahi, bas kaam ghata deta hai.
+            ->whereColumn('paid_amount', '<', 'total_cost')
             ->orderBy('purchase_date')
             ->orderBy('created_at')
             ->get()

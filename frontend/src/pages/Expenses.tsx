@@ -7,6 +7,7 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { Badge, Button, type Column, DataTable, Field, Input, MethodField, Modal, MoneyInput, Note, PageHeader, Select, StatTile } from '../components/ui'
+import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface Expense {
   id: string
@@ -81,7 +82,7 @@ export default function Expenses() {
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/expenses', p),
     onSuccess: () => {
-      ;['expenses', 'expenses/summary', 'dashboard', 'cash-book', 'accounting', 'payments'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+      MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setCreating(false)
     },
   })

@@ -176,6 +176,114 @@ class CustomerAdvanceTest extends TestCase
         $this->assertSame(2500000, (int) $customer->fresh()->balance);
     }
 
+    public function test_an_advance_taken_while_a_bill_is_open_lands_on_that_bill(): void
+    {
+        $product = $this->readyProduct();
+        $customer = Customer::create(['name' => 'Haji Ashraf']);
+
+        // Bill pehle, advance baad me.
+        $sale = $this->sell($customer, $product, 300);
+        $this->assertSame(3000000, (int) $sale->balance);
+
+        app(PaymentService::class)->advanceFromCustomer($customer, [
+            'payment_date' => '2026-06-11', 'amount' => 10000000, 'method' => 'cash',
+        ]);
+
+        $sale->refresh();
+        $this->assertSame(3000000, (int) $sale->paid, 'Khula bill advance se chukna chahiye.');
+        $this->assertSame(0, (int) $sale->balance);
+        $this->assertSame('paid', $sale->status);
+        $this->assertSame(-7000000, (int) $customer->fresh()->balance);
+        // Invariant: sum(paid) == sum(total) - max(balance, 0)
+        $this->assertSame(3000000, (int) Sale::where('customer_id', $customer->id)->sum('paid'));
+    }
+
+    public function test_voiding_a_sale_resyncs_the_other_bills(): void
+    {
+        $product = $this->readyProduct();
+        $customer = Customer::create(['name' => 'Haji Ashraf']);
+
+        app(PaymentService::class)->advanceFromCustomer($customer, [
+            'payment_date' => '2026-06-01', 'amount' => 3000000, 'method' => 'cash',
+        ]);
+        $first = $this->sell($customer, $product, 200);   // Rs 20,000, advance se
+        $second = $this->sell($customer, $product, 200);  // Rs 20,000, Rs 10,000 advance + Rs 10,000 udhaar
+        $this->assertSame(1000000, (int) $second->fresh()->balance);
+
+        app(SaleService::class)->void($first);
+
+        // Freed advance must land on the bill that is still open.
+        $second->refresh();
+        $this->assertSame(2000000, (int) $second->paid);
+        $this->assertSame(0, (int) $second->balance);
+        $this->assertSame('paid', $second->status);
+        $this->assertSame(-1000000, (int) $customer->fresh()->balance, 'Rs 10,000 advance bacha.');
+    }
+
+    public function test_an_invoice_that_was_paid_by_a_receipt_cannot_be_deleted(): void
+    {
+        $product = $this->readyProduct();
+        $customer = Customer::create(['name' => 'Malik Traders']);
+        $sale = $this->sell($customer, $product, 200);
+
+        app(PaymentService::class)->receiveFromCustomer([
+            'customer_id' => $customer->id, 'payment_date' => '2026-06-11',
+            'amount' => 2000000, 'method' => 'cash',
+        ]);
+
+        $this->expectExceptionMessage('pehle wo payment reverse karein');
+        app(SaleService::class)->void($sale->fresh());
+    }
+
+    public function test_an_advance_settled_invoice_does_not_claim_cash_was_received(): void
+    {
+        $product = $this->readyProduct();
+        $customer = Customer::create(['name' => 'Haji Ashraf']);
+        app(PaymentService::class)->advanceFromCustomer($customer, [
+            'payment_date' => '2026-06-01', 'amount' => 10000000, 'method' => 'cash',
+        ]);
+
+        $sale = $this->sell($customer, $product, 300);
+
+        $this->assertNull($sale->payment_method, 'Counter par cash aaya hi nahi tha.');
+    }
+
+    public function test_cash_above_the_bill_is_refused_instead_of_being_swallowed(): void
+    {
+        $product = $this->readyProduct();
+        $customer = Customer::create(['name' => 'Sadiq Bhai']);
+
+        $this->expectExceptionMessage('Advance jama karein');
+        $this->sell($customer, $product, 100, 9999999);   // bill Rs 10,000, cash Rs 99,999
+    }
+
+    public function test_a_zero_bill_is_refused_in_plain_language(): void
+    {
+        $product = $this->readyProduct();
+        $customer = Customer::create(['name' => 'Sadiq Bhai']);
+
+        $this->expectExceptionMessage('Bill ka total sifar hai');
+        app(SaleService::class)->create([
+            'customer_id' => $customer->id, 'sale_date' => '2026-06-10', 'type' => 'credit',
+            'paid' => 0, 'discount' => 1000000,
+            'items' => [['product_id' => $product->id, 'quantity' => 100, 'unit_price' => 10000]],
+        ]);
+    }
+
+    public function test_a_customer_holding_an_advance_cannot_be_deleted(): void
+    {
+        $customer = Customer::create(['name' => 'Haji Ashraf']);
+        app(PaymentService::class)->advanceFromCustomer($customer, [
+            'payment_date' => '2026-06-01', 'amount' => 10000000, 'method' => 'cash',
+        ]);
+
+        $this->deleteJson("/api/v1/customers/{$customer->id}")
+            ->assertStatus(422)
+            ->assertJsonFragment(['customer' => ['Is customer ka Rs 100,000.00 advance hamare paas jama hai. Pehle wo adjust ya wapas karein, phir delete.']]);
+
+        $this->assertNotNull(Customer::find($customer->id));
+    }
+
     public function test_advance_needs_the_payments_receive_permission(): void
     {
         $customer = Customer::create(['name' => 'Gated']);

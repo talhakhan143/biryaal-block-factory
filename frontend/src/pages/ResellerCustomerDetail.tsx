@@ -10,6 +10,7 @@ import {
   OutstandingNote, RowActions, Spinner, StatTile, Table, Tabs,
 } from '../components/ui'
 import SaleInvoiceModal from '../components/SaleInvoiceModal'
+import { RESELLER_MONEY_KEYS } from '../lib/queryKeys'
 
 interface SaleItem { item_name?: string; unit?: string; quantity: number; unit_price: number; line_total: number }
 interface Sale {
@@ -61,8 +62,7 @@ export default function ResellerCustomerDetail() {
   const receive = useMutation({
     mutationFn: (payload: Record<string, unknown>) => api.post('/reseller/payments/receive', { ...payload, customer_id: id }),
     onSuccess: () => {
-      ;['reseller/customers', 'reseller/sales', 'reseller/payments', 'reseller/receivables', 'reseller/rentals', 'reseller/dashboard']
-        .forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+      RESELLER_MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setReceiving(false)
     },
   })
