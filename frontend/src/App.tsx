@@ -18,6 +18,7 @@ const Inventory = lazy(() => import('./pages/Inventory'))
 const Purchases = lazy(() => import('./pages/Purchases'))
 const RawMaterials = lazy(() => import('./pages/RawMaterials'))
 const Suppliers = lazy(() => import('./pages/Suppliers'))
+const SupplierDetail = lazy(() => import('./pages/SupplierDetail'))
 const Customers = lazy(() => import('./pages/Customers'))
 const CustomerDetail = lazy(() => import('./pages/CustomerDetail'))
 const Payments = lazy(() => import('./pages/Payments'))
@@ -26,7 +27,9 @@ const CashBook = lazy(() => import('./pages/CashBook'))
 const TrialBalance = lazy(() => import('./pages/TrialBalance'))
 const Dispatch = lazy(() => import('./pages/Dispatch'))
 const Transport = lazy(() => import('./pages/Transport'))
+const MaterialTransport = lazy(() => import('./pages/MaterialTransport'))
 const Drivers = lazy(() => import('./pages/Drivers'))
+const DriverDetail = lazy(() => import('./pages/DriverDetail'))
 const Vehicles = lazy(() => import('./pages/Vehicles'))
 const Labour = lazy(() => import('./pages/Labour'))
 const Staff = lazy(() => import('./pages/Staff'))
@@ -82,13 +85,16 @@ export default function App() {
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/dispatch" element={<Dispatch />} />
           <Route path="/transport" element={<Transport />} />
+          <Route path="/material-transport" element={<MaterialTransport />} />
           <Route path="/drivers" element={<Drivers />} />
+          <Route path="/drivers/:id" element={<DriverDetail />} />
           <Route path="/vehicles" element={<Vehicles />} />
           <Route path="/labour" element={<Labour />} />
           <Route path="/staff" element={<Staff />} />
           <Route path="/purchases" element={<Purchases />} />
           <Route path="/materials" element={<RawMaterials />} />
           <Route path="/suppliers" element={<Suppliers />} />
+          <Route path="/suppliers/:id" element={<SupplierDetail />} />
           <Route path="/customers" element={<Customers />} />
           <Route path="/customers/:id" element={<CustomerDetail />} />
           <Route path="/payments" element={<Payments />} />

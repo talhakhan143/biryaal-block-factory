@@ -6,10 +6,10 @@ use App\Models\Account;
 use App\Models\Adjustment;
 use App\Models\Customer;
 use App\Models\Dispatch;
-use App\Models\JournalLine;
 use App\Models\Payment;
 use App\Models\Sale;
 use App\Models\SalesReturn;
+use App\Services\Accounting\PartyStatement;
 use Illuminate\Support\Collection;
 
 /**
@@ -25,6 +25,8 @@ use Illuminate\Support\Collection;
  */
 class CustomerHistoryService
 {
+    public function __construct(private PartyStatement $statement) {}
+
     /**
      * Factory statement rows, oldest first, each carrying the running balance
      * after it.
@@ -58,43 +60,20 @@ class CustomerHistoryService
      */
     private function ledgerRows(Collection $sales, Collection $receipts, Collection $returns, Collection $adjustments): array
     {
-        // Har document type ke apne ids, taake (source_type, source_id) ka jorh
-        // theek match ho aur kisi doosray document ki row na aa jaye.
-        $docs = [
+        return $this->statement->rows(Account::RECEIVABLE, $this->docs($sales, $receipts, $returns, $adjustments), 'debit');
+    }
+
+    /**
+     * @return array<class-string,array{0:string,1:Collection}>
+     */
+    private function docs(Collection $sales, Collection $receipts, Collection $returns, Collection $adjustments): array
+    {
+        return [
             Sale::class => ['sale', $sales->pluck('invoice_no', 'id')],
             Payment::class => ['receipt', $receipts->pluck('reference', 'id')],
             SalesReturn::class => ['return', $returns->pluck('reference', 'id')],
             Adjustment::class => ['adjustment', $adjustments->pluck('reference', 'id')],
         ];
-
-        $lines = $this->linesOn([Account::RECEIVABLE], $docs, 'entry:id,reference,entry_date,description,source_type,source_id,created_at')
-            ->filter(fn (JournalLine $l) => $l->entry !== null)
-            // Date pehle, phir jis tarteeb se post hui. Dono ko aik string me
-            // jorh kar sort karte hain taake aik hi din ki rows bhi stable rahen.
-            ->sortBy(fn (JournalLine $l) => $l->entry->entry_date?->toDateString().'|'.$l->entry->created_at?->format('YmdHisu'))
-            ->values();
-
-        $running = 0;
-
-        return $lines->map(function (JournalLine $line) use (&$running, $docs) {
-            $entry = $line->entry;
-            [$type, $ids] = $docs[$entry->source_type] ?? ['other', collect()];
-            $debit = (int) $line->debit;
-            $credit = (int) $line->credit;
-            $running += $debit - $credit;
-
-            return [
-                'date' => $entry->entry_date?->toDateString(),
-                'type' => $type,
-                'reference' => $ids->get($entry->source_id) ?? $entry->reference,
-                'journal_ref' => $entry->reference,
-                'description' => $entry->description,
-                'debit' => $debit,
-                'credit' => $credit,
-                'running' => $running,
-                'link_id' => $entry->source_id,
-            ];
-        })->all();
     }
 
     /** Full dossier: KPIs, the factory statement, and every document behind it. */
@@ -106,13 +85,8 @@ class CustomerHistoryService
         $adjustments = $this->adjustments($customer);
         $dispatches = $this->dispatches($customer);
 
-        $docs = [
-            Sale::class => ['sale', $sales->pluck('invoice_no', 'id')],
-            Payment::class => ['receipt', $receipts->pluck('reference', 'id')],
-            SalesReturn::class => ['return', $returns->pluck('reference', 'id')],
-            Adjustment::class => ['adjustment', $adjustments->pluck('reference', 'id')],
-        ];
-        $ledger = $this->ledgerRows($sales, $receipts, $returns, $adjustments);
+        $docs = $this->docs($sales, $receipts, $returns, $adjustments);
+        $ledger = $this->statement->rows(Account::RECEIVABLE, $docs, 'debit');
         $computed = $ledger === [] ? 0 : (int) end($ledger)['running'];
         $stored = (int) $customer->balance;
 
@@ -135,7 +109,8 @@ class CustomerHistoryService
                         ->sum(fn (Sale $s) => (int) $s->items->sum('quantity')),
                     'credit_sales_count' => $sales->where('type', 'credit')->count(),
                     'credit_total' => (int) $sales->where('type', 'credit')->sum('total'),
-                    'received' => $this->cashReceived($docs),
+                    // Cash ki legs se, documents ke paid column se nahi: wo badalta rehta hai.
+                    'received' => $this->statement->net([Account::CASH, Account::BANK], $docs, 'debit'),
                     'returned' => (int) $returns->sum('refund_amount'),
                     'adjustments' => (int) $adjustments->sum(fn (Adjustment $a) => $a->mode === 'customer_charge' ? (int) $a->amount : -(int) $a->amount),
                     'dispatch_count' => $dispatches->count(),
@@ -159,49 +134,6 @@ class CustomerHistoryService
             'adjustments' => $adjustments,
             'dispatches' => $dispatches,
         ];
-    }
-
-    /**
-     * Journal lines on the given accounts that belong to this customer's own
-     * documents. `$docs` maps a model class to [label, id => reference].
-     *
-     * @param  string[]  $codes
-     * @param  array<class-string,array{0:string,1:Collection}>  $docs
-     * @return Collection<int,JournalLine>
-     */
-    private function linesOn(array $codes, array $docs, ?string $with = null): Collection
-    {
-        $accounts = Account::whereIn('code', $codes)->pluck('id');
-        $live = array_filter($docs, fn (array $d) => $d[1]->isNotEmpty());
-        if ($accounts->isEmpty() || $live === []) {
-            return collect();
-        }
-
-        return JournalLine::query()
-            ->when($with, fn ($q, $w) => $q->with($w))
-            ->whereIn('account_id', $accounts)
-            ->where(function ($q) use ($live) {
-                foreach ($live as $class => [, $ids]) {
-                    $q->orWhereHas('entry', fn ($e) => $e->where('source_type', $class)->whereIn('source_id', $ids->keys()));
-                }
-            })
-            ->get();
-    }
-
-    /**
-     * Cash that actually came in from this customer, net of cash/bank refunds.
-     *
-     * Read off the Cash and Bank legs rather than added up from the documents:
-     * a sale's `paid` column keeps growing as later receipts are allocated back
-     * onto it, so sales.paid + receipts would count the same rupee twice.
-     *
-     * @param  array<class-string,array{0:string,1:Collection}>  $docs
-     */
-    private function cashReceived(array $docs): int
-    {
-        $lines = $this->linesOn([Account::CASH, Account::BANK], $docs);
-
-        return (int) $lines->sum('debit') - (int) $lines->sum('credit');
     }
 
     /** @return Collection<int,Sale> */

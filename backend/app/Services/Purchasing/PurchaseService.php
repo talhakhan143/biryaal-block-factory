@@ -7,6 +7,7 @@ use App\Models\Driver;
 use App\Models\MaterialPurchase;
 use App\Models\RawMaterial;
 use App\Models\Supplier;
+use App\Models\TransportTrip;
 use App\Services\Accounting\CashAccountResolver;
 use App\Services\Accounting\LedgerService;
 use App\Services\Transport\TransportService;
@@ -110,6 +111,7 @@ class PurchaseService
                     'driver_id' => $driverId,
                     'vehicle_label' => trim(($driver?->vehicle_name ?? '').' '.($driver?->vehicle_plate ?? '')) ?: null,
                     'material_purchase_id' => $purchase->id,
+                    'kind' => TransportTrip::INBOUND,
                     'trip_date' => $data['purchase_date'],
                     'to_location' => 'Factory',
                     'rate' => $freight,

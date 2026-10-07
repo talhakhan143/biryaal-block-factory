@@ -4,15 +4,19 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\MaterialPurchaseResource;
+use App\Http\Resources\PaymentResource;
 use App\Http\Resources\SupplierResource;
-use App\Models\MaterialPurchase;
 use App\Models\Payment;
 use App\Models\Supplier;
+use App\Services\Suppliers\SupplierHistoryService;
 use Illuminate\Http\Request;
 
 class SupplierController extends Controller
 {
     use HasTableQuery;
+
+    public function __construct(private SupplierHistoryService $history) {}
 
     public function index(Request $request)
     {
@@ -52,43 +56,38 @@ class SupplierController extends Controller
         return response()->noContent();
     }
 
-    /** Combined statement: purchases (debit to us) and payments (credit). */
+    /**
+     * Supplier statement: har wo cheez jo hamare dene ko hilati hai (bills,
+     * payments, manual adjustments), running total ke sath.
+     */
     public function ledger(Supplier $supplier)
     {
-        // Supplier ke khate me sirf wahi raqam jo usay deni hai. Agar kiraya
-        // driver ko gaya to wo is me se nikal jata hai, warna khate ka jorh
-        // upar likhe balance se match hi nahi karta.
-        $purchases = $supplier->purchases()->with('trip')->get()->map(function (MaterialPurchase $p) {
-            $bill = $p->supplierBill();
-            $freight = (int) $p->total_cost - $bill;
-
-            return [
-                'date' => $p->purchase_date->toDateString(),
-                'type' => 'purchase',
-                'reference' => $p->reference,
-                'description' => $freight > 0
-                    ? 'Material purchase (kiraya driver ko gaya)'
-                    : 'Material purchase',
-                'credit' => $bill,   // increases payable
-                'debit' => 0,
-            ];
-        });
-
-        $payments = $supplier->payments()->get()->map(fn (Payment $p) => [
-            'date' => $p->payment_date->toDateString(),
-            'type' => 'payment',
-            'reference' => $p->reference,
-            'description' => 'Payment made',
-            'credit' => 0,
-            'debit' => (int) $p->amount,        // reduces payable
-        ]);
-
-        $rows = $purchases->concat($payments)->sortBy('date')->values();
-
         return response()->json([
             'supplier' => new SupplierResource($supplier),
             'balance' => (int) $supplier->balance,
-            'rows' => $rows,
+            'rows' => $this->history->ledger($supplier),
+        ]);
+    }
+
+    /** Poori history: KPIs, khata, aur har bill aur payment jo us ke peechay hai. */
+    public function history(Supplier $supplier)
+    {
+        $data = $this->history->history($supplier);
+
+        return response()->json([
+            'supplier' => new SupplierResource($data['supplier']),
+            'summary' => $data['summary'],
+            'ledger' => $data['ledger'],
+            'purchases' => MaterialPurchaseResource::collection($data['purchases']),
+            'payments' => PaymentResource::collection($data['payments']),
+            'adjustments' => $data['adjustments']->map(fn ($a) => [
+                'id' => $a->id,
+                'reference' => $a->reference,
+                'mode' => $a->mode,
+                'adjustment_date' => $a->adjustment_date?->toDateString(),
+                'amount' => (int) $a->amount,
+                'reason' => $a->reason,
+            ])->values(),
         ]);
     }
 

@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { BookText, Coins, Trash2, Wallet } from 'lucide-react'
+import { ArrowRight, BookText, Coins, Trash2, Wallet } from 'lucide-react'
 import { AdvanceForm, Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, Table, useConfirm } from '../components/ui'
 
 interface Driver {
@@ -19,6 +20,7 @@ interface Driver {
 
 export default function Drivers() {
   const { can } = useAuth()
+  const navigate = useNavigate()
   const confirm = useConfirm()
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
@@ -44,8 +46,10 @@ export default function Drivers() {
     { key: 'balance', label: 'Dues / Advance', sortable: true, align: 'right', render: (d) => d.balance > 0 ? <Badge color="red">{formatPaisa(d.balance)}</Badge> : d.balance < 0 ? <Badge color="blue">Advance {formatPaisa(-d.balance)}</Badge> : <Badge color="green">Settled</Badge> },
     {
       key: 'actions', label: '', align: 'right', render: (d) => (
+        <div onClick={(e) => e.stopPropagation()}>
         <RowActions>
-          <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(d.id)} />
+          <IconButton icon={BookText} label="Khata (quick)" onClick={() => setLedgerId(d.id)} />
+          <IconButton icon={ArrowRight} label="Poori history" tone="primary" onClick={() => navigate(`/drivers/${d.id}`)} />
           {can('payments.manage') && <IconButton icon={Wallet} label="Pay driver" tone="primary" onClick={() => setPayId(d.id)} />}
           {can('payments.manage') && <IconButton icon={Coins} label="Advance dein" tone="amber" onClick={() => setAdvanceId(d.id)} />}
           {can('transport.delete') && (
@@ -54,6 +58,7 @@ export default function Drivers() {
             }} />
           )}
         </RowActions>
+        </div>
       ),
     },
   ]
@@ -78,7 +83,7 @@ export default function Drivers() {
 
   return (
     <div>
-      <PageHeader title="Drivers" subtitle="Driver ka baqi aur payment" actions={can('transport.manage') && <Button onClick={() => setCreating(true)}>+ Driver</Button>} />
+      <PageHeader title="Drivers" subtitle="Kisi bhi naam par click karein, poori history khul jayegi. Driver ka baqi aur payment" actions={can('transport.manage') && <Button onClick={() => setCreating(true)}>+ Driver</Button>} />
       <DataTable
         columns={columns}
         rows={data?.data}
@@ -93,6 +98,7 @@ export default function Drivers() {
         meta={data?.meta}
         page={page}
         onPage={setPage}
+        onRowClick={(d) => navigate(`/drivers/${d.id}`)}
       />
       {creating && (
         <Modal title="New Driver" onClose={() => setCreating(false)}>

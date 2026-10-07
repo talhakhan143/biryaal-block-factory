@@ -5,7 +5,7 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { Wallet } from 'lucide-react'
-import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, Note, OutstandingNote, PageHeader, RowActions, Select } from '../components/ui'
 import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface FreightDriver {
@@ -153,11 +153,9 @@ function PayBillForm({ outstanding, onSubmit, busy, error }: { outstanding: numb
 function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
   const suppliers = useList<{ id: string; name: string }>('suppliers', { per_page: 100 })
   const materials = useList<{ id: string; name: string; unit: string }>('raw-materials', { per_page: 100 })
-  const drivers = useList<{ id: string; name: string; vehicle_name?: string }>('drivers', { per_page: 100 })
   const [form, setForm] = useState({
     supplier_id: '', raw_material_id: '', purchase_date: new Date().toISOString().slice(0, 10),
-    quantity: '', unit_cost: '', transport_cost: '0', loading_cost: '0', unloading_cost: '0', paid_amount: '0',
-    driver_id: '', trip_paid: '0', method: 'cash', bank_ref: '',
+    quantity: '', unit_cost: '', loading_cost: '0', unloading_cost: '0', paid_amount: '0', method: 'cash', bank_ref: '',
   })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
 
@@ -166,11 +164,9 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
   const qty = Number(form.quantity) || 0
   const unit = Number(form.unit_cost) || 0
   const goods = qty * unit
-  const extras = (Number(form.transport_cost) || 0) + (Number(form.loading_cost) || 0) + (Number(form.unloading_cost) || 0)
+  const extras = (Number(form.loading_cost) || 0) + (Number(form.unloading_cost) || 0)
   const total = goods + extras
-  // Driver diya ho to kiraya uska, supplier ka bill utna kam.
-  const toDriver = form.driver_id ? (Number(form.transport_cost) || 0) : 0
-  const supplierBill = total - toDriver
+  const supplierBill = total
   const paid = Number(form.paid_amount) || 0
   const remaining = supplierBill - paid
   const overpaid = paid > supplierBill && supplierBill > 0
@@ -184,12 +180,9 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
           ...form,
           quantity: Number(form.quantity),
           unit_cost: Number(form.unit_cost),
-          transport_cost: Number(form.transport_cost),
           loading_cost: Number(form.loading_cost),
           unloading_cost: Number(form.unloading_cost),
           paid_amount: Number(form.paid_amount),
-          driver_id: form.driver_id || null,
-          trip_paid: form.driver_id ? Number(form.trip_paid) : undefined,
         })
       }}
       className="space-y-3"
@@ -210,44 +203,23 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
         <Field label="Date"><Input type="date" value={form.purchase_date} onChange={(e) => set('purchase_date', e.target.value)} required /></Field>
         <Field label="Quantity"><Input type="number" step="0.001" value={form.quantity} onChange={(e) => set('quantity', e.target.value)} required /></Field>
         <Field label="Unit cost (Rs)"><MoneyInput value={form.unit_cost} onChange={(v) => set('unit_cost', v)} required /></Field>
-        <Field label="Transport (Rs, total)"><MoneyInput value={form.transport_cost} onChange={(v) => set('transport_cost', v)} /></Field>
         <Field label="Loading (Rs, total)"><MoneyInput value={form.loading_cost} onChange={(v) => set('loading_cost', v)} /></Field>
         <Field label="Unloading (Rs, total)"><MoneyInput value={form.unloading_cost} onChange={(v) => set('unloading_cost', v)} /></Field>
         <Field label="Paid now (Rs)"><MoneyInput value={form.paid_amount} onChange={(v) => set('paid_amount', v)} /></Field>
       </div>
 
-      {/* Maal laane wala driver. Dispatch ki tarah yahan bhi uska kiraya chalta hai. */}
-      <div className="rounded-lg border p-3" style={{ borderColor: 'var(--border)' }}>
-        <Field label="Maal kaun laaya? (marzi se)">
-          <Select value={form.driver_id} onChange={(e) => set('driver_id', e.target.value)}>
-            <option value="">Koi driver nahi, kiraya supplier ke bill me</option>
-            {drivers.data?.data.map((d) => <option key={d.id} value={d.id}>{d.name}{d.vehicle_name ? ` (${d.vehicle_name})` : ''}</option>)}
-          </Select>
-        </Field>
-        {form.driver_id && (
-          <div className="mt-3 space-y-2">
-            <Field label="Driver ko abhi diya (Rs)"><MoneyInput value={form.trip_paid} onChange={(v) => set('trip_paid', v)} /></Field>
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>
-              Upar wala <strong>Transport (Rs, total)</strong> hi is driver ka kiraya hai. Baqi uske khate me
-              chala jayega aur Drivers ya Transport se kabhi bhi diya ja sakta hai. Supplier ke bill me kiraya nahi jayega.
-            </p>
-          </div>
-        )}
-      </div>
+      <Note>
+        Maal laane ka kiraya yahan nahi likha jata. Wo <strong>Maal ka Kiraya</strong> wale page par
+        driver ke naam se likhein, taake uska hisaab aur payment aik hi jagah rahe.
+      </Note>
 
       {/* Live bill total */}
       <div className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
         <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Maal ({qty || 0} × {rs(unit)})</span><span>{rs(goods)}</span></div>
-        <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Transport + loading + unloading</span><span>{rs(extras)}</span></div>
+        <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Loading + unloading</span><span>{rs(extras)}</span></div>
         <div className="mt-1 flex justify-between border-t pt-1 text-base font-bold" style={{ borderColor: 'var(--border)' }}>
           <span>Maal ki kul lagat</span><span style={{ color: 'var(--primary)' }}>{rs(total)}</span>
         </div>
-        {toDriver > 0 && (
-          <>
-            <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Is me se driver ka kiraya</span><span>{rs(toDriver)}</span></div>
-            <div className="flex justify-between font-semibold"><span>Supplier ko dena</span><span>{rs(supplierBill)}</span></div>
-          </>
-        )}
         {paid > 0 && (
           <>
             <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Abhi diya</span><span>{rs(paid)}</span></div>

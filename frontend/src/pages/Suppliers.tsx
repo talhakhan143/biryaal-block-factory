@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { BookText, Power, PowerOff, Trash2 } from 'lucide-react'
+import { ArrowRight, BookText, Power, PowerOff, Trash2 } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, Modal, PageHeader, RowActions, Spinner, Table, useConfirm } from '../components/ui'
 
 interface Supplier {
@@ -18,6 +19,7 @@ interface Supplier {
 
 export default function Suppliers() {
   const { can } = useAuth()
+  const navigate = useNavigate()
   const confirm = useConfirm()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
@@ -63,8 +65,10 @@ export default function Suppliers() {
     { key: 'is_active', label: 'Status', sortable: true, render: (s) => (s.is_active ? <Badge color="green">Active</Badge> : <Badge color="amber">Off</Badge>) },
     {
       key: 'actions', label: '', align: 'right', render: (s) => (
+        <div onClick={(e) => e.stopPropagation()}>
         <RowActions>
-          <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(s.id)} />
+          <IconButton icon={BookText} label="Khata (quick)" onClick={() => setLedgerId(s.id)} />
+          <IconButton icon={ArrowRight} label="Poori history" tone="primary" onClick={() => navigate(`/suppliers/${s.id}`)} />
           {can('suppliers.manage') && (
             <IconButton icon={s.is_active ? PowerOff : Power} label={s.is_active ? 'Deactivate' : 'Activate'} tone="amber" onClick={() => toggle.mutate(s)} />
           )}
@@ -74,6 +78,7 @@ export default function Suppliers() {
             }} />
           )}
         </RowActions>
+        </div>
       ),
     },
   ]
@@ -82,7 +87,7 @@ export default function Suppliers() {
     <div>
       <PageHeader
         title="Suppliers"
-        subtitle="Maal walay — jin se kacha maal lete hain"
+        subtitle="Kisi bhi naam par click karein, poori history khul jayegi. Maal walay — jin se kacha maal lete hain"
         actions={can('suppliers.manage') && <Button onClick={() => setCreating(true)}>+ Supplier</Button>}
       />
 
@@ -100,6 +105,7 @@ export default function Suppliers() {
         meta={data?.meta}
         page={page}
         onPage={setPage}
+        onRowClick={(s) => navigate(`/suppliers/${s.id}`)}
       />
 
       {creating && (

@@ -24,6 +24,7 @@ class TransportController extends Controller
         $trips = TransportTrip::query()
             ->with(['vehicle', 'driver'])
             ->when($request->driver_id, fn ($q, $id) => $q->where('driver_id', $id))
+            ->when($request->kind, fn ($q, $k) => $q->where('kind', $k))
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
             ->when($request->search, fn ($q, $s) => $q->where(function ($q) use ($s) {
                 $q->where('reference', 'like', "%{$s}%")
@@ -43,6 +44,8 @@ class TransportController extends Controller
             'vehicle_id' => ['nullable', 'uuid', 'exists:vehicles,id'],
             'driver_id' => ['required', 'uuid', 'exists:drivers,id'],
             'dispatch_id' => ['nullable', 'uuid', 'exists:dispatches,id'],
+            'material_purchase_id' => ['nullable', 'uuid', 'exists:material_purchases,id'],
+            'kind' => ['nullable', 'in:in,out'],
             'trip_date' => ['required', 'date'],
             'from_location' => ['nullable', 'string', 'max:255'],
             'to_location' => ['nullable', 'string', 'max:255'],

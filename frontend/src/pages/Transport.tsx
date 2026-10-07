@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Wallet } from 'lucide-react'
+import { ArrowRight, Wallet } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
@@ -10,8 +11,9 @@ import { Badge, Button, type Column, DataTable, Field, IconButton, Input, Method
 interface Trip {
   id: string
   reference: string
+  kind?: string
   vehicle_label?: string
-  driver?: { name: string }
+  driver?: { id: string; name: string }
   trip_date: string
   rate: number
   paid: number
@@ -23,6 +25,7 @@ const statusColor: Record<string, string> = { paid: 'green', partial: 'amber', u
 
 export default function Transport() {
   const { can } = useAuth()
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
@@ -50,15 +53,23 @@ export default function Transport() {
     { key: 'trip_date', label: 'Date', sortable: true, render: (t) => t.trip_date },
     { key: 'vehicle', label: 'Vehicle', render: (t) => t.vehicle_label ?? '—' },
     { key: 'driver', label: 'Driver', render: (t) => t.driver?.name ?? '—' },
+    { key: 'kind', label: 'Simt', render: (t) => <Badge color={t.kind === 'in' ? 'amber' : 'blue'}>{t.kind === 'in' ? 'Maal laaya' : 'Maal bheja'}</Badge> },
     { key: 'rate', label: 'Rate', sortable: true, align: 'right', render: (t) => formatPaisa(t.rate) },
     { key: 'paid', label: 'Paid', sortable: true, align: 'right', render: (t) => formatPaisa(t.paid) },
     { key: 'balance', label: 'Balance', sortable: true, align: 'right', render: (t) => formatPaisa(t.balance) },
     { key: 'status', label: 'Status', sortable: true, render: (t) => <Badge color={statusColor[t.status]}>{t.status}</Badge> },
     {
       key: 'actions', label: '', align: 'right', render: (t) => (
-        can('payments.manage') && t.status !== 'paid' && t.driver
-          ? <RowActions><IconButton icon={Wallet} label="Pay" tone="primary" onClick={() => setPayFor(t)} /></RowActions>
-          : null
+        <div onClick={(e) => e.stopPropagation()}>
+          <RowActions>
+            {can('payments.manage') && t.status !== 'paid' && t.driver && (
+              <IconButton icon={Wallet} label="Pay" tone="primary" onClick={() => setPayFor(t)} />
+            )}
+            {t.driver && (
+              <IconButton icon={ArrowRight} label="Driver ki poori history" tone="primary" onClick={() => navigate(`/drivers/${t.driver!.id}`)} />
+            )}
+          </RowActions>
+        </div>
       ),
     },
   ]
@@ -80,6 +91,7 @@ export default function Transport() {
         meta={data?.meta}
         page={page}
         onPage={setPage}
+        onRowClick={(t) => t.driver && navigate(`/drivers/${t.driver.id}`)}
       />
       {payFor && (
         <Modal title={`Pay Driver — ${payFor.reference}`} onClose={() => setPayFor(null)}>

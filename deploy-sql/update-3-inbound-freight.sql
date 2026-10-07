@@ -12,7 +12,10 @@
 --    ye file choose karein > Go.
 --
 --  KYA KARTI HAI
---    `transport_trips` me aik naya nullable column `material_purchase_id`
+--    `transport_trips` me do naye column: `material_purchase_id` aur `kind`.
+--    Pehla batata hai trip kis purchase ki hai, doosra ye ke trip maal laane
+--    ki hai ya bhejne ki.
+--    (purana matn) `transport_trips` me aik naya nullable column `material_purchase_id`
 --    daalti hai. Isi se pata chalta hai ke ye trip maal LAANE ki hai
 --    (purchase se judi) ya maal BHEJNE ki (dispatch se judi).
 --    Purani saari rows me ye khali rahega, yani un par koi asar nahi.
@@ -76,9 +79,34 @@ SET @sql := (
 );
 PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
--- 4) Laravel ka migrations register bhi update kar dein, taake aage
+-- 4) `kind` column: trip maal LAANE ki hai ya BHEJNE ki.
+SET @sql := (
+  SELECT IF(
+    EXISTS (
+      SELECT 1 FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'transport_trips' AND COLUMN_NAME = 'kind'
+    ),
+    'SELECT ''kind column already there, skipped'' AS note',
+    'ALTER TABLE `transport_trips` ADD COLUMN `kind` VARCHAR(255) NOT NULL DEFAULT ''out'' AFTER `material_purchase_id`'
+  )
+);
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- Jo trip kisi purchase se judi hai wo maal laane ki hai. Baqi sab 'out',
+-- jo ke wo waqai hain.
+UPDATE `transport_trips` SET `kind` = 'in' WHERE `material_purchase_id` IS NOT NULL;
+
+-- 5) Laravel ka migrations register bhi update kar dein, taake aage
 --    chal kar `artisan migrate` ye migration dobara chalane ki koshish
 --    na kare.
+INSERT INTO `migrations` (`migration`, `batch`)
+SELECT '2026_10_07_120000_add_kind_to_transport_trips',
+       COALESCE((SELECT MAX(b.batch) FROM (SELECT batch FROM `migrations`) b), 0) + 1
+WHERE NOT EXISTS (
+  SELECT 1 FROM (SELECT migration FROM `migrations`) m
+  WHERE m.migration = '2026_10_07_120000_add_kind_to_transport_trips'
+);
+
 INSERT INTO `migrations` (`migration`, `batch`)
 SELECT '2026_10_07_090000_add_material_purchase_to_transport_trips',
        COALESCE((SELECT MAX(b.batch) FROM (SELECT batch FROM `migrations`) b), 0) + 1

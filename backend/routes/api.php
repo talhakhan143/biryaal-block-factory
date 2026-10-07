@@ -60,6 +60,7 @@ Route::prefix('v1')->group(function () {
             Route::get('suppliers', [SupplierController::class, 'index']);
             Route::get('suppliers/{supplier}', [SupplierController::class, 'show']);
             Route::get('suppliers/{supplier}/ledger', [SupplierController::class, 'ledger']);
+            Route::get('suppliers/{supplier}/history', [SupplierController::class, 'history']);
         });
         Route::middleware('permission:suppliers.manage')->group(function () {
             Route::post('suppliers', [SupplierController::class, 'store']);
@@ -161,6 +162,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:transport.view')->group(function () {
             Route::get('drivers', [DriverController::class, 'index']);
             Route::get('drivers/{driver}/ledger', [DriverController::class, 'ledger']);
+            Route::get('drivers/{driver}/history', [DriverController::class, 'history']);
         });
         Route::middleware('permission:transport.manage')->group(function () {
             Route::post('drivers', [DriverController::class, 'store']);

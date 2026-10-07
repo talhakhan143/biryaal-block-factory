@@ -56,6 +56,7 @@ const FACTORY_GROUPS: NavGroup[] = [
     en: 'Purchases', ur: 'خریداری',
     items: [
       { to: '/purchases', en: 'Purchases', ur: 'مال خریدنا', permission: 'purchases.view', icon: ClipboardList },
+      { to: '/material-transport', en: 'Maal ka Kiraya', ur: 'مال لانے کا کرایہ', permission: 'transport.view', icon: Truck },
       { to: '/suppliers', en: 'Suppliers', ur: 'سپلائر', permission: 'suppliers.view', icon: Users },
     ],
   },
