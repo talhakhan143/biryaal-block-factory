@@ -4,12 +4,14 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Coins, HandCoins, Printer, Wallet } from 'lucide-react'
-import { AdvanceForm, Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Select, Spinner, Table } from '../components/ui'
+import { Coins, HandCoins, Printer, SquarePen, Undo2, Wallet } from 'lucide-react'
+import { AdvanceForm, Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Select, Spinner, Table, useConfirm } from '../components/ui'
 import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
 
 interface Payment extends PaymentDoc {
   id: string
+  /** Jo paisa kisi aik bill se juda ho usay yahan se nahi chheda ja sakta. */
+  can_rollback?: boolean
 }
 
 interface Party { id: string; name: string; balance: number }
@@ -34,6 +36,8 @@ const typeLabel: Record<PayableType, string> = { supplier: 'Supplier', driver: '
 export default function Payments() {
   const { can } = useAuth()
   const qc = useQueryClient()
+  const confirm = useConfirm()
+  const [editing, setEditing] = useState<Payment | null>(null)
   const [modal, setModal] = useState<'receipt' | 'supplier' | null>(null)
   const [preset, setPreset] = useState<string>('')
   const [settle, setSettle] = useState<Payable | null>(null)
@@ -64,7 +68,30 @@ export default function Payments() {
     { key: 'bank_ref', label: 'Bank / ref', render: (p) => <span className="text-xs" style={{ color: 'var(--muted)' }}>{p.bank_ref ?? '·'}</span> },
     {
       key: 'actions', label: '', align: 'right',
-      render: (p) => <RowActions><IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setReceipt(p)} /></RowActions>,
+      render: (p) => (
+        <RowActions>
+          <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setReceipt(p)} />
+          {can('payments.manage') && p.can_rollback && (
+            <IconButton icon={SquarePen} label="Rakam ya tareekh theek karein" tone="primary" onClick={() => setEditing(p)} />
+          )}
+          {can('payments.manage') && p.can_rollback && (
+            <IconButton icon={Undo2} label="Rollback (ye entry wapas lein)" tone="red" onClick={async () => {
+              const ok = await confirm({
+                title: `Rollback: ${p.reference}`,
+                message: (
+                  <>
+                    Ye entry poori wapas le li jayegi aur sab kuch pehle wali haalat par aa jayega:
+                    cash, bande ka khata aur jo bill is paise se chuke the wo dobara khul jayenge.
+                  </>
+                ),
+                confirmText: 'Rollback karein',
+                requireText: 'rollback',
+              })
+              if (ok) rollback.mutate(p.id)
+            }} />
+          )}
+        </RowActions>
+      ),
     },
   ]
   const recv = useList<Party>('customers', { has_dues: 1, page: recvPage })
@@ -92,6 +119,19 @@ export default function Payments() {
     mutationFn: ({ row, payload }: { row: Payable; payload: Record<string, unknown> }) =>
       api.post(payUrl(row), row.type === 'supplier' ? { supplier_id: row.id, ...payload } : payload),
     onSuccess: (res) => { invalidateAll(); setSettle(null); setReceipt(res.data.data) },
+  })
+
+  // Galat likhi hui entry wapas lena. Backend har figure pehle wali haalat par
+  // le aata hai, is liye yahan har mutalliqa screen refresh karna kaafi hai.
+  const rollback = useMutation({
+    mutationFn: (id: string) => api.delete(`/payments/${id}`),
+    onSuccess: () => invalidateAll(),
+    onError: (e) => alert(apiError(e)),
+  })
+
+  const editMut = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.patch(`/payments/${id}`, payload),
+    onSuccess: () => { invalidateAll(); setEditing(null) },
   })
 
   const topUpMut = useMutation({
@@ -241,6 +281,17 @@ export default function Payments() {
 
       {receipt && <PaymentReceipt payment={receipt} onClose={() => setReceipt(null)} />}
 
+      {editing && (
+        <Modal title={`Theek karein: ${editing.reference}`} onClose={() => setEditing(null)}>
+          <EditPaymentForm
+            payment={editing}
+            onSubmit={(payload) => editMut.mutate({ id: editing.id, payload })}
+            busy={editMut.isPending}
+            error={editMut.error ? apiError(editMut.error) : ''}
+          />
+        </Modal>
+      )}
+
       {topUp && (
         <Modal title={`Advance: ${topUp.name}`} onClose={() => setTopUp(null)}>
           <AdvanceForm
@@ -253,6 +304,39 @@ export default function Payments() {
         </Modal>
       )}
     </div>
+  )
+}
+
+/**
+ * Galat rakam ya tareekh theek karna. Reference wahi rehta hai jo parchi par
+ * bande ko diya ja chuka hai, sirf andar ka hisaab dobara lagta hai.
+ */
+function EditPaymentForm({ payment, onSubmit, busy, error }: { payment: Payment; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
+  const [form, setForm] = useState({
+    payment_date: payment.payment_date,
+    amount: String((payment.amount ?? 0) / 100),
+    method: payment.method ?? 'cash',
+    bank_ref: payment.bank_ref ?? '',
+  })
+  const set = (k: string, v: string) => setForm({ ...form, [k]: v })
+  const amt = Number(form.amount)
+  const bad = !Number.isFinite(amt) || amt <= 0
+
+  return (
+    <form
+      onSubmit={(e) => { e.preventDefault(); if (bad) return; onSubmit({ ...form, amount: amt }) }}
+      className="space-y-3"
+    >
+      <div className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+        <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Kis ka</span><span>{payment.party_name ?? '\u00b7'}</span></div>
+        <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Abhi likha hua</span><span>{formatPaisa(payment.amount ?? 0)}</span></div>
+      </div>
+      <Field label="Date"><Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} required /></Field>
+      <Field label="Amount (Rs)"><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} required /></Field>
+      <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
+      {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
+      <Button type="submit" disabled={busy || bad} className="w-full">{busy ? 'Saving\u2026' : 'Save karein'}</Button>
+    </form>
   )
 }
 

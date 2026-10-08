@@ -641,6 +641,12 @@ interface ConfirmOptions {
   confirmText?: string
   cancelText?: string
   tone?: 'danger' | 'primary'
+  /**
+   * Diya ho to bande ko ye lafz haath se likhna parega, warna confirm ka
+   * button dabta hi nahi. Un kaamon ke liye jo wapas nahi hote, taake
+   * galti se click na ho jaye.
+   */
+  requireText?: string
 }
 type ConfirmFn = (opts: ConfirmOptions) => Promise<boolean>
 const ConfirmContext = createContext<ConfirmFn>(async () => false)
@@ -658,11 +664,15 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const close = (val: boolean) => {
     state?.resolve(val)
     setState(null)
+    setTyped('')
   }
 
+  const [typed, setTyped] = useState('')
   const o = state?.opts
   const danger = (o?.tone ?? 'danger') === 'danger'
   const accent = danger ? 'var(--red)' : 'var(--primary)'
+  const needs = o?.requireText
+  const okToGo = !needs || typed.trim().toLowerCase() === needs.toLowerCase()
 
   return (
     <ConfirmContext.Provider value={confirm}>
@@ -686,9 +696,24 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 <div className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>{o?.message}</div>
               </div>
             </div>
+            {needs && (
+              <div className="mt-4">
+                <p className="mb-1.5 text-sm" style={{ color: 'var(--muted)' }}>
+                  Pakka karne ke liye niche <strong style={{ color: 'var(--text)' }}>{needs}</strong> likhein.
+                </p>
+                <Input
+                  value={typed}
+                  onChange={(e) => setTyped(e.target.value)}
+                  placeholder={needs}
+                  autoFocus
+                  autoComplete="off"
+                  onKeyDown={(e) => { if (e.key === 'Enter' && okToGo) close(true) }}
+                />
+              </div>
+            )}
             <div className="mt-6 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => close(false)}>{o?.cancelText ?? 'Cancel'}</Button>
-              <Button variant={danger ? 'danger' : 'primary'} onClick={() => close(true)}>{o?.confirmText ?? 'Confirm'}</Button>
+              <Button variant={danger ? 'danger' : 'primary'} disabled={!okToGo} onClick={() => close(true)}>{o?.confirmText ?? 'Confirm'}</Button>
             </div>
           </div>
         </div>

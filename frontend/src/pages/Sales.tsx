@@ -4,9 +4,10 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Eye, HandCoins, Trash2 } from 'lucide-react'
+import { Eye, HandCoins, Undo2 } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, useConfirm } from '../components/ui'
 import SaleInvoiceModal from '../components/SaleInvoiceModal'
+import { MONEY_KEYS } from '../lib/queryKeys'
 import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
 
 interface Sale {
@@ -55,8 +56,8 @@ export default function Sales() {
   const del = useMutation({
     mutationFn: (id: string) => api.delete(`/sales/${id}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sales'] })
-      qc.invalidateQueries({ queryKey: ['dispatches-pending'] })
+      // Rollback se customer ka khata, stock aur dashboard sab badalte hain.
+      ;[...MONEY_KEYS, 'customer-history', 'dispatches-pending'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
     },
     onError: (e) => alert(apiError(e)),
   })
@@ -78,8 +79,23 @@ export default function Sales() {
           )}
           <IconButton icon={Eye} label="View" tone="primary" onClick={() => setViewId(s.id)} />
           {can('sales.delete') && (
-            <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
-              if (await confirm({ title: 'Invoice delete karein?', message: `Invoice ${s.invoice_no} delete ho jayega. Stock wapas ready me chala jayega.`, confirmText: 'Delete' })) del.mutate(s.id)
+            <IconButton icon={Undo2} label="Rollback (ye bill wapas lein)" tone="red" onClick={async () => {
+              const ok = await confirm({
+                title: `Rollback: ${s.invoice_no}`,
+                message: (
+                  <>
+                    Ye bill poora wapas le liya jayega aur sab kuch pehle wali haalat par aa jayega:
+                    <br />block wapas ready stock me, customer ke khate se ye rakam wapas, aur khate me
+                    is bill ka hisaab khatam.
+                    <br /><br />
+                    Agar is bill par paisa mil chuka hai, challan ban chuka hai ya maal wapas aaya hai
+                    to system khud mana kar dega.
+                  </>
+                ),
+                confirmText: 'Rollback karein',
+                requireText: 'rollback',
+              })
+              if (ok) del.mutate(s.id)
             }} />
           )}
         </RowActions>

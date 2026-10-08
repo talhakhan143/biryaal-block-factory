@@ -5,6 +5,8 @@ namespace App\Services\Payments;
 use App\Models\Account;
 use App\Models\Customer;
 use App\Models\Driver;
+use App\Models\JournalEntry;
+use App\Models\JournalLine;
 use App\Models\MaterialPurchase;
 use App\Models\Payment;
 use App\Models\Sale;
@@ -524,6 +526,160 @@ class PaymentService
 
             $remaining -= $apply;
         }
+    }
+
+    /**
+     * Galat likhi hui payment ko wapas lena (rollback).
+     *
+     * Usool wahi hai jo baqi jagah hai: andaza mat lagao, khate se parho. Is
+     * payment ne party ke control account par jitna paisa hilaya tha utna hi
+     * wapas chadha dete hain, phir uski journal entry hata dete hain. Customer
+     * ka hisaab allocator khud dobara bana leta hai, is liye jo bills is paise
+     * se chuk gaye the wo wapas khul jate hain.
+     *
+     * Payment ka apna record Auditable hai, is liye kis ne kab rollback kiya
+     * wo audit log me mehfooz reh jata hai.
+     */
+    public function reverse(Payment $payment): void
+    {
+        DB::transaction(function () use ($payment) {
+            if ($payment->allocatable_id) {
+                throw new InvalidArgumentException(
+                    'Ye paisa kisi aik bill ke sath juda hua hai, is liye yahan se wapas nahi hota. Usi bill par ja kar handle karein.'
+                );
+            }
+
+            $party = $payment->party;
+            if (! $party) {
+                throw new InvalidArgumentException('Is payment ka banda hi nahi mila, rollback nahi ho sakta.');
+            }
+
+            $lines = JournalLine::query()
+                ->with('account')
+                ->whereHas('entry', fn ($q) => $q
+                    ->where('source_type', $payment->getMorphClass())
+                    ->where('source_id', $payment->id))
+                ->get();
+
+            // Customer ka hisaab 1100 par chalta hai, baqi sab ka 2000 par.
+            // Dono soorat me party ka balance utna hi NEECHE gaya tha jitna
+            // control account par hila, is liye wapas utna hi upar chadhega.
+            $isCustomer = $party instanceof Customer;
+            $code = $isCustomer ? Account::RECEIVABLE : Account::PAYABLE;
+            $moved = (int) $lines
+                ->filter(fn (JournalLine $l) => $l->account?->code === $code)
+                ->sum(fn (JournalLine $l) => $isCustomer
+                    ? (int) $l->credit - (int) $l->debit
+                    : (int) $l->debit - (int) $l->credit);
+
+            if ($moved !== 0) {
+                $party->increment('balance', $moved);
+            }
+
+            JournalEntry::where('source_type', $payment->getMorphClass())
+                ->where('source_id', $payment->id)
+                ->get()
+                ->each(function (JournalEntry $entry) {
+                    $entry->lines()->delete();
+                    $entry->delete();
+                });
+
+            $payment->delete();
+
+            if ($isCustomer) {
+                $this->allocator->rebuild($party->refresh());
+            }
+        });
+    }
+
+    /**
+     * Galat rakam ya galat tareekh theek karna.
+     *
+     * Rollback karke dobara likhne ke bajae wahi record badalte hain, taake
+     * parchi ka reference wahi rahe jo bande ko pehle de diya gaya tha. Andar
+     * se kaam wahi hota hai: purana asar hata kar naya lagana.
+     *
+     * @param  array{payment_date?:string,amount?:int,method?:string,bank_ref?:string,notes?:string}  $data
+     */
+    public function update(Payment $payment, array $data): Payment
+    {
+        return DB::transaction(function () use ($payment, $data) {
+            if ($payment->allocatable_id) {
+                throw new InvalidArgumentException(
+                    'Ye paisa kisi aik bill ke sath juda hua hai, is liye yahan se badla nahi ja sakta. Usi bill par ja kar handle karein.'
+                );
+            }
+
+            $party = $payment->party;
+            if (! $party) {
+                throw new InvalidArgumentException('Is payment ka banda hi nahi mila, tabdeeli nahi ho sakti.');
+            }
+
+            $amount = (int) ($data['amount'] ?? $payment->amount);
+            $this->assertPositive($amount);
+
+            $date = $data['payment_date'] ?? $payment->payment_date->toDateString();
+            $method = $data['method'] ?? $payment->method;
+            $isCustomer = $party instanceof Customer;
+
+            $lines = JournalLine::query()
+                ->with('account')
+                ->whereHas('entry', fn ($q) => $q
+                    ->where('source_type', $payment->getMorphClass())
+                    ->where('source_id', $payment->id))
+                ->get();
+            $code = $isCustomer ? Account::RECEIVABLE : Account::PAYABLE;
+            $moved = (int) $lines
+                ->filter(fn (JournalLine $l) => $l->account?->code === $code)
+                ->sum(fn (JournalLine $l) => $isCustomer
+                    ? (int) $l->credit - (int) $l->debit
+                    : (int) $l->debit - (int) $l->credit);
+
+            $entries = JournalEntry::where('source_type', $payment->getMorphClass())
+                ->where('source_id', $payment->id)
+                ->get();
+            $description = $entries->first()?->description ?? "Payment {$payment->reference}";
+            $entries->each(function (JournalEntry $entry) {
+                $entry->lines()->delete();
+                $entry->delete();
+            });
+
+            // Purana asar hata kar nayi rakam ka asar lagao.
+            if ($moved !== 0) {
+                $party->increment('balance', $moved);
+            }
+            $party->decrement('balance', $amount);
+
+            $payment->update([
+                'payment_date' => $date,
+                'amount' => $amount,
+                'method' => $method,
+                'bank_ref' => $data['bank_ref'] ?? $payment->bank_ref,
+                'notes' => $data['notes'] ?? $payment->notes,
+            ]);
+
+            $cashAccount = CashAccountResolver::code($method);
+            $this->ledger->post(
+                $date,
+                $description,
+                $isCustomer
+                    ? [
+                        ['account' => $cashAccount, 'debit' => $amount],
+                        ['account' => Account::RECEIVABLE, 'credit' => $amount, 'memo' => $party->name],
+                    ]
+                    : [
+                        ['account' => Account::PAYABLE, 'debit' => $amount, 'memo' => $party->name],
+                        ['account' => $cashAccount, 'credit' => $amount],
+                    ],
+                $payment,
+            );
+
+            if ($isCustomer) {
+                $this->allocator->rebuild($party->refresh());
+            }
+
+            return $payment->refresh();
+        });
     }
 
     private function assertPositive(int $amount): void

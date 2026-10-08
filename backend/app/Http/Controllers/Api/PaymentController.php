@@ -101,6 +101,33 @@ class PaymentController extends Controller
         return response()->json(['data' => $rows->sortByDesc('advance')->values()]);
     }
 
+    /** Galat likhi hui payment wapas lena. Khata aur bills purani haalat par. */
+    public function destroy(Payment $payment)
+    {
+        $this->service->reverse($payment);
+
+        return response()->noContent();
+    }
+
+    /** Rakam, tareekh ya tareeqa theek karna. Reference wahi rehta hai. */
+    public function update(Request $request, Payment $payment)
+    {
+        $data = $request->validate([
+            'payment_date' => ['sometimes', 'required', 'date'],
+            'amount' => ['sometimes', 'required', 'numeric', 'gt:0'],
+            'method' => ['sometimes', 'required', 'in:cash,bank'],
+            'bank_ref' => ['nullable', 'string', 'max:255', 'required_if:method,bank'],
+            'notes' => ['nullable', 'string'],
+        ], [
+            'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
+        ]);
+        if (isset($data['amount'])) {
+            $data['amount'] = Money::toPaisa($data['amount']);
+        }
+
+        return new PaymentResource($this->service->update($payment, $data)->load(['party', 'allocatable']));
+    }
+
     /**
      * Advance from a customer: paisa pehle, maal baad me. Har agli sale khud
      * is me se kat jati hai, kyunki dono aik hi receivable account par chalti
