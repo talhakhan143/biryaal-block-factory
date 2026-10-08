@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
- * Manual adjustments — correct a customer/supplier balance (discount / extra
+ * Manual adjustments, correct a customer/supplier balance (discount / extra
  * charge) or record a one-off cash in/out. Every mode posts a balanced journal
  * entry so the cash book, accounts and dashboard all stay in sync.
  */

@@ -50,7 +50,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
-        // Self password change — verifies current password; blocked for Sales Users.
+        // Self password change, verifies current password; blocked for Sales Users.
         Route::post('change-password', [AuthController::class, 'changePassword']);
 
         Route::get('dashboard', [DashboardController::class, 'index'])
@@ -145,11 +145,11 @@ Route::prefix('v1')->group(function () {
         Route::get('payments', [PaymentController::class, 'index'])->middleware('permission:payments.view');
         Route::get('payments/payables', [PaymentController::class, 'payables'])->middleware('permission:payments.view');
         Route::get('payments/advances', [PaymentController::class, 'advances'])->middleware('permission:payments.view');
-        // Customer money IN — receipts (allowed for sales staff).
+        // Customer money IN, receipts (allowed for sales staff).
         Route::post('payments/receipt', [PaymentController::class, 'receipt'])->middleware('permission:payments.receive');
         // Advance: paisa pehle, maal baad me.
         Route::post('customers/{customer}/advance', [PaymentController::class, 'advance'])->middleware('permission:payments.receive');
-        // Money OUT to suppliers — theft-sensitive, manage only.
+        // Money OUT to suppliers, theft-sensitive, manage only.
         Route::post('payments/supplier', [PaymentController::class, 'payment'])->middleware('permission:payments.manage');
 
         // Expenses
@@ -235,9 +235,9 @@ Route::prefix('v1')->group(function () {
         // One-shot: sync roles/permissions + Baryal accounts + clear perm cache
         // (role checked inside controller). Run once after a deploy on live.
         Route::post('system/sync-access', [SystemController::class, 'syncAccess']);
-        // DANGER — Super Admin hard reset (role checked inside controller)
+        // DANGER, Super Admin hard reset (role checked inside controller)
         Route::post('system/reset', [SystemController::class, 'reset']);
-        // Maintenance — re-sync transport trips to driver balances
+        // Maintenance, re-sync transport trips to driver balances
         Route::post('system/reconcile-transport', [SystemController::class, 'reconcileTransport']);
 
         // Reports (PDF / Excel export)
@@ -297,7 +297,7 @@ Route::prefix('v1')->group(function () {
             Route::post('reseller/dispatches', [ResellerDispatchController::class, 'store']);
             // Returns
             Route::post('reseller/returns', [ResellerSalesReturnController::class, 'store']);
-            // Money hub — receive (customer) / pay driver kiraya
+            // Money hub, receive (customer) / pay driver kiraya
             Route::post('reseller/payments/receive', [ResellerPaymentController::class, 'receive']);
             Route::post('reseller/payments/driver/{driver}/pay', [ResellerPaymentController::class, 'payDriver']);
         });

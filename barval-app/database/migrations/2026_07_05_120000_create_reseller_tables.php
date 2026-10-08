@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Resellers Point — a business run alongside the block factory but with its
+ * Resellers Point, a business run alongside the block factory but with its
  * OWN books. Nothing here posts to the factory ledger / trial balance. Only
  * the `customers` table is shared (same customer across both panels).
  */
@@ -41,7 +41,7 @@ return new class extends Migration
             $table->index('name');
         });
 
-        // Purchases (maal khareedna) — builds stock + supplier udhaar
+        // Purchases (maal khareedna), builds stock + supplier udhaar
         Schema::create('reseller_purchases', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('reference')->unique();
@@ -64,7 +64,7 @@ return new class extends Migration
             $table->index('payment_status');
         });
 
-        // Kiraya (rental) — per-day charges accrue until returned
+        // Kiraya (rental), per-day charges accrue until returned
         Schema::create('reseller_rentals', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('reference')->unique();
@@ -85,7 +85,7 @@ return new class extends Migration
             $table->index('status');
         });
 
-        // Reseller cash log — the separate hisab (money in from kiraya, out to suppliers)
+        // Reseller cash log, the separate hisab (money in from kiraya, out to suppliers)
         Schema::create('reseller_payments', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('reference')->unique();

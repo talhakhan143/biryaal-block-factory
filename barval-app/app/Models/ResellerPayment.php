@@ -34,4 +34,26 @@ class ResellerPayment extends Model
     {
         return $this->belongsTo(Customer::class);
     }
+
+    // Jis sauday ka paisa hai. Parchi par uska reference likha jata hai.
+
+    public function sale(): BelongsTo
+    {
+        return $this->belongsTo(ResellerSale::class, 'reseller_sale_id');
+    }
+
+    public function purchase(): BelongsTo
+    {
+        return $this->belongsTo(ResellerPurchase::class, 'reseller_purchase_id');
+    }
+
+    public function rental(): BelongsTo
+    {
+        return $this->belongsTo(ResellerRental::class, 'reseller_rental_id');
+    }
+
+    public function salesReturn(): BelongsTo
+    {
+        return $this->belongsTo(ResellerSalesReturn::class, 'reseller_sales_return_id');
+    }
 }

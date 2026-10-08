@@ -14,7 +14,7 @@ use InvalidArgumentException;
 
 /**
  * Resellers Point selling + returns. Receivable lives ONLY on reseller_sales
- * (a customer's reseller dues = sum of their reseller_sales.balance) — it never
+ * (a customer's reseller dues = sum of their reseller_sales.balance), it never
  * touches customers.balance, which is the block factory's. Money in/out is
  * logged in reseller_payments. Nothing posts to the block factory ledger.
  */
@@ -26,14 +26,14 @@ class ResellerSalesService
     public function createSale(array $data): ResellerSale
     {
         if (empty($data['items'])) {
-            throw new InvalidArgumentException('Bikri me kam se kam ek item hona chahiye.');
+            throw new InvalidArgumentException('Bill me kam se kam ek item hona chahiye.');
         }
 
         return DB::transaction(function () use ($data) {
             $customer = isset($data['customer_id']) ? Customer::findOrFail($data['customer_id']) : null;
             $type = $data['type'] ?? 'cash';
             if ($type === 'credit' && ! $customer) {
-                throw new InvalidArgumentException('Udhaar bikri ke liye customer zaroori hai.');
+                throw new InvalidArgumentException('Udhaar wale bill ke liye customer zaroori hai.');
             }
 
             $resolved = [];
@@ -137,10 +137,10 @@ class ResellerSalesService
     {
         DB::transaction(function () use ($sale) {
             if ($sale->dispatches()->exists()) {
-                throw new InvalidArgumentException('Is bikri par challan/dispatch ban chuka — pehle wo handle karein.');
+                throw new InvalidArgumentException('Is bill par challan/dispatch ban chuka, pehle wo handle karein.');
             }
             if (ResellerSalesReturn::where('reseller_sale_id', $sale->id)->exists()) {
-                throw new InvalidArgumentException('Is bikri par return mojood hai — delete nahi ho sakta.');
+                throw new InvalidArgumentException('Is bill par return mojood hai, delete nahi ho sakta.');
             }
 
             $sale->load('items');
@@ -215,7 +215,7 @@ class ResellerSalesService
                     // customer ka reseller udhaar kam karo (oldest sales first)
                     $this->reduceReceivable($customer, $refund);
                 } else {
-                    // cash wapas — reseller cash OUT
+                    // cash wapas, reseller cash OUT
                     $this->logPayment(ResellerPayment::OUT, $refund, $data['return_date'], [
                         'customer_id' => $customer?->id,
                         'reseller_sales_return_id' => $return->id,

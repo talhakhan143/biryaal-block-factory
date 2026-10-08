@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Resellers Point selling side — POS/sales, dispatch (challan) and returns.
+ * Resellers Point selling side, POS/sales, dispatch (challan) and returns.
  * Own tables + own money (receivable tracked per-sale, NOT on customers.balance
  * which belongs to the block factory). Customers, drivers and vehicles are the
  * only shared entities.

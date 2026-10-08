@@ -24,10 +24,61 @@ class DriverController extends Controller
 
     public function index(Request $request)
     {
-        $query = Driver::query();
+        // Kaam ki kism: maal laaya (purchases ka kiraya) ya maal bheja (block
+        // sell ka kiraya). Diya ho to list sirf us kaam wale drivers ki, aur
+        // har driver ke sath usi kaam ka hisaab.
+        $kind = in_array($request->query('kind'), [TransportTrip::INBOUND, TransportTrip::OUTBOUND], true)
+            ? $request->query('kind')
+            : null;
+
+        $query = Driver::query()
+            ->when($kind, fn ($q, $k) => $q
+                ->whereHas('trips', fn ($t) => $this->ofKind($t, $k))
+                ->withCount(['trips as kind_trips' => fn ($t) => $this->ofKind($t, $k)])
+                ->withSum(['trips as kind_kiraya' => fn ($t) => $this->ofKind($t, $k)], 'rate')
+                ->withSum(['trips as kind_paid' => fn ($t) => $this->ofKind($t, $k)], 'paid')
+                ->withSum(['trips as kind_due' => fn ($t) => $this->ofKind($t, $k)], 'balance'));
+
         $this->applyTableQuery($query, $request, ['name', 'phone', 'balance', 'vehicle_name', 'created_at'], ['name', 'phone', 'vehicle_name'], 'created_at');
 
-        return DriverResource::collection($query->paginate($request->integer('per_page', 50)));
+        return DriverResource::collection($query->paginate($request->integer('per_page', 50)))
+            // Tiles poori list ke hain: search ya page badalne se nahi hilte.
+            ->additional(['totals' => $this->kirayaSplit()]);
+    }
+
+    /**
+     * Sirf aik kism ki trips. Purani entries me kism likhi hi nahi thi, is liye
+     * "maal bheja" ka matlab hai "maal laaya ke ilawa sab".
+     */
+    private function ofKind($query, string $kind)
+    {
+        return $kind === TransportTrip::INBOUND
+            ? $query->where('kind', TransportTrip::INBOUND)
+            : $query->where(fn ($q) => $q->where('kind', '!=', TransportTrip::INBOUND)->orWhereNull('kind'));
+    }
+
+    /**
+     * Dono taraf ka kiraya aik nazar me: kitna bana, kitna diya, kitna baqi.
+     *
+     * @return array{in:array<string,int>,out:array<string,int>}
+     */
+    private function kirayaSplit(): array
+    {
+        $rows = TransportTrip::query()
+            ->selectRaw("case when kind = ? then 'in' else 'out' end as side", [TransportTrip::INBOUND])
+            ->selectRaw('count(*) as trips, sum(rate) as kiraya, sum(paid) as paid, sum(balance) as due')
+            ->groupBy('side')
+            ->get()
+            ->keyBy('side');
+
+        $side = fn (string $k) => [
+            'trips' => (int) ($rows[$k]->trips ?? 0),
+            'kiraya' => (int) ($rows[$k]->kiraya ?? 0),
+            'paid' => (int) ($rows[$k]->paid ?? 0),
+            'due' => max((int) ($rows[$k]->due ?? 0), 0),
+        ];
+
+        return ['in' => $side('in'), 'out' => $side('out')];
     }
 
     public function store(Request $request)
@@ -58,10 +109,10 @@ class DriverController extends Controller
 
         $payment = $this->payments->settleParty($driver, $data);
 
-        return new PaymentResource($payment);
+        return new PaymentResource(($payment)->load(['party', 'allocatable']));
     }
 
-    /** Give an advance to a driver (baqi ke bina — balance jama ho jata hai). */
+    /** Give an advance to a driver (baqi ke bina, balance jama ho jata hai). */
     public function advance(Request $request, Driver $driver)
     {
         $data = $request->validate([
@@ -75,7 +126,7 @@ class DriverController extends Controller
         ]);
         $data['amount'] = Money::toPaisa($data['amount']);
 
-        return new PaymentResource($this->payments->advanceToParty($driver, $data));
+        return new PaymentResource(($this->payments->advanceToParty($driver, $data))->load(['party', 'allocatable']));
     }
 
     public function destroy(Driver $driver)
@@ -83,7 +134,7 @@ class DriverController extends Controller
         try {
             $driver->delete();
         } catch (QueryException) {
-            return response()->json(['message' => 'Driver ka record use me hai — delete nahi ho sakta. Inactive karein.'], 422);
+            return response()->json(['message' => 'Driver ka record use me hai, delete nahi ho sakta. Inactive karein.'], 422);
         }
 
         return response()->noContent();

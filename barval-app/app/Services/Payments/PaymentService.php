@@ -384,7 +384,7 @@ class PaymentService
 
     /**
      * Pay an ADVANCE to a party that carries a `balance` column (Driver,
-     * Labourer) — money given before any dues exist. This intentionally drives
+     * Labourer), money given before any dues exist. This intentionally drives
      * the balance NEGATIVE; that negative balance is the outstanding advance
      * (the party will work it off against future dues). It does NOT settle any
      * open trips. Same ledger posting as a normal payment: Dr Payable, Cr Cash.
@@ -396,7 +396,7 @@ class PaymentService
             $this->assertPositive($amount);
 
             $name = $party->name ?? class_basename($party);
-            $note = trim('Advance — '.($data['notes'] ?? ''), " —\t\n");
+            $note = trim('Advance. '.($data['notes'] ?? ''), " .\t\n");
 
             $payment = Payment::create([
                 'reference' => Sequence::next('PAY'),
@@ -535,19 +535,19 @@ class PaymentService
 
     /**
      * Block a settlement from exceeding what is actually owed. Overpaying is how
-     * money silently "disappears" (balance goes negative untracked) — to give
+     * money silently "disappears" (balance goes negative untracked), to give
      * more than the dues, the explicit Advance flow must be used instead.
      */
     private function assertWithinOutstanding(int $amount, int $outstanding): void
     {
         if ($outstanding <= 0) {
             throw ValidationException::withMessages([
-                'amount' => 'Iska koi baqi nahi — sab clear hai. Zyada dena ho to "Advance" ka option use karein.',
+                'amount' => 'Iska koi baqi nahi, sab clear hai. Zyada dena ho to "Advance" ka option use karein.',
             ]);
         }
         if ($amount > $outstanding) {
             throw ValidationException::withMessages([
-                'amount' => 'Baqi sirf '.Money::format($outstanding).' hai — us se zyada "Pay" nahi ho sakta. Zyada dena ho to "Advance" ka option use karein.',
+                'amount' => 'Baqi sirf '.Money::format($outstanding).' hai, us se zyada "Pay" nahi ho sakta. Zyada dena ho to "Advance" ka option use karein.',
             ]);
         }
     }

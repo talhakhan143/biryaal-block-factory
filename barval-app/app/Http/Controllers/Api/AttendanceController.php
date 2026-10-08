@@ -44,7 +44,7 @@ class AttendanceController extends Controller
             'status' => ['required', 'in:present,half,absent'],
             'note' => ['nullable', 'string'],
         ], [
-            'work_date.before_or_equal' => 'Future date ki attendance nahi ho sakti — sirf aaj tak.',
+            'work_date.before_or_equal' => 'Future date ki attendance nahi ho sakti, sirf aaj tak.',
         ]);
 
         return new AttendanceResource($this->service->markAttendance($data)->load('labourer'));
@@ -60,7 +60,7 @@ class AttendanceController extends Controller
             'dates.*' => ['date', 'before_or_equal:today', 'distinct'],
             'note' => ['nullable', 'string'],
         ], [
-            'dates.*.before_or_equal' => 'Future date ki attendance nahi ho sakti — sirf aaj tak.',
+            'dates.*.before_or_equal' => 'Future date ki attendance nahi ho sakti, sirf aaj tak.',
         ]);
 
         $marked = $this->service->markAttendanceBulk($data);

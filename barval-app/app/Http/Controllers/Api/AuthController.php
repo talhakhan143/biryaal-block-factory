@@ -53,7 +53,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Change your OWN password — requires the current password for verification.
+     * Change your OWN password, requires the current password for verification.
      *
      * Sales Users cannot change their own password; the Owner manages it for them.
      */

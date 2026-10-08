@@ -144,7 +144,8 @@ class ResellerCustomerHistoryService
     /** @return Collection<int,ResellerSalesReturn> */
     private function returns(Customer $customer): Collection
     {
-        return ResellerSalesReturn::where('customer_id', $customer->id)
+        return ResellerSalesReturn::with('items.item:id,name')
+            ->where('customer_id', $customer->id)
             ->orderByDesc('return_date')->orderByDesc('created_at')
             ->get();
     }

@@ -19,7 +19,8 @@ class ResellerSalesReturnController extends Controller
     public function index(Request $request)
     {
         $query = ResellerSalesReturn::query()
-            ->with('customer')
+            // items bhi sath: wapsi ki parchi par maal ki line chhapni hoti hai.
+            ->with(['customer', 'items.item:id,name'])
             ->when($request->customer_id, fn ($q, $id) => $q->where('customer_id', $id));
 
         $this->applyTableQuery($query, $request, ['return_date', 'refund_amount'], ['reference'], 'return_date', ['customer' => ['name']]);

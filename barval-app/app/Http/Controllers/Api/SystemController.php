@@ -35,7 +35,7 @@ class SystemController extends Controller
         // 1) Permissions + role mappings (creates new perms, re-syncs every role).
         (new RolePermissionSeeder)->run();
 
-        // 2) Real Baryal logins — only created if missing, otherwise role re-synced.
+        // 2) Real Baryal logins, only created if missing, otherwise role re-synced.
         //    A created account gets a random password (this file is in a public
         //    repo, so no password may be written here); the Owner then sets a real
         //    one from the Users page. Existing accounts are never touched.
@@ -81,14 +81,14 @@ class SystemController extends Controller
 
         if ($data['confirm'] !== 'RESET') {
             throw ValidationException::withMessages([
-                'confirm' => 'Galat — bilkul "RESET" (capital) likhein.',
+                'confirm' => 'Galat, bilkul "RESET" (capital) likhein.',
             ]);
         }
 
         $wiped = $this->service->reset();
 
         return response()->json([
-            'message' => 'System reset ho gaya — saara data clear. Users, roles aur accounts safe hain.',
+            'message' => 'System reset ho gaya, saara data clear. Users, roles aur accounts safe hain.',
             'tables_cleared' => count($wiped),
         ]);
     }
@@ -107,7 +107,7 @@ class SystemController extends Controller
         $purchases = $this->reconcilePurchases();
 
         return response()->json([
-            'message' => "Reconcile ho gaya — {$trips} trip(s), {$sales} sale(s), {$purchases} purchase(s) update hue.",
+            'message' => "Reconcile ho gaya, {$trips} trip(s), {$sales} sale(s), {$purchases} purchase(s) update hue.",
             'trips_fixed' => $trips,
             'sales_fixed' => $sales,
             'purchases_fixed' => $purchases,

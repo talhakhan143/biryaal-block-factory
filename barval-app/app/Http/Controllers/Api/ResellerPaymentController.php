@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ResellerPaymentResource;
 use App\Models\Customer;
 use App\Models\Driver;
 use App\Models\ResellerDispatch;
@@ -16,7 +17,7 @@ use App\Support\Money;
 use Illuminate\Http\Request;
 
 /**
- * Resellers Point money hub — mirrors the block factory Payments page. Every
+ * Resellers Point money hub, mirrors the block factory Payments page. Every
  * party we owe (payable) and everyone who owes us (receivable) in one place,
  * each with a settle action. Fully self-contained reseller books.
  */
@@ -30,7 +31,7 @@ class ResellerPaymentController extends Controller
     public function index(Request $request)
     {
         $query = ResellerPayment::query()
-            ->with(['supplier', 'customer'])
+            ->with(['supplier', 'customer', 'sale', 'purchase', 'rental', 'salesReturn'])
             ->when($request->direction, fn ($q, $d) => $q->where('direction', $d));
 
         $this->applyTableQuery(
@@ -45,15 +46,11 @@ class ResellerPaymentController extends Controller
         $payments = $query->paginate($request->integer('per_page', 15));
 
         return response()->json([
-            'data' => $payments->map(fn (ResellerPayment $p) => [
-                'id' => $p->id,
-                'reference' => $p->reference,
-                'direction' => $p->direction,
-                'party' => $p->supplier?->name ?? $p->customer?->name ?? $p->notes ?? '—',
-                'amount' => (int) $p->amount,
-                'method' => $p->method,
-                'payment_date' => $p->payment_date?->toDateString(),
-            ]),
+            'data' => $payments->map(fn (ResellerPayment $p) => array_merge(
+                (new ResellerPaymentResource($p))->toArray($request),
+                // Purana naam, list ka column isi par laga hua hai.
+                ['party' => $p->supplier?->name ?? $p->customer?->name ?? $p->notes ?? '·'],
+            )),
             'meta' => ['current_page' => $payments->currentPage(), 'last_page' => $payments->lastPage(), 'total' => $payments->total()],
         ]);
     }
@@ -109,7 +106,7 @@ class ResellerPaymentController extends Controller
             $kiraya = (int) ($kiryaByCust[$cid] ?? 0);
             $rows[] = [
                 'customer_id' => $cid,
-                'name' => $names[$cid] ?? '—',
+                'name' => $names[$cid] ?? '·',
                 'sale_due' => $sale,
                 'kiraya_due' => $kiraya,
                 'total' => $sale + $kiraya,
@@ -133,9 +130,9 @@ class ResellerPaymentController extends Controller
         ], ['bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.']);
         $data['amount'] = Money::toPaisa($data['amount']);
 
-        $this->service->receiveFromCustomer(Customer::findOrFail($data['customer_id']), $data);
+        $payment = $this->service->receiveFromCustomer(Customer::findOrFail($data['customer_id']), $data);
 
-        return response()->noContent();
+        return new ResellerPaymentResource($payment->load(['supplier', 'customer', 'sale', 'purchase', 'rental', 'salesReturn']));
     }
 
     /** Pay a driver's outstanding reseller kiraya. */
@@ -149,8 +146,8 @@ class ResellerPaymentController extends Controller
         ], ['bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.']);
         $data['amount'] = Money::toPaisa($data['amount']);
 
-        $this->service->payDriverKiraya($driver, $data);
+        $payment = $this->service->payDriverKiraya($driver, $data);
 
-        return response()->noContent();
+        return new ResellerPaymentResource($payment->load(['supplier', 'customer', 'sale', 'purchase', 'rental', 'salesReturn']));
     }
 }

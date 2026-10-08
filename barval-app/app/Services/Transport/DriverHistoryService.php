@@ -40,8 +40,9 @@ class DriverHistoryService
         $computed = $ledger === [] ? 0 : (int) end($ledger)['running'];
         $stored = (int) $driver->balance;
 
+        // Purani trips me kism likhi hi nahi thi, wo "maal bheja" hain.
         $inbound = $trips->where('kind', TransportTrip::INBOUND);
-        $outbound = $trips->where('kind', TransportTrip::OUTBOUND);
+        $outbound = $trips->reject(fn (TransportTrip $t) => $t->kind === TransportTrip::INBOUND);
 
         $dates = collect([$trips->max('trip_date'), $payments->max('payment_date')])
             ->filter()->map(fn ($d) => $d->toDateString())->sort()->values();
@@ -53,8 +54,14 @@ class DriverHistoryService
                 'kiraya_total' => (int) $trips->sum('rate'),
                 'inbound_count' => $inbound->count(),
                 'inbound_total' => (int) $inbound->sum('rate'),
+                // Jo paisa is taraf ke kiraye me gaya. Lump payment allocation
+                // se trips.paid par chadhta hai, is liye seedha wahi jorhte hain.
+                'inbound_paid' => (int) $inbound->sum('paid'),
+                'inbound_due' => max((int) $inbound->sum('balance'), 0),
                 'outbound_count' => $outbound->count(),
                 'outbound_total' => (int) $outbound->sum('rate'),
+                'outbound_paid' => (int) $outbound->sum('paid'),
+                'outbound_due' => max((int) $outbound->sum('balance'), 0),
                 'paid' => $this->statement->net([Account::CASH, Account::BANK], $docs, 'credit'),
                 // Dena wahi jo musbat ho; minus ka matlab advance diya hua hai.
                 'outstanding' => max($stored, 0),

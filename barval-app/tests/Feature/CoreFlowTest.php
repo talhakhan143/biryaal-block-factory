@@ -15,6 +15,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use RuntimeException;
+use InvalidArgumentException;
 use Tests\TestCase;
 
 class CoreFlowTest extends TestCase
@@ -82,7 +83,10 @@ class CoreFlowTest extends TestCase
 
     public function test_sale_exceeding_ready_stock_is_rejected(): void
     {
-        $this->expectException(RuntimeException::class);
+        // Stock kam ho to sauda hona hi nahi chahiye, aur bande ko saaf
+        // batana chahiye ke kitna maal tayar hai.
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/ready stock kam hai/');
 
         Sanctum::actingAs($this->owner);
         $product = $this->readyProduct(100);

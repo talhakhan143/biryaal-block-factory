@@ -78,6 +78,6 @@ class TransportController extends Controller
         ]);
         $data['amount'] = Money::toPaisa($data['amount']);
 
-        return new PaymentResource($this->payments->payForTrip($transportTrip, $data));
+        return new PaymentResource(($this->payments->payForTrip($transportTrip, $data))->load(['party', 'allocatable']));
     }
 }

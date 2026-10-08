@@ -63,7 +63,7 @@ class LabourService
 
     /**
      * Mark attendance for many dates at once for one labourer. Dates already
-     * recorded are skipped (never double-charged — corrections go through
+     * recorded are skipped (never double-charged, corrections go through
      * Adjustments). Returns how many were actually marked.
      *
      * @param  array{labourer_id:string,status:string,dates:array<int,string>,note?:string}  $data
@@ -88,7 +88,7 @@ class LabourService
             $marked = 0;
             foreach ($data['dates'] as $date) {
                 if (in_array($date, $existing, true)) {
-                    continue; // already recorded — leave it untouched
+                    continue; // already recorded, leave it untouched
                 }
 
                 $attendance = Attendance::create([

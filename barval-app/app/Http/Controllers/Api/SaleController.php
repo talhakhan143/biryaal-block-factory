@@ -92,6 +92,6 @@ class SaleController extends Controller
         ]);
         $data['amount'] = Money::toPaisa($data['amount']);
 
-        return new PaymentResource($this->payments->receiveForSale($sale, $data));
+        return new PaymentResource(($this->payments->receiveForSale($sale, $data))->load(['party', 'allocatable']));
     }
 }

@@ -12,13 +12,13 @@ use Illuminate\Support\Facades\Schema;
  * KEPT (never touched): users, roles, permissions, personal access tokens
  * (so nobody is logged out), and the chart of accounts structure. Because every
  * account balance is derived from journal_lines, deleting the journals alone
- * resets all balances to zero — the account rows themselves stay intact.
+ * resets all balances to zero, the account rows themselves stay intact.
  */
 class SystemResetService
 {
     /**
      * Order is leaf-first, but FK checks are disabled during the wipe so the
-     * exact order does not actually matter — listed logically for clarity.
+     * exact order does not actually matter, listed logically for clarity.
      */
     private const TABLES = [
         // Sales side
@@ -38,7 +38,7 @@ class SystemResetService
         'attendances', 'salaries', 'staff', 'labourers',
         // Master parties / catalog (test data)
         'customers', 'suppliers', 'products', 'raw_materials',
-        // Resellers Point — its own books, wiped on the same terms as above.
+        // Resellers Point, its own books, wiped on the same terms as above.
         // Without these a "hard reset" left the reseller panel full of demo
         // sales, kiraya and stock while the rest of the app read as empty.
         'reseller_sale_items', 'reseller_sales',
@@ -46,11 +46,11 @@ class SystemResetService
         'reseller_dispatch_items', 'reseller_dispatches',
         'reseller_payments', 'reseller_purchases', 'reseller_rentals',
         'reseller_suppliers', 'reseller_items',
-        // Ledger backbone — clearing this zeroes every account balance
+        // Ledger backbone, clearing this zeroes every account balance
         'journal_lines', 'journal_entries',
         // Misc
         'audits',
-        // Document numbering — restart from 1
+        // Document numbering, restart from 1
         'sequences',
     ];
 

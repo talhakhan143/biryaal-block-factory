@@ -60,7 +60,7 @@ class ProductController extends Controller
             $product->stock()->delete();
             $product->delete();
         } catch (QueryException $e) {
-            return response()->json(['message' => 'Ye product use me hai (sale/production) — delete nahi ho sakta. "Active" off kar dein.'], 422);
+            return response()->json(['message' => 'Ye product use me hai (sale/production), delete nahi ho sakta. "Active" off kar dein.'], 422);
         }
 
         return response()->noContent();

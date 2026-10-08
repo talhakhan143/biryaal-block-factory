@@ -99,8 +99,8 @@ class ResellerDispatchController extends Controller
             'method' => ['nullable', 'in:cash,bank'],
             'bank_ref' => ['nullable', 'string', 'max:255', 'required_if:method,bank'],
         ], [
-            'reseller_sale_id.required' => 'Dispatch sirf kisi bikri ke against hota hai.',
-            'driver_id.required' => 'Driver chunna zaroori hai — challan gaadi par jata hai.',
+            'reseller_sale_id.required' => 'Dispatch sirf kisi bill ke against hota hai.',
+            'driver_id.required' => 'Driver chunna zaroori hai, challan gaadi par jata hai.',
             'trip_paid.lte' => 'Driver ko diya gaya paisa kiraye se zyada nahi ho sakta.',
             'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
         ]);

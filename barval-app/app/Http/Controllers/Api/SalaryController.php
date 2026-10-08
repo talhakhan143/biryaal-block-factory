@@ -70,16 +70,16 @@ class SalaryController extends Controller
         $outstanding = (int) $salary->balance;
         if ($outstanding <= 0) {
             throw ValidationException::withMessages([
-                'amount' => 'Is tankha ka koi baqi nahi — sab clear hai.',
+                'amount' => 'Is tankha ka koi baqi nahi, sab clear hai.',
             ]);
         }
         if ($paisa > $outstanding) {
             throw ValidationException::withMessages([
-                'amount' => 'Baqi tankha sirf '.Money::format($outstanding).' hai — us se zyada nahi de sakte.',
+                'amount' => 'Baqi tankha sirf '.Money::format($outstanding).' hai, us se zyada nahi de sakte.',
             ]);
         }
         $data['amount'] = $paisa;
 
-        return new PaymentResource($this->service->pay($salary, $data));
+        return new PaymentResource(($this->service->pay($salary, $data))->load(['party', 'allocatable']));
     }
 }

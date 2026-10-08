@@ -88,7 +88,7 @@ class DispatchController extends Controller
     {
         $data = $request->validate([
             // a challan is always the delivery of a POS order on a vehicle:
-            // order, driver and kiraya are all mandatory — no empty challans.
+            // order, driver and kiraya are all mandatory, no empty challans.
             'customer_id' => ['nullable', 'uuid', 'exists:customers,id'],
             'sale_id' => ['required', 'uuid', 'exists:sales,id'],
             'vehicle_id' => ['nullable', 'uuid', 'exists:vehicles,id'],
@@ -105,7 +105,7 @@ class DispatchController extends Controller
         ], [
             'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
             'sale_id.required' => 'Dispatch sirf kisi POS order ke against hota hai.',
-            'driver_id.required' => 'Driver chunna zaroori hai — challan gaadi par jata hai.',
+            'driver_id.required' => 'Driver chunna zaroori hai, challan gaadi par jata hai.',
             'trip_rate.required' => 'Kiraya (trip rate) likhna zaroori hai.',
             'trip_rate.gt' => 'Kiraya 0 se zyada hona chahiye.',
             'trip_paid.lte' => 'Driver ko diya gaya paisa kiraye se zyada nahi ho sakta.',

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Resellers Point delivery (challan) — a full copy of the block factory dispatch
+ * Resellers Point delivery (challan), a full copy of the block factory dispatch
  * flow but on its OWN tables. Drivers and vehicles are the shared entities
  * (identity only). Kiraya is reseller money: the paid portion goes out of the
  * reseller cash log (reseller_payments); the shared driver's balance is NEVER
@@ -55,7 +55,7 @@ class ResellerDispatchService
                 ]);
             }
 
-            // Kiraya jo driver ko abhi diya — reseller cash OUT (driver balance untouched).
+            // Kiraya jo driver ko abhi diya, reseller cash OUT (driver balance untouched).
             if ($paid > 0) {
                 ResellerPayment::create([
                     'reference' => Sequence::next('RPAY'),
