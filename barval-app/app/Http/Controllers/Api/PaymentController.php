@@ -98,7 +98,24 @@ class PaymentController extends Controller
                 'advance' => (int) abs((int) $sal->balance),
             ]));
 
-        return response()->json(['data' => $rows->sortByDesc('advance')->values()]);
+        // Customer ka advance ulti taraf ka hai: wo paisa humne diya nahi, pakad
+        // rakha hai. Is liye alag list me jata hai, warna "advance diye" ka
+        // matlab hi badal jata hai aur hisaab ulta parh liya jata hai.
+        $received = Customer::where('balance', '<', 0)
+            ->orderBy('balance')
+            ->get(['id', 'name', 'phone', 'balance'])
+            ->map(fn (Customer $c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+                'phone' => $c->phone,
+                'advance' => (int) abs((int) $c->balance),
+            ])
+            ->values();
+
+        return response()->json([
+            'data' => $rows->sortByDesc('advance')->values(),
+            'received' => $received,
+        ]);
     }
 
     /** Galat likhi hui payment wapas lena. Khata aur bills purani haalat par. */
