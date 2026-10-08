@@ -82,7 +82,7 @@ const FACTORY_GROUPS: NavGroup[] = [
       { to: '/cash-book', en: 'Cash Book', ur: 'روزانہ کیش', permission: 'accounting.view', icon: Wallet },
       { to: '/expenses', en: 'Expenses', ur: 'اخراجات', permission: 'expenses.view', icon: BookText },
       { to: '/reports', en: 'Reports', ur: 'رپورٹس', permission: 'reports.view', icon: FileBarChart },
-      // Hidden — accountant-only screens (Adjustments, Trial Balance, Accounts Ledger) to keep it simple.
+      // Hidden, accountant-only screens (Adjustments, Trial Balance, Accounts Ledger) to keep it simple.
       // Routes/data intact; re-add here anytime.
     ],
   },
@@ -95,7 +95,7 @@ const FACTORY_GROUPS: NavGroup[] = [
   },
 ]
 
-// Resellers Point — apna panel, grouped like the block factory.
+// Resellers Point, apna panel, grouped like the block factory.
 const RESELLER_GROUPS: NavGroup[] = [
   {
     en: 'Overview', ur: 'مرکزی',
@@ -134,7 +134,7 @@ const RESELLER_GROUPS: NavGroup[] = [
       { to: '/reseller/dispatch', en: 'Dispatch', ur: 'چالان', permission: 'reseller.view', icon: Truck },
       { to: '/reseller/customers', en: 'Customers', ur: 'کسٹمر', permission: 'customers.view', icon: Users },
       { to: '/drivers', en: 'Drivers', ur: 'ڈرائیور', permission: 'transport.view', icon: UserRound },
-      // Vehicles hata diya — driver add karte waqt gaadi wahin add hoti hai
+      // Vehicles hata diya, driver add karte waqt gaadi wahin add hoti hai
     ],
   },
 ]
@@ -160,12 +160,12 @@ export default function Layout() {
     navigate(WORKSPACE_HOME[w])
   }
   const [pwOpen, setPwOpen] = useState(false)
-  // Sales Users cannot change their own password — Owner manages it for them.
+  // Sales Users cannot change their own password, Owner manages it for them.
   const canChangePw = !!user && !user.roles.includes('Sales User')
 
   return (
     <div className="flex h-full" style={{ background: 'var(--bg)' }}>
-      {/* Mobile backdrop — tap to close the drawer */}
+      {/* Mobile backdrop, tap to close the drawer */}
       {navOpen && (
         <div
           className="fixed inset-0 z-30 bg-black/50 lg:hidden"

@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Car, Phone, Wallet } from 'lucide-react'
+import { ArrowLeft, Car, Phone, Printer, Wallet } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
 import {
-  Badge, Button, Card, Field, Input, MethodField, Modal, MoneyInput, Note,
+  Badge, Button, Card, Field, IconButton, Input, MethodField, Modal, MoneyInput, Note,
   OutstandingNote, PagedTable, Spinner, StatTile, Tabs,
 } from '../components/ui'
+import { KirayaVoucher, PaymentReceipt, type PaymentDoc, type TripDoc } from '../components/receipts'
 import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface LedgerRow {
@@ -23,15 +24,21 @@ interface LedgerRow {
 interface Trip {
   id: string; reference: string; kind: string; trip_date: string
   vehicle_label?: string; notes?: string
+  from_location?: string; to_location?: string
   rate: number; paid: number; balance: number; status: string
 }
-interface PaymentRow { id: string; reference: string; payment_date: string; amount: number; method: string; bank_ref?: string; notes?: string }
+interface PaymentRow {
+  id: string; reference: string; payment_date: string; amount: number
+  method: string; bank_ref?: string; notes?: string
+  direction?: string
+  against?: { type: string; reference?: string | null } | null
+}
 interface History {
   driver: { id: string; name: string; phone?: string; vehicle_name?: string; vehicle_plate?: string; balance: number }
   summary: {
     trips_count: number; kiraya_total: number
-    inbound_count: number; inbound_total: number
-    outbound_count: number; outbound_total: number
+    inbound_count: number; inbound_total: number; inbound_paid: number; inbound_due: number
+    outbound_count: number; outbound_total: number; outbound_paid: number; outbound_due: number
     paid: number; outstanding: number; advance: number; balance: number
     first_activity?: string; last_activity?: string; ledger_balance: number; reconciled: boolean
   }
@@ -56,6 +63,9 @@ export default function DriverDetail() {
   const { can } = useAuth()
   const [tab, setTab] = useState<TabKey>('statement')
   const [paying, setPaying] = useState(false)
+  // Kiraye ki parchi aur paise ki rasid: dono yahin se khulti hain.
+  const [voucher, setVoucher] = useState<TripDoc | null>(null)
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['driver-history', id],
@@ -64,9 +74,10 @@ export default function DriverDetail() {
 
   const pay = useMutation({
     mutationFn: (payload: Record<string, unknown>) => api.post(`/drivers/${id}/pay`, payload),
-    onSuccess: () => {
+    onSuccess: (res) => {
       ;[...MONEY_KEYS, 'driver-history'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setPaying(false)
+      setReceipt(res.data.data)
     },
   })
 
@@ -90,6 +101,24 @@ export default function DriverDetail() {
     { key: 'payments', label: 'Paisa mila', count: data.payments.length },
   ]
 
+  // Driver ka naam trip ke sath nahi aata (page ka driver hi hota hai), is liye
+  // parchi par yahin se chadhaya jata hai.
+  const printTrip = (t: Trip) => setVoucher({ ...t, driver: { name: d.name } })
+  const printPayment = (p: PaymentRow) => setReceipt({ ...p, direction: p.direction ?? 'payment' })
+  // Khate ki row sirf tab chhap sakti hai jab uska poora kaghaz mojood ho.
+  const ledgerTrip = (r: LedgerRow) => data.trips.find((t) => t.reference === r.reference)
+  const ledgerPayment = (r: LedgerRow) => data.payments.find((p) => p.reference === r.reference)
+  const canPrintLedger = (r: LedgerRow) => Boolean(r.type === 'trip' ? ledgerTrip(r) : r.type === 'payment' ? ledgerPayment(r) : undefined)
+  const printLedger = (r: LedgerRow) => {
+    if (r.type === 'trip') {
+      const t = ledgerTrip(r)
+      if (t) printTrip(t)
+      return
+    }
+    const p = ledgerPayment(r)
+    if (p) printPayment(p)
+  }
+
   return (
     <div>
       <Back onClick={() => navigate('/drivers')} />
@@ -112,8 +141,18 @@ export default function DriverDetail() {
       <div className="bf-stagger mb-5 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-5">
         <StatTile label="Kitna dena hai" value={formatPaisa(s.outstanding)} hint="Saare kiraye ka baqi" tone={s.outstanding > 0 ? 'red' : 'green'} />
         <StatTile label="Advance diya hua" value={formatPaisa(s.advance)} hint={s.advance > 0 ? 'Agle kiraye me se katega' : 'Koi advance nahi'} tone={s.advance > 0 ? 'amber' : 'text'} />
-        <StatTile label="Maal laane ka kiraya" value={formatPaisa(s.inbound_total)} hint={`${s.inbound_count} trip, supplier se factory`} tone="primary" />
-        <StatTile label="Maal bhejne ka kiraya" value={formatPaisa(s.outbound_total)} hint={`${s.outbound_count} trip, customer tak`} tone="primary" />
+        <StatTile
+          label="Maal laane ka kiraya"
+          value={formatPaisa(s.inbound_total)}
+          hint={`Purchases ke liye · ${s.inbound_count} trip · diya ${formatPaisa(s.inbound_paid)} · baqi ${formatPaisa(s.inbound_due)}`}
+          tone={s.inbound_due > 0 ? 'amber' : 'primary'}
+        />
+        <StatTile
+          label="Maal bhejne ka kiraya"
+          value={formatPaisa(s.outbound_total)}
+          hint={`Block sell ke liye · ${s.outbound_count} trip · diya ${formatPaisa(s.outbound_paid)} · baqi ${formatPaisa(s.outbound_due)}`}
+          tone={s.outbound_due > 0 ? 'amber' : 'primary'}
+        />
         <StatTile label="Paisa mila" value={formatPaisa(s.paid)} hint="Cash aur bank, dono" tone="green" />
       </div>
 
@@ -128,10 +167,10 @@ export default function DriverDetail() {
 
       <Tabs tabs={tabs} active={tab} onChange={setTab} />
 
-      {tab === 'statement' && <Statement rows={data.ledger} balance={s.balance} />}
-      {tab === 'in' && <Trips rows={inbound} empty="Is driver ne abhi koi maal laaya nahi." />}
-      {tab === 'out' && <Trips rows={outbound} empty="Is driver ne abhi koi maal bheja nahi." />}
-      {tab === 'payments' && <Payments rows={data.payments} />}
+      {tab === 'statement' && <Statement rows={data.ledger} balance={s.balance} onPrint={printLedger} canPrint={canPrintLedger} />}
+      {tab === 'in' && <Trips rows={inbound} label="Maal laane ka kiraya (purchases)" empty="Is driver ne abhi koi maal laaya nahi." onPrint={printTrip} />}
+      {tab === 'out' && <Trips rows={outbound} label="Maal bhejne ka kiraya (block sell)" empty="Is driver ne abhi koi maal bheja nahi." onPrint={printTrip} />}
+      {tab === 'payments' && <Payments rows={data.payments} onPrint={printPayment} />}
 
       {paying && (
         <Modal title={`Paisa dein: ${d.name}`} onClose={() => setPaying(false)}>
@@ -143,6 +182,8 @@ export default function DriverDetail() {
           />
         </Modal>
       )}
+      {receipt && <PaymentReceipt payment={receipt} party={d.name} onClose={() => setReceipt(null)} />}
+      {voucher && <KirayaVoucher trip={voucher} onClose={() => setVoucher(null)} />}
     </div>
   )
 }
@@ -159,7 +200,7 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <Card><p className="text-sm" style={{ color: 'var(--muted)' }}>{children}</p></Card>
 }
 
-function Statement({ rows, balance }: { rows: LedgerRow[]; balance: number }) {
+function Statement({ rows, balance, onPrint, canPrint }: { rows: LedgerRow[]; balance: number; onPrint: (r: LedgerRow) => void; canPrint: (r: LedgerRow) => boolean }) {
   if (rows.length === 0) {
     return (
       <Note>
@@ -170,7 +211,7 @@ function Statement({ rows, balance }: { rows: LedgerRow[]; balance: number }) {
   return (
     <>
     <PagedTable
-      head={['Date', 'Kya hua', 'Ref', { label: 'Kiraya bana', align: 'right' }, { label: 'Paisa diya', align: 'right' }, { label: 'Baqi raha', align: 'right' }]}
+      head={['Date', 'Kya hua', 'Ref', { label: 'Kiraya bana', align: 'right' }, { label: 'Paisa diya', align: 'right' }, { label: 'Baqi raha', align: 'right' }, { label: 'Parchi', align: 'right' }]}
       rows={rows}
       searchText={(r) => `${r.date} ${r.reference} ${r.type === 'trip' ? 'Trip ka kiraya' : 'Paisa diya'}`}
       searchPlaceholder="Date ya ref se dhoondein…"
@@ -178,6 +219,7 @@ function Statement({ rows, balance }: { rows: LedgerRow[]; balance: number }) {
         <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
           <td className="px-4 py-2.5 font-bold" colSpan={5}>{balance < 0 ? 'Advance diya hua' : 'Ab kitna dena hai'}</td>
           <td className="px-4 py-2.5 text-right font-bold" style={{ color: balance > 0 ? 'var(--amber)' : 'var(--green)' }}>{formatPaisa(Math.abs(balance))}</td>
+          <td />
         </tr>
       )}
       row={(r) => (
@@ -188,6 +230,9 @@ function Statement({ rows, balance }: { rows: LedgerRow[]; balance: number }) {
           <td className="px-4 py-2 text-right">{r.credit ? formatPaisa(r.credit) : '·'}</td>
           <td className="px-4 py-2 text-right" style={{ color: r.debit ? 'var(--green)' : undefined }}>{r.debit ? formatPaisa(r.debit) : '·'}</td>
           <td className="px-4 py-2 text-right font-semibold">{formatPaisa(r.running)}</td>
+          <td className="px-4 py-2 text-right">
+            {canPrint(r) && <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => onPrint(r)} />}
+          </td>
         </tr>
       )}
     />
@@ -195,14 +240,27 @@ function Statement({ rows, balance }: { rows: LedgerRow[]; balance: number }) {
   )
 }
 
-function Trips({ rows, empty }: { rows: Trip[]; empty: string }) {
+function Trips({ rows, label, empty, onPrint }: { rows: Trip[]; label: string; empty: string; onPrint: (t: Trip) => void }) {
   if (rows.length === 0) return <Empty>{empty}</Empty>
+  const kiraya = rows.reduce((a, t) => a + t.rate, 0)
+  const paid = rows.reduce((a, t) => a + t.paid, 0)
+  const due = rows.reduce((a, t) => a + t.balance, 0)
   return (
     <PagedTable
-      head={['Ref', 'Date', 'Gaari', 'Tafseel', { label: 'Kiraya', align: 'right' }, { label: 'Diya', align: 'right' }, { label: 'Baqi', align: 'right' }, 'Haal']}
+      head={['Ref', 'Date', 'Gaari', 'Tafseel', { label: 'Kiraya', align: 'right' }, { label: 'Diya', align: 'right' }, { label: 'Baqi', align: 'right' }, 'Haal', { label: 'Parchi', align: 'right' }]}
       rows={rows}
       searchText={(t) => `${t.reference} ${t.trip_date} ${t.vehicle_label ?? ''} ${t.notes ?? ''} ${t.status}`}
       searchPlaceholder="Ref, date ya gaari se dhoondein…"
+      footer={(
+        <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
+          <td className="px-4 py-2.5 font-bold" colSpan={4}>{label}</td>
+          <td className="px-4 py-2.5 text-right font-bold">{formatPaisa(kiraya)}</td>
+          <td className="px-4 py-2.5 text-right font-bold" style={{ color: 'var(--green)' }}>{formatPaisa(paid)}</td>
+          <td className="px-4 py-2.5 text-right font-bold" style={{ color: due > 0 ? 'var(--amber)' : undefined }}>{formatPaisa(due)}</td>
+          <td />
+          <td />
+        </tr>
+      )}
       row={(t) => (
         <tr key={t.id} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{t.reference}</td>
@@ -213,18 +271,21 @@ function Trips({ rows, empty }: { rows: Trip[]; empty: string }) {
           <td className="px-4 py-2 text-right" style={{ color: 'var(--green)' }}>{formatPaisa(t.paid)}</td>
           <td className="px-4 py-2 text-right" style={{ color: t.balance > 0 ? 'var(--amber)' : undefined }}>{t.balance ? formatPaisa(t.balance) : '·'}</td>
           <td className="px-4 py-2"><Badge color={statusColor[t.status]}>{t.status}</Badge></td>
+          <td className="px-4 py-2 text-right">
+            <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => onPrint(t)} />
+          </td>
         </tr>
       )}
     />
   )
 }
 
-function Payments({ rows }: { rows: PaymentRow[] }) {
+function Payments({ rows, onPrint }: { rows: PaymentRow[]; onPrint: (r: PaymentRow) => void }) {
   if (rows.length === 0) return <Empty>Is driver ko abhi koi paisa nahi diya.</Empty>
   const total = rows.reduce((a, r) => a + r.amount, 0)
   return (
     <PagedTable
-      head={['Ref', 'Date', 'Cash ya bank', 'Tafseel', { label: 'Kitna diya', align: 'right' }]}
+      head={['Ref', 'Date', 'Cash ya bank', 'Tafseel', { label: 'Kitna diya', align: 'right' }, { label: 'Parchi', align: 'right' }]}
       rows={rows}
       searchText={(r) => `${r.reference} ${r.payment_date} ${r.method} ${r.notes ?? ''} ${r.bank_ref ?? ''}`}
       searchPlaceholder="Ref ya date se dhoondein…"
@@ -232,6 +293,7 @@ function Payments({ rows }: { rows: PaymentRow[] }) {
         <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
           <td className="px-4 py-2.5 font-bold" colSpan={4}>Kul paisa diya</td>
           <td className="px-4 py-2.5 text-right font-bold" style={{ color: 'var(--green)' }}>{formatPaisa(total)}</td>
+          <td />
         </tr>
       )}
       row={(r) => (
@@ -241,6 +303,9 @@ function Payments({ rows }: { rows: PaymentRow[] }) {
           <td className="px-4 py-2 capitalize">{r.method}</td>
           <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>{r.notes || r.bank_ref || '·'}</td>
           <td className="px-4 py-2 text-right font-medium" style={{ color: 'var(--green)' }}>{formatPaisa(r.amount)}</td>
+          <td className="px-4 py-2 text-right">
+            <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => onPrint(r)} />
+          </td>
         </tr>
       )}
     />

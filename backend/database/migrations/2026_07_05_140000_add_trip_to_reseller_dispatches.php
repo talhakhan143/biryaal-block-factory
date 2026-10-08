@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Reseller challan kiraya — recorded in reseller books only. trip_paid goes out
+ * Reseller challan kiraya, recorded in reseller books only. trip_paid goes out
  * of reseller cash (reseller_payments), NOT the shared driver's balance, so
  * there is no conflict with the block factory transport ledger.
  */

@@ -4,8 +4,9 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Wallet } from 'lucide-react'
+import { Printer, Wallet } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select } from '../components/ui'
+import { PaymentReceipt, PurchaseBill, type PaymentDoc, type PurchaseDoc } from '../components/receipts'
 import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface FreightDriver {
@@ -17,17 +18,11 @@ interface FreightDriver {
   balance: number
   status: string
 }
-interface Purchase {
+/** List se jo row aati hai wo poora bill chhapne ke liye kaafi hai. */
+interface Purchase extends PurchaseDoc {
   id: string
-  reference: string
-  supplier?: { name: string }
-  raw_material?: { name: string }
-  purchase_date: string
-  quantity: number
-  total_cost: number
   /** Supplier ko kitna dena. Kiraya driver ko gaya ho to wo is me nahi. */
   supplier_bill: number
-  paid_amount: number
   payment_status: string
   freight_driver?: FreightDriver | null
 }
@@ -43,6 +38,9 @@ export default function Purchases() {
   const [sort, setSort] = useState('purchase_date')
   const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [payFor, setPayFor] = useState<Purchase | null>(null)
+  // Khareed ka bill aur paise ki rasid, dono chhapne ke liye.
+  const [bill, setBill] = useState<PurchaseDoc | null>(null)
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
   const { data, isLoading } = useList<Purchase>('purchases', { page, search, sort, dir })
 
   const onSort = (key: string) => {
@@ -54,8 +52,8 @@ export default function Purchases() {
   const columns: Column<Purchase>[] = [
     { key: 'reference', label: 'Ref', sortable: true, render: (p) => <span className="font-mono text-xs">{p.reference}</span> },
     { key: 'purchase_date', label: 'Date', sortable: true, render: (p) => p.purchase_date },
-    { key: 'supplier', label: 'Supplier', render: (p) => p.supplier?.name ?? '—' },
-    { key: 'material', label: 'Material', render: (p) => p.raw_material?.name ?? '—' },
+    { key: 'supplier', label: 'Supplier', render: (p) => p.supplier?.name ?? '·' },
+    { key: 'material', label: 'Material', render: (p) => p.raw_material?.name ?? '·' },
     { key: 'quantity', label: 'Qty', sortable: true, align: 'right', render: (p) => p.quantity },
     { key: 'total_cost', label: 'Maal ki lagat', sortable: true, align: 'right', render: (p) => formatPaisa(p.total_cost) },
     {
@@ -71,26 +69,31 @@ export default function Purchases() {
     { key: 'payment_status', label: 'Status', sortable: true, render: (p) => <Badge color={statusColor[p.payment_status]}>{p.payment_status}</Badge> },
     {
       key: 'actions', label: '', align: 'right', render: (p) => (
-        can('payments.manage') && p.payment_status !== 'paid'
-          ? <RowActions><IconButton icon={Wallet} label="Pay" tone="primary" onClick={() => setPayFor(p)} /></RowActions>
-          : null
+        <RowActions>
+          <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setBill(p)} />
+          {can('payments.manage') && p.payment_status !== 'paid' && (
+            <IconButton icon={Wallet} label="Pay" tone="primary" onClick={() => setPayFor(p)} />
+          )}
+        </RowActions>
       ),
     },
   ]
 
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/purchases', p),
-    onSuccess: () => {
+    onSuccess: (res) => {
       MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setCreating(false)
+      setBill(res.data.data)
     },
   })
 
   const pay = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/purchases/${id}/pay`, payload),
-    onSuccess: () => {
+    onSuccess: (res) => {
       MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setPayFor(null)
+      setReceipt(res.data.data)
     },
   })
 
@@ -98,7 +101,7 @@ export default function Purchases() {
     <div>
       <PageHeader
         title="Material Purchases"
-        subtitle="Kacha maal khareedna — kharcha aur udhaar"
+        subtitle="Kacha maal khareedna, kharcha aur udhaar"
         actions={can('purchases.manage') && <Button onClick={() => setCreating(true)}>+ Purchase</Button>}
       />
       <DataTable
@@ -116,8 +119,10 @@ export default function Purchases() {
         page={page}
         onPage={setPage}
       />
+      {bill && <PurchaseBill purchase={bill} onClose={() => setBill(null)} />}
+      {receipt && <PaymentReceipt payment={receipt} onClose={() => setReceipt(null)} />}
       {payFor && (
-        <Modal title={`Pay — ${payFor.reference}`} onClose={() => setPayFor(null)}>
+        <Modal title={`Pay, ${payFor.reference}`} onClose={() => setPayFor(null)}>
           <PayBillForm
             outstanding={payFor.supplier_bill - payFor.paid_amount}
             onSubmit={(payload) => pay.mutate({ id: payFor.id, payload })}
@@ -155,16 +160,20 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
   const materials = useList<{ id: string; name: string; unit: string }>('raw-materials', { per_page: 100 })
   const [form, setForm] = useState({
     supplier_id: '', raw_material_id: '', purchase_date: new Date().toISOString().slice(0, 10),
-    quantity: '', unit_cost: '', loading_cost: '0', unloading_cost: '0', paid_amount: '0', method: 'cash', bank_ref: '',
+    quantity: '', unit_cost: '', loading_cost: '0', paid_amount: '0', method: 'cash', bank_ref: '',
   })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
 
-  // Live bill: maal (qty × unit) + transport + loading + unloading.
+  // Live bill: maal (qty × unit) + loading.
+  //
+  // Kiraya yahan jaan bujh kar nahi hai. Maal laane wale driver ka kiraya
+  // "Maal ka Kiraya" wale page par us driver ke naam likha jata hai. Dono
+  // jagah likhne se wahi kiraya do dafa gin liya jata.
   const rs = (n: number) => 'Rs ' + n.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const qty = Number(form.quantity) || 0
   const unit = Number(form.unit_cost) || 0
   const goods = qty * unit
-  const extras = (Number(form.loading_cost) || 0) + (Number(form.unloading_cost) || 0)
+  const extras = Number(form.loading_cost) || 0
   const total = goods + extras
   const supplierBill = total
   const paid = Number(form.paid_amount) || 0
@@ -181,7 +190,6 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
           quantity: Number(form.quantity),
           unit_cost: Number(form.unit_cost),
           loading_cost: Number(form.loading_cost),
-          unloading_cost: Number(form.unloading_cost),
           paid_amount: Number(form.paid_amount),
         })
       }}
@@ -204,14 +212,13 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
         <Field label="Quantity"><Input type="number" step="0.001" value={form.quantity} onChange={(e) => set('quantity', e.target.value)} required /></Field>
         <Field label="Unit cost (Rs)"><MoneyInput value={form.unit_cost} onChange={(v) => set('unit_cost', v)} required /></Field>
         <Field label="Loading (Rs, total)"><MoneyInput value={form.loading_cost} onChange={(v) => set('loading_cost', v)} /></Field>
-        <Field label="Unloading (Rs, total)"><MoneyInput value={form.unloading_cost} onChange={(v) => set('unloading_cost', v)} /></Field>
         <Field label="Paid now (Rs)"><MoneyInput value={form.paid_amount} onChange={(v) => set('paid_amount', v)} /></Field>
       </div>
 
       {/* Live bill total */}
       <div className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
         <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Maal ({qty || 0} × {rs(unit)})</span><span>{rs(goods)}</span></div>
-        <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Loading + unloading</span><span>{rs(extras)}</span></div>
+        <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Loading</span><span>{rs(extras)}</span></div>
         <div className="mt-1 flex justify-between border-t pt-1 text-base font-bold" style={{ borderColor: 'var(--border)' }}>
           <span>Maal ki kul lagat</span><span style={{ color: 'var(--primary)' }}>{rs(total)}</span>
         </div>

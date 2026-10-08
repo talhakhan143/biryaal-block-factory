@@ -4,18 +4,12 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Coins, HandCoins, Wallet } from 'lucide-react'
+import { Coins, HandCoins, Printer, Wallet } from 'lucide-react'
 import { AdvanceForm, Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Select, Spinner, Table } from '../components/ui'
+import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
 
-interface Payment {
+interface Payment extends PaymentDoc {
   id: string
-  reference: string
-  direction: string
-  party_name?: string
-  payment_date: string
-  amount: number
-  method: string
-  bank_ref?: string
 }
 
 interface Party { id: string; name: string; balance: number }
@@ -44,6 +38,8 @@ export default function Payments() {
   const [preset, setPreset] = useState<string>('')
   const [settle, setSettle] = useState<Payable | null>(null)
   const [topUp, setTopUp] = useState<Advance | null>(null)
+  // Jahan paisa haath badla, wahin parchi khul jati hai.
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
   const [page, setPage] = useState(1)
   const [recvPage, setRecvPage] = useState(1)
   const [payPage, setPayPage] = useState(1)
@@ -65,7 +61,11 @@ export default function Payments() {
     { key: 'party', label: 'Party', render: (p) => p.party_name },
     { key: 'amount', label: 'Amount', sortable: true, align: 'right', render: (p) => formatPaisa(p.amount) },
     { key: 'method', label: 'Method', sortable: true, render: (p) => <Badge color={p.method === 'bank' ? 'blue' : 'slate'}>{p.method}</Badge> },
-    { key: 'bank_ref', label: 'Bank / ref', render: (p) => <span className="text-xs" style={{ color: 'var(--muted)' }}>{p.bank_ref ?? '—'}</span> },
+    { key: 'bank_ref', label: 'Bank / ref', render: (p) => <span className="text-xs" style={{ color: 'var(--muted)' }}>{p.bank_ref ?? '·'}</span> },
+    {
+      key: 'actions', label: '', align: 'right',
+      render: (p) => <RowActions><IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setReceipt(p)} /></RowActions>,
+    },
   ]
   const recv = useList<Party>('customers', { has_dues: 1, page: recvPage })
   const payables = useQuery({
@@ -85,26 +85,26 @@ export default function Payments() {
   const mutate = useMutation({
     mutationFn: ({ kind, payload }: { kind: string; payload: Record<string, unknown> }) =>
       api.post(kind === 'receipt' ? '/payments/receipt' : '/payments/supplier', payload),
-    onSuccess: () => { invalidateAll(); setModal(null); setPreset('') },
+    onSuccess: (res) => { invalidateAll(); setModal(null); setPreset(''); setReceipt(res.data.data) },
   })
 
   const settleMut = useMutation({
     mutationFn: ({ row, payload }: { row: Payable; payload: Record<string, unknown> }) =>
       api.post(payUrl(row), row.type === 'supplier' ? { supplier_id: row.id, ...payload } : payload),
-    onSuccess: () => { invalidateAll(); setSettle(null) },
+    onSuccess: (res) => { invalidateAll(); setSettle(null); setReceipt(res.data.data) },
   })
 
   const topUpMut = useMutation({
     mutationFn: ({ row, payload }: { row: Advance; payload: Record<string, unknown> }) =>
       api.post(advanceUrl(row)!, payload),
-    onSuccess: () => { invalidateAll(); setTopUp(null) },
+    onSuccess: (res) => { invalidateAll(); setTopUp(null); setReceipt(res.data.data) },
   })
 
   const open = (kind: 'receipt' | 'supplier', partyId = '') => { setPreset(partyId); setModal(kind) }
 
   const advRows = advances.data ?? []
 
-  // Payables come as one full list — paginate on the client so the page never grows endless.
+  // Payables come as one full list, paginate on the client so the page never grows endless.
   const PAY_PER = 10
   const payAll = payables.data ?? []
   const payMeta = { current_page: payPage, last_page: Math.max(1, Math.ceil(payAll.length / PAY_PER)), total: payAll.length }
@@ -123,9 +123,9 @@ export default function Payments() {
         }
       />
 
-      {/* Customers who owe us — collect here */}
+      {/* Customers who owe us, collect here */}
       <div>
-        <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Lene baqi (Customers se) <span className="font-normal" style={{ color: 'var(--muted)' }}>— receivables</span></h2>
+        <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Lene baqi (Customers se) <span className="font-normal" style={{ color: 'var(--muted)' }}>receivables</span></h2>
         <Table head={['Customer', 'Baqi (dene hain)', '']}>
           {recv.data?.data.map((c) => (
             <tr key={c.id}>
@@ -140,14 +140,14 @@ export default function Payments() {
               </td>
             </tr>
           ))}
-          {recv.data?.data.length === 0 && <tr><td colSpan={3} className="px-4 py-4 text-center text-sm" style={{ color: 'var(--muted)' }}>Sab clear — kisi se lena baqi nahi.</td></tr>}
+          {recv.data?.data.length === 0 && <tr><td colSpan={3} className="px-4 py-4 text-center text-sm" style={{ color: 'var(--muted)' }}>Sab clear, kisi se lena baqi nahi.</td></tr>}
         </Table>
         <Pagination meta={recv.data?.meta} page={recvPage} onPage={setRecvPage} />
       </div>
 
-      {/* Everyone we owe — suppliers, drivers, labourers, staff */}
+      {/* Everyone we owe, suppliers, drivers, labourers, staff */}
       <div>
-        <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Dene baqi (sab ko) <span className="font-normal" style={{ color: 'var(--muted)' }}>— payables: suppliers, drivers, mazdoor, staff</span></h2>
+        <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Dene baqi (sab ko) <span className="font-normal" style={{ color: 'var(--muted)' }}>payables: suppliers, drivers, mazdoor, staff</span></h2>
         {payables.isLoading ? <Spinner /> : (
           <>
             <Table head={['Kis ko', 'Type', 'Baqi (dene hain)', '']}>
@@ -165,16 +165,16 @@ export default function Payments() {
                   </td>
                 </tr>
               ))}
-              {payAll.length === 0 && <tr><td colSpan={4} className="px-4 py-4 text-center text-sm" style={{ color: 'var(--muted)' }}>Sab clear — kisi ko dena baqi nahi.</td></tr>}
+              {payAll.length === 0 && <tr><td colSpan={4} className="px-4 py-4 text-center text-sm" style={{ color: 'var(--muted)' }}>Sab clear, kisi ko dena baqi nahi.</td></tr>}
             </Table>
             <Pagination meta={payMeta} page={payPage} onPage={setPayPage} />
           </>
         )}
       </div>
 
-      {/* Advances given — negative balances; work off against future dues */}
+      {/* Advances given, negative balances; work off against future dues */}
       <div>
-        <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Advance diye <span className="font-normal" style={{ color: 'var(--muted)' }}>— jo aage mazdoori / charge se khud adjust honge</span></h2>
+        <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Advance diye <span className="font-normal" style={{ color: 'var(--muted)' }}>jo aage mazdoori / charge se khud adjust honge</span></h2>
         {advances.isLoading ? <Spinner /> : (
           <Table head={['Kis ko', 'Type', 'Advance jama', '']}>
             {advRows.map((a) => (
@@ -229,7 +229,7 @@ export default function Payments() {
       )}
 
       {settle && (
-        <Modal title={`Pay — ${settle.name}`} onClose={() => setSettle(null)}>
+        <Modal title={`Paisa dein: ${settle.name}`} onClose={() => setSettle(null)}>
           <SettleForm
             outstanding={settle.balance}
             onSubmit={(payload) => settleMut.mutate({ row: settle, payload })}
@@ -239,8 +239,10 @@ export default function Payments() {
         </Modal>
       )}
 
+      {receipt && <PaymentReceipt payment={receipt} onClose={() => setReceipt(null)} />}
+
       {topUp && (
-        <Modal title={`Advance — ${topUp.name}`} onClose={() => setTopUp(null)}>
+        <Modal title={`Advance: ${topUp.name}`} onClose={() => setTopUp(null)}>
           <AdvanceForm
             who={typeLabel[topUp.type]}
             balance={-topUp.advance}
@@ -298,7 +300,7 @@ function PaymentForm({ kind, initialParty = '', onSubmit, busy, error }: { kind:
       </Field>
       {selected && <OutstandingNote label={outstandingLabel} amount={selected.balance} onFill={(rs) => set('amount', String(rs))} />}
       {selected && selected.balance <= 0 ? (
-        <p className="text-sm" style={{ color: 'var(--green)' }}>Sab clear — koi baqi nahi.</p>
+        <p className="text-sm" style={{ color: 'var(--green)' }}>Sab clear, koi baqi nahi.</p>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3">

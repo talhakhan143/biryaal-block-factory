@@ -54,7 +54,7 @@ function Stat({ label, hint, value, tone = 'text', to }: { label: string; hint: 
 function SectionTitle({ title, note }: { title: string; note?: string }) {
   return (
     <h2 className="mb-3 mt-6 text-sm font-bold" style={{ color: 'var(--text)' }}>
-      {title} {note && <span className="font-normal" style={{ color: 'var(--muted)' }}>— {note}</span>}
+      {title} {note && <span className="font-normal" style={{ color: 'var(--muted)' }}>({note})</span>}
     </h2>
   )
 }
@@ -90,9 +90,9 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader title="Dashboard" subtitle="Poora hisaab — har cheez yahan se control karein" />
+      <PageHeader title="Dashboard" subtitle="Poora hisaab, har cheez yahan se control karein" />
 
-      {/* Money position — sirf accounts-access wale (Sales User ko nahi) */}
+      {/* Money position, sirf accounts-access wale (Sales User ko nahi) */}
       {money && (
         <>
           <SectionTitle title="Paisa" note="cash position" />
@@ -131,15 +131,15 @@ export default function Dashboard() {
         <Stat label="Ready Stock" hint="Tayar maal · click for list" value={`${data.stock.ready} pcs`} tone="green" to="/inventory" />
       </div>
 
-      {/* Profit & Loss — sirf accounts-access wale */}
+      {/* Profit & Loss, sirf accounts-access wale */}
       {money && (
         <>
-          <SectionTitle title={`Munafa / Nuksan (${data.month.label})`} note="profit & loss — kharch me expenses + salaries + labour sab" />
+          <SectionTitle title={`Munafa / Nuksan (${data.month.label})`} note="profit & loss, kharch me expenses + salaries + labour sab" />
           <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
             <Stat label="Is mahine Aamdani" hint="Farokht + other income" value={formatPaisa(data.month.income)} tone="green" to="/reports" />
             <Stat label="Is mahine Kharch" hint="Expenses + salary + labour · click for breakdown" value={formatPaisa(data.month.expenses_total)} tone="red" to={expensesMonth} />
             <Stat label="Net Profit (mahina)" hint={data.month.net_profit < 0 ? 'NUKSAN' : 'Munafa is mahine'} value={formatPaisa(data.month.net_profit)} tone={data.month.net_profit < 0 ? 'red' : 'green'} />
-            <Stat label="Net Profit (ab tak)" hint={data.totals.net_profit < 0 ? 'NUKSAN — lifetime' : 'Lifetime munafa'} value={formatPaisa(data.totals.net_profit)} tone={data.totals.net_profit < 0 ? 'red' : 'green'} />
+            <Stat label="Net Profit (ab tak)" hint={data.totals.net_profit < 0 ? 'NUKSAN, lifetime' : 'Lifetime munafa'} value={formatPaisa(data.totals.net_profit)} tone={data.totals.net_profit < 0 ? 'red' : 'green'} />
           </div>
         </>
       )}
@@ -151,7 +151,7 @@ export default function Dashboard() {
         <Stat label="Total Sold" hint="Ab tak bik'e blocks" value={`${data.totals.sold} pcs`} tone="green" to="/sales" />
         <Stat label="Remaining Ready" hint="Bechne ke liye baqi" value={`${data.stock.ready} pcs`} tone="green" to="/inventory" />
         <Stat label="Curing Stock" hint="Curing me · tayar honay baqi" value={`${data.stock.curing} pcs`} tone="amber" to="/production" />
-        {/* Damaged card hidden — data safe, re-enable anytime */}
+        {/* Damaged card hidden, data safe, re-enable anytime */}
       </div>
 
       {/* Alerts */}
@@ -182,7 +182,7 @@ export default function Dashboard() {
       </div>
 
       {editMat && (
-        <Modal title={`Update — ${editMat.name}`} onClose={() => setEditMat(null)}>
+        <Modal title={`Update, ${editMat.name}`} onClose={() => setEditMat(null)}>
           <MaterialEditForm
             mat={editMat}
             busy={saveMat.isPending}
@@ -217,7 +217,7 @@ function MaterialEditForm({ mat, onSubmit, busy, error }: { mat: LowMat; onSubmi
         <Field label={`Current stock (${form.unit})`}><Input type="number" step="0.001" min="0" value={form.current_qty} onChange={(e) => set('current_qty', e.target.value)} required /></Field>
         <Field label="Low stock alert par"><Input type="number" step="0.001" min="0" value={form.low_stock_threshold} onChange={(e) => set('low_stock_threshold', e.target.value)} /></Field>
       </div>
-      <p className="text-xs" style={{ color: 'var(--muted)' }}>Stock manual theek karne ke liye — khareed ke liye Purchases use karein.</p>
+      <p className="text-xs" style={{ color: 'var(--muted)' }}>Stock manual theek karne ke liye, khareed ke liye Purchases use karein.</p>
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
       <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Update'}</Button>
     </form>

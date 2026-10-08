@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, FileText, HandCoins, Phone, MapPin } from 'lucide-react'
+import { ArrowLeft, FileText, HandCoins, Phone, MapPin, Printer } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
@@ -10,6 +10,7 @@ import {
   OutstandingNote, PagedTable, RowActions, Spinner, StatTile, Tabs,
 } from '../components/ui'
 import SaleInvoiceModal from '../components/SaleInvoiceModal'
+import { AdjustmentVoucher, PaymentReceipt, ReturnNote, type AdjustmentDoc, type PaymentDoc, type ReturnDoc } from '../components/receipts'
 import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface LedgerRow {
@@ -28,13 +29,16 @@ interface Sale {
   subtotal: number; discount: number; transport_fare: number; total: number; paid: number; balance: number
   payment_method?: string; items?: SaleItem[]
 }
-interface Receipt { id: string; reference: string; payment_date: string; amount: number; method: string; bank_ref?: string }
+interface Receipt {
+  id: string; reference: string; payment_date: string; amount: number; method: string; bank_ref?: string
+  direction?: string; notes?: string | null; against?: { type: string; reference?: string | null } | null
+}
 interface Return {
   id: string; reference: string; return_date: string; return_value: number
-  deduction: number; refund_amount: number; refund_mode: string
+  deduction: number; refund_amount: number; refund_mode: string; notes?: string | null
   items?: { product_name?: string; quantity: number; unit_price: number; line_total: number }[]
 }
-interface Adjustment { id: string; reference: string; mode: string; adjustment_date: string; amount: number; reason: string }
+interface Adjustment { id: string; reference: string; mode: string; adjustment_date: string; amount: number; reason: string; notes?: string | null }
 interface Dispatch {
   id: string; reference: string; dispatch_date: string; status: string
   driver?: { name: string } | null; vehicle?: { name?: string; plate?: string } | null
@@ -78,6 +82,8 @@ export default function CustomerDetail() {
   const { can } = useAuth()
   const [tab, setTab] = useState<TabKey>('statement')
   const [receiving, setReceiving] = useState(false)
+  // Paisa jama hote hi parchi khul jaye, phir list se bhi dobara nikal aaye.
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['customer-history', id],
@@ -86,9 +92,10 @@ export default function CustomerDetail() {
 
   const receive = useMutation({
     mutationFn: (payload: Record<string, unknown>) => api.post('/payments/receipt', { ...payload, customer_id: id }),
-    onSuccess: () => {
+    onSuccess: (res) => {
       MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setReceiving(false)
+      setReceipt(res.data.data)
     },
   })
 
@@ -165,9 +172,11 @@ export default function CustomerDetail() {
 
       {tab === 'statement' && <Statement rows={data.ledger} balance={s.factory.balance} />}
       {tab === 'sales' && <Sales rows={data.sales} />}
-      {tab === 'receipts' && <Receipts rows={data.receipts} />}
-      {tab === 'returns' && <Returns returns={data.returns} adjustments={data.adjustments} />}
+      {tab === 'receipts' && <Receipts rows={data.receipts} party={c.name} />}
+      {tab === 'returns' && <Returns returns={data.returns} adjustments={data.adjustments} party={c.name} />}
       {tab === 'dispatches' && <Dispatches rows={data.dispatches} />}
+
+      {receipt && <PaymentReceipt payment={receipt} party={c.name} onClose={() => setReceipt(null)} />}
 
       {receiving && (
         <Modal title={`Paisa jama karein: ${c.name}`} onClose={() => setReceiving(false)}>
@@ -296,12 +305,14 @@ function Sales({ rows }: { rows: Sale[] }) {
   )
 }
 
-function Receipts({ rows }: { rows: Receipt[] }) {
+function Receipts({ rows, party }: { rows: Receipt[]; party: string }) {
+  const [slip, setSlip] = useState<PaymentDoc | null>(null)
   if (rows.length === 0) return <Empty>Is customer se abhi koi paisa nahi aaya.</Empty>
   const total = rows.reduce((a, r) => a + r.amount, 0)
   return (
+    <>
     <PagedTable
-      head={['Ref', 'Date', 'Cash ya bank', 'Bank detail', { label: 'Kitna mila', align: 'right' }]}
+      head={['Ref', 'Date', 'Cash ya bank', 'Bank detail', { label: 'Kitna mila', align: 'right' }, '']}
       rows={rows}
       searchText={(r) => `${r.reference} ${r.payment_date} ${r.method} ${r.bank_ref ?? ''}`}
       searchPlaceholder="Ref ya date se dhoondein…"
@@ -309,6 +320,7 @@ function Receipts({ rows }: { rows: Receipt[] }) {
         <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
           <td className="px-4 py-2.5 font-bold" colSpan={4}>Kul paisa mila</td>
           <td className="px-4 py-2.5 text-right font-bold" style={{ color: 'var(--green)' }}>{formatPaisa(total)}</td>
+          <td />
         </tr>
       )}
       row={(r) => (
@@ -318,13 +330,27 @@ function Receipts({ rows }: { rows: Receipt[] }) {
           <td className="px-4 py-2 capitalize">{r.method}</td>
           <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>{r.bank_ref || '·'}</td>
           <td className="px-4 py-2 text-right font-medium" style={{ color: 'var(--green)' }}>{formatPaisa(r.amount)}</td>
+          <td className="px-4 py-2 text-right">
+            <RowActions>
+              <IconButton
+                icon={Printer}
+                label="Parchi dekhein / print karein"
+                tone="primary"
+                onClick={() => setSlip({ ...r, direction: r.direction ?? 'receipt' })}
+              />
+            </RowActions>
+          </td>
         </tr>
       )}
     />
+    {slip && <PaymentReceipt payment={slip} party={party} onClose={() => setSlip(null)} />}
+    </>
   )
 }
 
-function Returns({ returns, adjustments }: { returns: Return[]; adjustments: Adjustment[] }) {
+function Returns({ returns, adjustments, party }: { returns: Return[]; adjustments: Adjustment[]; party: string }) {
+  const [ret, setRet] = useState<ReturnDoc | null>(null)
+  const [adj, setAdj] = useState<AdjustmentDoc | null>(null)
   if (returns.length === 0 && adjustments.length === 0) return <Empty>Na koi maal wapas aaya, na koi hath se theek ki gayi entry.</Empty>
   return (
     <div className="space-y-5">
@@ -332,7 +358,7 @@ function Returns({ returns, adjustments }: { returns: Return[]; adjustments: Adj
         <div>
           <h3 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Maal wapsi</h3>
           <PagedTable
-            head={['Ref', 'Date', { label: 'Maal ki qeemat', align: 'right' }, { label: 'Kaata', align: 'right' }, { label: 'Wapas kiya', align: 'right' }, 'Kaise']}
+            head={['Ref', 'Date', { label: 'Maal ki qeemat', align: 'right' }, { label: 'Kaata', align: 'right' }, { label: 'Wapas kiya', align: 'right' }, 'Kaise', '']}
             rows={returns}
             searchText={(r) => `${r.reference} ${r.return_date} ${(r.items ?? []).map((i) => i.product_name ?? '').join(' ')}`}
             searchPlaceholder="Ref, date ya maal se dhoondein…"
@@ -348,6 +374,16 @@ function Returns({ returns, adjustments }: { returns: Return[]; adjustments: Adj
                     {r.refund_mode === 'account' ? 'Khate me' : r.refund_mode === 'cash' ? 'Cash diya' : 'Bank se diya'}
                   </Badge>
                 </td>
+                <td className="px-4 py-2 text-right">
+                  <RowActions>
+                    <IconButton
+                      icon={Printer}
+                      label="Parchi dekhein / print karein"
+                      tone="primary"
+                      onClick={() => setRet({ ...r, customer: { name: party } })}
+                    />
+                  </RowActions>
+                </td>
               </tr>
             )}
           />
@@ -357,7 +393,7 @@ function Returns({ returns, adjustments }: { returns: Return[]; adjustments: Adj
         <div>
           <h3 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>Hath se ki gayi theek</h3>
           <PagedTable
-            head={['Ref', 'Date', 'Kya kiya', 'Wajah', { label: 'Kitna', align: 'right' }]}
+            head={['Ref', 'Date', 'Kya kiya', 'Wajah', { label: 'Kitna', align: 'right' }, '']}
             rows={adjustments}
             searchText={(a) => `${a.reference} ${a.adjustment_date} ${a.reason}`}
             searchPlaceholder="Ref, date ya wajah se dhoondein…"
@@ -372,11 +408,23 @@ function Returns({ returns, adjustments }: { returns: Return[]; adjustments: Adj
                 </td>
                 <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>{a.reason}</td>
                 <td className="px-4 py-2 text-right font-medium">{formatPaisa(a.amount)}</td>
+                <td className="px-4 py-2 text-right">
+                  <RowActions>
+                    <IconButton
+                      icon={Printer}
+                      label="Parchi dekhein / print karein"
+                      tone="primary"
+                      onClick={() => setAdj({ ...a, party_name: party })}
+                    />
+                  </RowActions>
+                </td>
               </tr>
             )}
           />
         </div>
       )}
+      {ret && <ReturnNote ret={ret} onClose={() => setRet(null)} />}
+      {adj && <AdjustmentVoucher adjustment={adj} onClose={() => setAdj(null)} />}
     </div>
   )
 }

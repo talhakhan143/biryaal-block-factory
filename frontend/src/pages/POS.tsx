@@ -7,6 +7,7 @@ import { formatPaisa } from '../lib/money'
 import { Button, Card, Field, Input, MethodField, Modal, MoneyInput, Note, OutstandingNote, Select } from '../components/ui'
 import CustomerForm, { type CustomerPayload } from '../components/CustomerForm'
 import InvoiceSheet from '../components/InvoiceSheet'
+import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
 import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface Product {
@@ -34,7 +35,9 @@ export default function POS() {
   const [receipt, setReceipt] = useState<Record<string, unknown> | null>(null)
   const [addingCustomer, setAddingCustomer] = useState(false)
   const [takingAdvance, setTakingAdvance] = useState(false)
-  const [advanceSlip, setAdvanceSlip] = useState<{ reference: string; date: string; name: string; amount: number; held: number; method: string } | null>(null)
+  // Advance ki parchi wahi shared rasid hai jo baqi har page par chalti hai,
+  // taake customer ke haath me har jagah aik jaisa kaghaz jaye.
+  const [advanceSlip, setAdvanceSlip] = useState<{ payment: PaymentDoc; name: string; held: number } | null>(null)
 
   // MoneyInput akela "." ya "-" bhi rehne deta hai, aur Number('.') NaN hai.
   // Bina guard ke poora bill NaN ban jata tha aur "Rs NaN" dikhane ke bawajood
@@ -96,14 +99,7 @@ export default function POS() {
     onSuccess: (res) => {
       MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       customers.refetch()
-      setAdvanceSlip({
-        reference: res.data.reference,
-        date: res.data.payment_date,
-        name: res.customer.name,
-        amount: res.data.amount,
-        held: res.customer.advance,
-        method: res.data.method,
-      })
+      setAdvanceSlip({ payment: res.data, name: res.customer.name, held: res.customer.advance })
       setTakingAdvance(false)
     },
   })
@@ -203,7 +199,7 @@ export default function POS() {
 
         <div className="mt-4 space-y-3 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
           {/* Customer: cash (poora paisa) me optional, udhaar me zaroori */}
-          <Field label={isCredit ? 'Customer (Grahak) — zaroori (udhaar)' : 'Customer (Grahak) — optional'}>
+          <Field label={isCredit ? 'Customer (Grahak), zaroori (udhaar)' : 'Customer (Grahak) (optional)'}>
             <div className="flex items-center gap-2">
               <Select value={customerId} onChange={(e) => setCustomerId(e.target.value)} required={isCredit} className="flex-1">
                 <option value="">{isCredit ? 'Select…' : 'Walk-in (bina naam)'}</option>
@@ -240,11 +236,11 @@ export default function POS() {
           <Field label="Discount (Rs)">
             <MoneyInput value={discount} onChange={setDiscount} />
           </Field>
-          <Field label="Transport / kiraya (Rs) — customer deta hai">
+          <Field label="Transport / kiraya (Rs), customer deta hai">
             <MoneyInput value={transport} onChange={setTransport} />
           </Field>
-          {/* Paid now hamesha — khali = poora paisa; kam likho to baqi udhaar */}
-          <Field label={advanceHeld > 0 ? 'Paid now (Rs) — khali = advance se' : 'Paid now (Rs) — khali = poora'}>
+          {/* Paid now hamesha, khali = poora paisa; kam likho to baqi udhaar */}
+          <Field label={advanceHeld > 0 ? 'Paid now (Rs), khali = advance se' : 'Paid now (Rs), khali = poora'}>
             <MoneyInput value={paid} onChange={setPaid} placeholder={advanceHeld > 0 ? '0 (advance se)' : String(total / 100)} />
           </Field>
 
@@ -299,7 +295,15 @@ export default function POS() {
         </Modal>
       )}
 
-      {advanceSlip && <AdvanceSlip slip={advanceSlip} onClose={() => setAdvanceSlip(null)} />}
+      {advanceSlip && (
+        <PaymentReceipt
+          payment={advanceSlip.payment}
+          party={advanceSlip.name}
+          reason="Advance jama (paisa pehle, maal baad me)"
+          extraTotals={[{ label: 'Kul advance jama', value: advanceSlip.held }]}
+          onClose={() => setAdvanceSlip(null)}
+        />
+      )}
 
       {receipt && <Receipt sale={receipt} onClose={() => setReceipt(null)} />}
     </div>
@@ -349,20 +353,3 @@ function AdvanceForm({ held, onSubmit, busy, error }: { held: number; onSubmit: 
   )
 }
 
-function AdvanceSlip({ slip, onClose }: { slip: { reference: string; date: string; name: string; amount: number; held: number; method: string }; onClose: () => void }) {
-  return (
-    <InvoiceSheet
-      docType="Advance Receipt"
-      number={slip.reference}
-      date={slip.date}
-      customer={slip.name}
-      meta={`Received via ${slip.method.toUpperCase()}`}
-      lines={[{ name: 'Advance payment (paisa pehle, maal baad me)', qty: '1', total: slip.amount }]}
-      totals={[
-        { label: 'Aaj mila advance', value: slip.amount, strong: true },
-        { label: 'Kul advance jama', value: slip.held },
-      ]}
-      onClose={onClose}
-    />
-  )
-}

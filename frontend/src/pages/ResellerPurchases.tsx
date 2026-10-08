@@ -4,10 +4,11 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Wallet } from 'lucide-react'
+import { Printer, Wallet } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select } from '../components/ui'
 import type { RSupplier } from './ResellerSuppliers'
 import type { ResellerItem } from './ResellerItems'
+import { PaymentReceipt, PurchaseBill, type PaymentDoc, type PurchaseDoc } from '../components/receipts'
 
 interface RPurchase {
   id: string
@@ -16,9 +17,15 @@ interface RPurchase {
   item?: { name: string; unit: string }
   purchase_date: string
   quantity: number
+  unit_cost: number
+  transport_cost: number
+  loading_cost: number
+  unloading_cost: number
   total_cost: number
   paid_amount: number
   payment_status: string
+  bank_ref?: string | null
+  notes?: string | null
 }
 
 const statusColor: Record<string, string> = { paid: 'green', partial: 'amber', unpaid: 'red' }
@@ -32,6 +39,9 @@ export default function ResellerPurchases() {
   const [sort, setSort] = useState('purchase_date')
   const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [payFor, setPayFor] = useState<RPurchase | null>(null)
+  // Parchi: khareed ka bill, aur supplier ko diye paise ki rasid.
+  const [bill, setBill] = useState<PurchaseDoc | null>(null)
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
   const { data, isLoading } = useList<RPurchase>('reseller/purchases', { page, search, sort, dir })
   const manage = can('reseller.manage')
 
@@ -44,32 +54,36 @@ export default function ResellerPurchases() {
   const columns: Column<RPurchase>[] = [
     { key: 'reference', label: 'Ref', sortable: true, render: (p) => <span className="font-mono text-xs">{p.reference}</span> },
     { key: 'purchase_date', label: 'Date', sortable: true, render: (p) => p.purchase_date },
-    { key: 'supplier', label: 'Supplier', render: (p) => p.supplier?.name ?? '—' },
-    { key: 'item', label: 'Item', render: (p) => p.item?.name ?? '—' },
+    { key: 'supplier', label: 'Supplier', render: (p) => p.supplier?.name ?? '·' },
+    { key: 'item', label: 'Item', render: (p) => p.item?.name ?? '·' },
     { key: 'quantity', label: 'Qty', sortable: true, align: 'right', render: (p) => `${p.quantity} ${p.item?.unit ?? ''}` },
     { key: 'total_cost', label: 'Total', sortable: true, align: 'right', render: (p) => formatPaisa(p.total_cost) },
     { key: 'payment_status', label: 'Status', sortable: true, render: (p) => <Badge color={statusColor[p.payment_status]}>{p.payment_status}</Badge> },
     {
       key: 'actions', label: '', align: 'right', render: (p) => (
-        manage && p.payment_status !== 'paid'
-          ? <RowActions><IconButton icon={Wallet} label="Pay" tone="primary" onClick={() => setPayFor(p)} /></RowActions>
-          : null
+        <RowActions>
+          <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setBill(p)} />
+          {manage && p.payment_status !== 'paid' && <IconButton icon={Wallet} label="Pay" tone="primary" onClick={() => setPayFor(p)} />}
+        </RowActions>
       ),
     },
   ]
 
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/reseller/purchases', p),
-    onSuccess: () => {
+    onSuccess: (res) => {
       ['reseller/purchases', 'reseller/items', 'reseller/suppliers', 'reseller/payables', 'reseller/payments', 'reseller/dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setCreating(false)
+      setBill(res.data.data)
     },
   })
   const pay = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/reseller/purchases/${id}/pay`, payload),
-    onSuccess: () => {
+    onSuccess: (res) => {
       ['reseller/purchases', 'reseller/suppliers', 'reseller/payables', 'reseller/payments', 'reseller/dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setPayFor(null)
+      // Yahan parent purchase wapas aata hai, parchi alag se `payment` me.
+      setReceipt(res.data.payment)
     },
   })
 
@@ -77,7 +91,7 @@ export default function ResellerPurchases() {
     <div>
       <PageHeader
         title="Reseller Purchases"
-        subtitle="Maal khareedna — stock chadhega, udhaar bhi track hoga"
+        subtitle="Maal khareedna, stock chadhega, udhaar bhi track hoga"
         actions={manage && <Button onClick={() => setCreating(true)}>+ Khareed</Button>}
       />
       <DataTable
@@ -85,8 +99,10 @@ export default function ResellerPurchases() {
         search={search} onSearch={(v) => { setSearch(v); setPage(1) }} searchPlaceholder="Ref, supplier ya item se search…"
         sort={sort} dir={dir} onSort={onSort} meta={data?.meta} page={page} onPage={setPage}
       />
+      {bill && <PurchaseBill purchase={bill} subtitle="Resellers Point" onClose={() => setBill(null)} />}
+      {receipt && <PaymentReceipt payment={receipt} subtitle="Resellers Point" onClose={() => setReceipt(null)} />}
       {payFor && (
-        <Modal title={`Pay — ${payFor.reference}`} onClose={() => setPayFor(null)}>
+        <Modal title={`Pay, ${payFor.reference}`} onClose={() => setPayFor(null)}>
           <PayBillForm outstanding={payFor.total_cost - payFor.paid_amount} onSubmit={(payload) => pay.mutate({ id: payFor.id, payload })} busy={pay.isPending} error={pay.error ? apiError(pay.error) : ''} />
         </Modal>
       )}
@@ -199,7 +215,7 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
         <div className="mt-1 flex justify-between border-t pt-1 text-base font-bold" style={{ borderColor: 'var(--border)' }}>
           <span>Total bill</span><span style={{ color: 'var(--primary)' }}>{rs(total)}</span>
         </div>
-        {/* Profit / margin — landed cost vs retail */}
+        {/* Profit / margin, landed cost vs retail */}
         {retail > 0 && qty > 0 && (
           <div className="mt-1 border-t pt-1" style={{ borderColor: 'var(--border)' }}>
             <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Landed cost / unit</span><span>{rs(landed)}</span></div>
@@ -215,7 +231,7 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
           </>
         )}
       </div>
-      {overpaid && <p className="text-sm" style={{ color: 'var(--red)' }}>Diya hua amount bill ({rs(total)}) se zyada hai — kam karein.</p>}
+      {overpaid && <p className="text-sm" style={{ color: 'var(--red)' }}>Diya hua amount bill ({rs(total)}) se zyada hai, kam karein.</p>}
 
       <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
       {error && <p className="text-sm text-red-600">{error}</p>}

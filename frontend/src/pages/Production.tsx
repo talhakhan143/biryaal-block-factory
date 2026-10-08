@@ -53,7 +53,7 @@ export default function Production() {
   const columns: Column<Batch>[] = [
     { key: 'reference', label: 'Ref', sortable: true, render: (b) => <span className="font-mono text-xs">{b.reference}</span> },
     { key: 'production_date', label: 'Date', sortable: true, render: (b) => b.production_date },
-    { key: 'product', label: 'Product', render: (b) => b.product?.name ?? '—' },
+    { key: 'product', label: 'Product', render: (b) => b.product?.name ?? '·' },
     { key: 'shift', label: 'Shift', render: (b) => <span className="capitalize">{b.shift}</span> },
     { key: 'quantity_produced', label: 'Qty', sortable: true, render: (b) => b.quantity_produced },
     { key: 'ready_at', label: 'Ready On', render: (b) => b.ready_at },

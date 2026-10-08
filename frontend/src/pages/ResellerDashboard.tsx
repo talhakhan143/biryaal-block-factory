@@ -46,7 +46,7 @@ function Stat({ label, hint, value, tone = 'text', to }: { label: string; hint: 
 function SectionTitle({ title, note }: { title: string; note?: string }) {
   return (
     <h2 className="mb-3 mt-6 text-sm font-bold" style={{ color: 'var(--text)' }}>
-      {title} {note && <span className="font-normal" style={{ color: 'var(--muted)' }}>— {note}</span>}
+      {title} {note && <span className="font-normal" style={{ color: 'var(--muted)' }}>({note})</span>}
     </h2>
   )
 }
@@ -69,9 +69,9 @@ export default function ResellerDashboard() {
 
   return (
     <div>
-      <PageHeader title="Resellers Point — Dashboard" subtitle="Alag hisab — aaj ka lain den, payable/receivable, stock, kiraya" />
+      <PageHeader title="Resellers Point, Dashboard" subtitle="Alag hisab, aaj ka lain den, payable/receivable, stock, kiraya" />
 
-      {/* Money / profit — sirf accounts-access wale (Sales User ko nahi) */}
+      {/* Money / profit, sirf accounts-access wale (Sales User ko nahi) */}
       {money && (
         <>
           <SectionTitle title="Aaj (Today)" note="kitna aya / gaya" />
@@ -140,7 +140,7 @@ export default function ResellerDashboard() {
       </div>
 
       {editItem && (
-        <Modal title={`Update — ${editItem.name}`} onClose={() => setEditItem(null)}>
+        <Modal title={`Update, ${editItem.name}`} onClose={() => setEditItem(null)}>
           <ItemEditForm item={editItem} busy={saveItem.isPending} error={saveItem.error ? apiError(saveItem.error) : ''} onSubmit={(payload) => saveItem.mutate({ id: editItem.id, payload })} />
         </Modal>
       )}
@@ -172,7 +172,7 @@ function ItemEditForm({ item, onSubmit, busy, error }: { item: LowItem; onSubmit
         <Field label={`Current stock (${form.unit})`}><Input type="number" step="0.001" min="0" value={form.stock_qty} onChange={(e) => set('stock_qty', e.target.value)} required /></Field>
         <Field label="Low stock alert par"><Input type="number" step="0.001" min="0" value={form.low_stock_threshold} onChange={(e) => set('low_stock_threshold', e.target.value)} /></Field>
       </div>
-      <p className="text-xs" style={{ color: 'var(--muted)' }}>Stock manual theek karne ke liye — khareed ke liye Purchases use karein.</p>
+      <p className="text-xs" style={{ color: 'var(--muted)' }}>Stock manual theek karne ke liye, khareed ke liye Purchases use karein.</p>
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
       <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Update'}</Button>
     </form>

@@ -141,7 +141,7 @@ class SaleService
                 $lines[] = ['account' => Account::SALES, 'credit' => $goodsNet, 'memo' => 'Block sale'];
             }
             if ($fare > 0) {
-                // freight collected on behalf of the driver — a liability, not revenue
+                // freight collected on behalf of the driver, a liability, not revenue
                 $lines[] = ['account' => Account::TRANSPORT_CLEARING, 'credit' => $fare, 'memo' => 'Freight collected'];
             }
 
@@ -166,13 +166,13 @@ class SaleService
     {
         DB::transaction(function () use ($sale) {
             if ($sale->dispatches()->exists()) {
-                throw new InvalidArgumentException('Is order ki delivery (challan) ho chuki — pehle wo handle karein, phir delete.');
+                throw new InvalidArgumentException('Is order ki delivery (challan) ho chuki, pehle wo handle karein, phir delete.');
             }
             if (SalesReturn::where('sale_id', $sale->id)->exists()) {
-                throw new InvalidArgumentException('Is invoice par block return mojood hai — delete nahi ho sakta.');
+                throw new InvalidArgumentException('Is invoice par block return mojood hai, delete nahi ho sakta.');
             }
             if ($sale->allocatedPayments()->exists()) {
-                throw new InvalidArgumentException('Is invoice par alag se payment receive ho chuki — pehle wo reverse karein, phir delete.');
+                throw new InvalidArgumentException('Is invoice par alag se payment receive ho chuki, pehle wo reverse karein, phir delete.');
             }
             $sale->load('items.product', 'customer');
 

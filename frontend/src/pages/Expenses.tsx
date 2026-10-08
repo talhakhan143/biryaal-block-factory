@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { X } from 'lucide-react'
+import { Printer, X } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, type Column, DataTable, Field, Input, MethodField, Modal, MoneyInput, Note, PageHeader, Select, StatTile } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, Note, PageHeader, RowActions, Select, StatTile } from '../components/ui'
+import { ExpenseVoucher, type ExpenseDoc } from '../components/receipts'
 import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface Expense {
@@ -17,6 +18,8 @@ interface Expense {
   title: string
   amount: number
   method: string
+  bank_ref?: string | null
+  notes?: string | null
 }
 
 interface CostSummary {
@@ -39,6 +42,8 @@ export default function Expenses() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const [creating, setCreating] = useState(false)
+  // Jo kharcha abhi likha gaya ya jis row ka print dabaya gaya, uski parchi.
+  const [voucher, setVoucher] = useState<ExpenseDoc | null>(null)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('expense_date')
@@ -81,9 +86,11 @@ export default function Expenses() {
 
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/expenses', p),
-    onSuccess: () => {
+    onSuccess: (res) => {
       MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setCreating(false)
+      // Paisa gaya hai, to kaghaz saath hi nikal aana chahiye.
+      setVoucher(res.data.data)
     },
   })
 
@@ -94,6 +101,13 @@ export default function Expenses() {
     { key: 'title', label: 'Title', render: (e) => e.title },
     { key: 'amount', label: 'Amount', sortable: true, align: 'right', render: (e) => formatPaisa(e.amount) },
     { key: 'method', label: 'Method', render: (e) => <span className="capitalize">{e.method}</span> },
+    {
+      key: 'actions', label: '', align: 'right', render: (e) => (
+        <RowActions>
+          <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setVoucher(e)} />
+        </RowActions>
+      ),
+    },
   ]
 
   const scopeLabel = from && to && from === to ? pretty(from)
@@ -106,7 +120,7 @@ export default function Expenses() {
     <div>
       <PageHeader
         title="Expenses"
-        subtitle="Kharchay — bijli, diesel waghera"
+        subtitle="Kharchay, bijli, diesel waghera"
         actions={can('expenses.manage') && <Button onClick={() => setCreating(true)}>+ Expense</Button>}
       />
 
@@ -213,6 +227,8 @@ export default function Expenses() {
           <Note>In dinon me koi salary ya mazdoori nahi likhi gayi.</Note>
         </div>
       )}
+
+      {voucher && <ExpenseVoucher expense={voucher} onClose={() => setVoucher(null)} />}
 
       {creating && (
         <Modal title="New Expense" onClose={() => setCreating(false)}>

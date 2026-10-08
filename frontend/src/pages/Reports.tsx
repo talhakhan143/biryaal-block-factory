@@ -59,7 +59,7 @@ export default function Reports() {
   const cell = (col: Column, row: Record<string, string | number>) => {
     const v = row[col.key]
     if (col.money && typeof v === 'number') return formatPaisa(v)
-    return v ?? '—'
+    return v ?? '·'
   }
 
   return (

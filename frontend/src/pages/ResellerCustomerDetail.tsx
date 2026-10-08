@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, FileText, HandCoins, MapPin, Phone } from 'lucide-react'
+import { ArrowLeft, FileText, HandCoins, MapPin, Phone, Printer } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
@@ -10,6 +10,7 @@ import {
   OutstandingNote, PagedTable, RowActions, Spinner, StatTile, Tabs,
 } from '../components/ui'
 import SaleInvoiceModal from '../components/SaleInvoiceModal'
+import { PaymentReceipt, RentalVoucher, type PaymentDoc, type RentalDoc } from '../components/receipts'
 import { RESELLER_MONEY_KEYS } from '../lib/queryKeys'
 
 interface SaleItem { item_name?: string; unit?: string; quantity: number; unit_price: number; line_total: number }
@@ -18,7 +19,7 @@ interface Sale {
   subtotal: number; discount: number; transport_fare: number; total: number; paid: number; balance: number
   items?: SaleItem[]
 }
-interface Receipt { id: string; reference: string; payment_date: string; amount: number; method: string; bank_ref?: string }
+interface Receipt { id: string; reference: string; payment_date: string; amount: number; method: string; bank_ref?: string; notes?: string | null }
 interface Return { id: string; reference: string; return_date: string; return_value: number; deduction: number; refund_amount: number; refund_mode: string }
 interface Rental {
   id: string; reference: string; item_name: string; unit: string; quantity: number
@@ -53,6 +54,8 @@ export default function ResellerCustomerDetail() {
   const [tab, setTab] = useState<TabKey>('sales')
   const [receiving, setReceiving] = useState(false)
   const [invoiceId, setInvoiceId] = useState<string | null>(null)
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
+  const [rentalDoc, setRentalDoc] = useState<RentalDoc | null>(null)
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['reseller/customers', id],
@@ -61,9 +64,12 @@ export default function ResellerCustomerDetail() {
 
   const receive = useMutation({
     mutationFn: (payload: Record<string, unknown>) => api.post('/reseller/payments/receive', { ...payload, customer_id: id }),
-    onSuccess: () => {
+    onSuccess: (res) => {
+      const doc = res.data.data
       RESELLER_MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setReceiving(false)
+      // Reseller ki books me rukh 'in' likha hota hai, parchi 'receipt' samajhti hai.
+      if (doc) setReceipt({ ...doc, direction: 'receipt', party_name: doc.party_name ?? data?.customer.name })
     },
   })
 
@@ -120,8 +126,30 @@ export default function ResellerCustomerDetail() {
       <Tabs tabs={tabs} active={tab} onChange={setTab} />
 
       {tab === 'sales' && <Sales rows={data.sales} onInvoice={setInvoiceId} />}
-      {tab === 'receipts' && <Receipts rows={data.receipts} />}
-      {tab === 'rentals' && <Rentals rows={data.rentals} />}
+      {tab === 'receipts' && (
+        <Receipts
+          rows={data.receipts}
+          onParchi={(r) => setReceipt({
+            // Is tab me sirf aaya hua paisa hota hai, is liye rukh 'receipt'.
+            ...r,
+            direction: 'receipt',
+            party_name: c.name,
+            payment_date: String(r.payment_date).slice(0, 10),
+          })}
+        />
+      )}
+      {tab === 'rentals' && (
+        <Rentals
+          rows={data.rentals}
+          onParchi={(r) => setRentalDoc({
+            // Sirf naam badle hain, hisaab API ka hi hai.
+            ...r,
+            customer: { name: c.name },
+            accrued_total: r.accrued,
+            outstanding: r.due,
+          })}
+        />
+      )}
       {tab === 'returns' && <Returns rows={data.returns} />}
 
       {invoiceId && <SaleInvoiceModal id={invoiceId} source="reseller" onClose={() => setInvoiceId(null)} />}
@@ -136,6 +164,9 @@ export default function ResellerCustomerDetail() {
           />
         </Modal>
       )}
+
+      {receipt && <PaymentReceipt payment={receipt} subtitle="Resellers Point" onClose={() => setReceipt(null)} />}
+      {rentalDoc && <RentalVoucher rental={rentalDoc} onClose={() => setRentalDoc(null)} />}
     </div>
   )
 }
@@ -178,12 +209,12 @@ function Sales({ rows, onInvoice }: { rows: Sale[]; onInvoice: (id: string) => v
   )
 }
 
-function Receipts({ rows }: { rows: Receipt[] }) {
+function Receipts({ rows, onParchi }: { rows: Receipt[]; onParchi: (r: Receipt) => void }) {
   if (rows.length === 0) return <Empty>Is customer se abhi koi paisa nahi aaya.</Empty>
   const total = rows.reduce((a, r) => a + r.amount, 0)
   return (
     <PagedTable
-      head={['Ref', 'Date', 'Cash ya bank', 'Bank detail', { label: 'Kitna mila', align: 'right' }]}
+      head={['Ref', 'Date', 'Cash ya bank', 'Bank detail', { label: 'Kitna mila', align: 'right' }, '']}
       rows={rows}
       searchText={(r) => `${r.reference} ${r.payment_date} ${r.method} ${r.bank_ref ?? ''}`}
       searchPlaceholder="Ref ya date se dhoondein…"
@@ -191,6 +222,7 @@ function Receipts({ rows }: { rows: Receipt[] }) {
         <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
           <td className="px-4 py-2.5 font-bold" colSpan={4}>Kul paisa mila</td>
           <td className="px-4 py-2.5 text-right font-bold" style={{ color: 'var(--green)' }}>{formatPaisa(total)}</td>
+          <td />
         </tr>
       )}
       row={(r) => (
@@ -200,17 +232,20 @@ function Receipts({ rows }: { rows: Receipt[] }) {
           <td className="px-4 py-2 capitalize">{r.method}</td>
           <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>{r.bank_ref || '·'}</td>
           <td className="px-4 py-2 text-right font-medium" style={{ color: 'var(--green)' }}>{formatPaisa(r.amount)}</td>
+          <td className="px-4 py-2 text-right">
+            <RowActions><IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => onParchi(r)} /></RowActions>
+          </td>
         </tr>
       )}
     />
   )
 }
 
-function Rentals({ rows }: { rows: Rental[] }) {
+function Rentals({ rows, onParchi }: { rows: Rental[]; onParchi: (r: Rental) => void }) {
   if (rows.length === 0) return <Empty>Is customer ne kuch kiraye par nahi liya.</Empty>
   return (
     <PagedTable
-      head={['Ref', 'Cheez', { label: 'Kitni', align: 'right' }, { label: 'Ek din ka', align: 'right' }, 'Kab se', { label: 'Din', align: 'right' }, { label: 'Kul bana', align: 'right' }, { label: 'Paisa mila', align: 'right' }, { label: 'Baqi', align: 'right' }, 'Haal']}
+      head={['Ref', 'Cheez', { label: 'Kitni', align: 'right' }, { label: 'Ek din ka', align: 'right' }, 'Kab se', { label: 'Din', align: 'right' }, { label: 'Kul bana', align: 'right' }, { label: 'Paisa mila', align: 'right' }, { label: 'Baqi', align: 'right' }, 'Haal', '']}
       rows={rows}
       searchText={(r) => `${r.reference} ${r.item_name} ${r.start_date} ${r.status === 'returned' ? 'Wapas aa gaya' : 'Abhi uske paas'}`}
       searchPlaceholder="Ref ya cheez ke naam se dhoondein…"
@@ -226,6 +261,9 @@ function Rentals({ rows }: { rows: Rental[] }) {
           <td className="px-4 py-2 text-right" style={{ color: 'var(--green)' }}>{formatPaisa(r.paid_amount)}</td>
           <td className="px-4 py-2 text-right font-medium" style={{ color: r.due > 0 ? 'var(--amber)' : undefined }}>{formatPaisa(r.due)}</td>
           <td className="px-4 py-2"><Badge color={r.status === 'returned' ? 'green' : 'amber'}>{r.status === 'returned' ? 'Wapas aa gaya' : 'Abhi uske paas'}</Badge></td>
+          <td className="px-4 py-2 text-right">
+            <RowActions><IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => onParchi(r)} /></RowActions>
+          </td>
         </tr>
       )}
     />

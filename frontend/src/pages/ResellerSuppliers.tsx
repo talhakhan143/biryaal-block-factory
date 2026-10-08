@@ -6,6 +6,7 @@ import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { SquarePen, Trash2, Wallet } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, useConfirm } from '../components/ui'
+import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
 
 export interface RSupplier {
   id: string
@@ -24,6 +25,7 @@ export default function ResellerSuppliers() {
   const [editing, setEditing] = useState<RSupplier | null>(null)
   const [creating, setCreating] = useState(false)
   const [payFor, setPayFor] = useState<RSupplier | null>(null)
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('created_at')
@@ -49,8 +51,12 @@ export default function ResellerSuppliers() {
   })
   const pay = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/reseller/suppliers/${id}/pay`, payload),
-    onSuccess: () => {
+    onSuccess: (res) => {
       ['reseller/suppliers', 'reseller/purchases', 'reseller/dashboard', 'reseller/payables', 'reseller/payments'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+      // Is endpoint par supplier res.data.data me aata hai aur parchi res.data.payment me.
+      const doc = res.data.payment
+      // Supplier ko paisa diya ja raha hai, is liye parchi 'payment' wali hai.
+      if (doc) setReceipt({ ...doc, direction: 'payment', party_name: doc.party_name ?? payFor?.name })
       setPayFor(null)
     },
   })
@@ -60,7 +66,7 @@ export default function ResellerSuppliers() {
 
   const columns: Column<RSupplier>[] = [
     { key: 'name', label: 'Name', sortable: true, render: (s) => <span className="font-medium">{s.name}</span> },
-    { key: 'phone', label: 'Phone', render: (s) => s.phone ?? '—' },
+    { key: 'phone', label: 'Phone', render: (s) => s.phone ?? '·' },
     { key: 'balance', label: 'Udhaar (dena)', sortable: true, align: 'right', render: (s) => <span style={{ color: s.balance > 0 ? 'var(--amber)' : 'var(--muted)' }}>{formatPaisa(s.balance)}</span> },
     { key: 'status', label: 'Status', render: (s) => (s.is_active ? <Badge color="green">Active</Badge> : <Badge color="slate">Off</Badge>) },
     { key: 'created_at', label: 'Kab bana', sortable: true, render: (r) => (r.created_at ? String(r.created_at).slice(0, 10) : '·') },
@@ -81,7 +87,7 @@ export default function ResellerSuppliers() {
     <div>
       <PageHeader
         title="Reseller Suppliers"
-        subtitle="Jin se maal khareedte ho — udhaar/hisab yahan"
+        subtitle="Jin se maal khareedte ho, udhaar/hisab yahan"
         actions={manage && <Button onClick={() => setCreating(true)}>+ Supplier</Button>}
       />
       <DataTable
@@ -95,10 +101,11 @@ export default function ResellerSuppliers() {
         </Modal>
       )}
       {payFor && (
-        <Modal title={`Pay — ${payFor.name}`} onClose={() => setPayFor(null)}>
+        <Modal title={`Pay, ${payFor.name}`} onClose={() => setPayFor(null)}>
           <PaySupplierForm outstanding={payFor.balance} onSubmit={(payload) => pay.mutate({ id: payFor.id, payload })} busy={pay.isPending} error={pay.error ? apiError(pay.error) : ''} />
         </Modal>
       )}
+      {receipt && <PaymentReceipt payment={receipt} subtitle="Resellers Point" onClose={() => setReceipt(null)} />}
     </div>
   )
 }

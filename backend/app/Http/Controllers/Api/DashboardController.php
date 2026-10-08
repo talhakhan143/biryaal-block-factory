@@ -61,7 +61,7 @@ class DashboardController extends Controller
         // ---- Money owed vs advances. We split each party's signed balance:
         //      positive = we owe them (payable), negative = advance we've already
         //      paid (they work it off). Summing positives/negatives separately
-        //      keeps both figures honest — the PAYABLE control account is just
+        //      keeps both figures honest, the PAYABLE control account is just
         //      their net, so the books still reconcile. ----
         $receivables = (int) Customer::where('balance', '>', 0)->sum('balance');
         // Customers ka wo paisa jo hamare paas pehle se jama hai (minus balance).
@@ -158,7 +158,7 @@ class DashboardController extends Controller
 
     /**
      * Count POS orders that still have blocks left to deliver. Done entirely in
-     * SQL (per sale+product: ordered minus dispatched) — no model hydration, so
+     * SQL (per sale+product: ordered minus dispatched), no model hydration, so
      * it stays fast as data grows.
      */
     private function pendingDispatchCount(): int

@@ -32,12 +32,12 @@ export default function AuditLogs() {
     { key: 'user', label: 'User', render: (a) => a.user },
     { key: 'event', label: 'Action', sortable: true, render: (a) => <Badge color={eventColor[a.event] ?? 'slate'}>{a.event}</Badge> },
     { key: 'auditable_type', label: 'Record', sortable: true, render: (a) => a.model },
-    { key: 'fields', label: 'Changed fields', render: (a) => <span className="text-xs" style={{ color: 'var(--muted)' }}>{Object.keys(a.new_values ?? {}).slice(0, 6).join(', ') || '—'}</span> },
+    { key: 'fields', label: 'Changed fields', render: (a) => <span className="text-xs" style={{ color: 'var(--muted)' }}>{Object.keys(a.new_values ?? {}).slice(0, 6).join(', ') || '·'}</span> },
   ]
 
   return (
     <div>
-      <PageHeader title="Audit Logs" subtitle="Kisne kya change kiya — record" />
+      <PageHeader title="Audit Logs" subtitle="Kisne kya change kiya, record" />
       <DataTable
         columns={columns}
         rows={data?.data}

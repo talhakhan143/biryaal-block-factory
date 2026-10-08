@@ -63,7 +63,7 @@ export default function Suppliers() {
 
   const columns: Column<Supplier>[] = [
     { key: 'name', label: 'Name', sortable: true, render: (s) => <span className="font-medium" style={{ opacity: s.is_active ? 1 : 0.55 }}>{s.name}</span> },
-    { key: 'phone', label: 'Phone', sortable: true, render: (s) => s.phone ?? '—' },
+    { key: 'phone', label: 'Phone', sortable: true, render: (s) => s.phone ?? '·' },
     { key: 'balance', label: 'Balance (we owe)', sortable: true, align: 'right', render: (s) => (s.balance > 0 ? <Badge color="red">{formatPaisa(s.balance)}</Badge> : <Badge color="green">Settled</Badge>) },
     { key: 'is_active', label: 'Status', sortable: true, render: (s) => (s.is_active ? <Badge color="green">Active</Badge> : <Badge color="amber">Off</Badge>) },
     { key: 'created_at', label: 'Kab bana', sortable: true, render: (r) => (r.created_at ? String(r.created_at).slice(0, 10) : '·') },
@@ -92,7 +92,7 @@ export default function Suppliers() {
     <div>
       <PageHeader
         title="Suppliers"
-        subtitle="Kisi bhi naam par click karein, poori history khul jayegi. Maal walay — jin se kacha maal lete hain"
+        subtitle="Kisi bhi naam par click karein, poori history khul jayegi. Maal walay, jin se kacha maal lete hain"
         actions={can('suppliers.manage') && <Button onClick={() => setCreating(true)}>+ Supplier</Button>}
       />
 
@@ -159,7 +159,7 @@ function LedgerModal({ id, onClose }: { id: string; onClose: () => void }) {
       ) : (
         <div>
           <div className="mb-3 text-sm">
-            {data.supplier.name} — Balance: <strong>{formatPaisa(data.balance)}</strong>
+            {data.supplier.name}, Balance: <strong>{formatPaisa(data.balance)}</strong>
           </div>
           <Table head={['Date', 'Ref', 'Desc', { label: 'Debit', align: 'right' }, { label: 'Credit', align: 'right' }]}>
             {data.rows.map((r: Record<string, string | number>, i: number) => (
@@ -167,8 +167,8 @@ function LedgerModal({ id, onClose }: { id: string; onClose: () => void }) {
                 <td className="px-4 py-2">{r.date}</td>
                 <td className="px-4 py-2">{r.reference}</td>
                 <td className="px-4 py-2">{r.description}</td>
-                <td className="px-4 py-2">{r.debit ? formatPaisa(Number(r.debit)) : '—'}</td>
-                <td className="px-4 py-2">{r.credit ? formatPaisa(Number(r.credit)) : '—'}</td>
+                <td className="px-4 py-2">{r.debit ? formatPaisa(Number(r.debit)) : '·'}</td>
+                <td className="px-4 py-2">{r.credit ? formatPaisa(Number(r.credit)) : '·'}</td>
               </tr>
             ))}
           </Table>

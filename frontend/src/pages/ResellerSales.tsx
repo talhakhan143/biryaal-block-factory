@@ -7,6 +7,7 @@ import { useAuth } from '../lib/auth'
 import { FileText, HandCoins, Trash2 } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, useConfirm } from '../components/ui'
 import SaleInvoiceModal from '../components/SaleInvoiceModal'
+import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
 
 interface Sale {
   id: string
@@ -32,6 +33,8 @@ export default function ResellerSales() {
   const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [payFor, setPayFor] = useState<Sale | null>(null)
   const [invoiceId, setInvoiceId] = useState<string | null>(null)
+  // Customer se paisa mila to rasid khud khul jaye.
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
   const { data, isLoading } = useList<Sale>('reseller/sales', { page, search, sort, dir })
   const manage = can('reseller.manage')
 
@@ -44,7 +47,8 @@ export default function ResellerSales() {
   const invalidate = () => ['reseller/sales', 'reseller/items', 'reseller/dashboard', 'reseller/receivables', 'reseller/payables', 'reseller/payments'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
   const pay = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/reseller/sales/${id}/receive`, payload),
-    onSuccess: () => { invalidate(); setPayFor(null) },
+    // Yahan parent bill wapas aata hai, parchi alag se `payment` me.
+    onSuccess: (res) => { invalidate(); setPayFor(null); setReceipt(res.data.payment) },
   })
   const del = useMutation({
     mutationFn: (id: string) => api.delete(`/reseller/sales/${id}`),
@@ -76,14 +80,15 @@ export default function ResellerSales() {
 
   return (
     <div>
-      <PageHeader title="Reseller Sales" subtitle="Farokht record, udhaar wasooli — sab alag hisab" />
+      <PageHeader title="Reseller Sales" subtitle="Farokht record, udhaar wasooli, sab alag hisab" />
       <DataTable
         columns={columns} rows={data?.data} loading={isLoading} emptyText="Koi farokht nahi."
         search={search} onSearch={(v) => { setSearch(v); setPage(1) }} searchPlaceholder="Invoice ya customer se search…"
         sort={sort} dir={dir} onSort={onSort} meta={data?.meta} page={page} onPage={setPage}
       />
+      {receipt && <PaymentReceipt payment={receipt} subtitle="Resellers Point" onClose={() => setReceipt(null)} />}
       {payFor && (
-        <Modal title={`Receive — ${payFor.invoice_no}`} onClose={() => setPayFor(null)}>
+        <Modal title={`Receive, ${payFor.invoice_no}`} onClose={() => setPayFor(null)}>
           <ReceiveForm outstanding={payFor.balance} onSubmit={(payload) => pay.mutate({ id: payFor.id, payload })} busy={pay.isPending} error={pay.error ? apiError(pay.error) : ''} />
         </Modal>
       )}

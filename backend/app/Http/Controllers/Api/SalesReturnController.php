@@ -19,7 +19,8 @@ class SalesReturnController extends Controller
     public function index(Request $request)
     {
         $query = SalesReturn::query()
-            ->with('customer')
+            // items bhi sath: wapsi ki parchi par maal ki line chhapni hoti hai.
+            ->with(['customer', 'items.product:id,name'])
             ->when($request->from, fn ($q, $d) => $q->whereDate('return_date', '>=', $d))
             ->when($request->to, fn ($q, $d) => $q->whereDate('return_date', '<=', $d));
 

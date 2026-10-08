@@ -33,7 +33,7 @@ class StoreSaleRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'customer_id.required_if' => 'Udhaar (credit) bikri ke liye customer chunna zaroori hai.',
+            'customer_id.required_if' => 'Udhaar (credit) wale bill ke liye customer chunna zaroori hai.',
             'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
         ];
     }

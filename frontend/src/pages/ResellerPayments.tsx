@@ -4,12 +4,23 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Wallet, HandCoins } from 'lucide-react'
+import { Wallet, HandCoins, Printer } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, PagedTable, RowActions, Spinner } from '../components/ui'
+import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
 
 interface Payable { type: string; id: string; name: string; balance: number }
 interface Receivable { customer_id: string; name: string; sale_due: number; kiraya_due: number; total: number }
-interface PayRow { id: string; reference: string; direction: string; party: string; amount: number; method: string; payment_date: string }
+interface PayRow extends PaymentDoc { id: string; party: string }
+
+/**
+ * Reseller ki books me paise ka rukh 'in' / 'out' likha hota hai, aur parchi
+ * 'receipt' / 'payment' samajhti hai. Yahan sirf wahi naam badalta hai, rakam
+ * ya hisaab ko haath nahi lagta.
+ */
+const asParchi = (p: PaymentDoc): PaymentDoc => ({
+  ...p,
+  direction: p.direction === 'in' || p.direction === 'receipt' ? 'receipt' : 'payment',
+})
 
 export default function ResellerPayments() {
   const { can } = useAuth()
@@ -17,6 +28,7 @@ export default function ResellerPayments() {
   const manage = can('reseller.manage')
   const [payFor, setPayFor] = useState<Payable | null>(null)
   const [receiveFor, setReceiveFor] = useState<Receivable | null>(null)
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState('payment_date')
@@ -37,11 +49,24 @@ export default function ResellerPayments() {
   const pay = useMutation({
     mutationFn: ({ p, payload }: { p: Payable; payload: Record<string, unknown> }) =>
       p.type === 'supplier' ? api.post(`/reseller/suppliers/${p.id}/pay`, payload) : api.post(`/reseller/payments/driver/${p.id}/pay`, payload),
-    onSuccess: () => { refresh(); setPayFor(null) },
+    // Supplier wala endpoint supplier wapas deta hai aur parchi alag se
+    // (res.data.payment); driver wala seedhi parchi deta hai (res.data.data).
+    onSuccess: (res, vars) => {
+      const doc = res.data.payment ?? res.data.data
+      refresh()
+      setPayFor(null)
+      // Driver ke kiraye me API party ka naam nahi deti, is liye yahan se de rahe hain.
+      if (doc) setReceipt(asParchi({ ...doc, party_name: doc.party_name ?? vars.p.name }))
+    },
   })
   const receive = useMutation({
     mutationFn: (payload: Record<string, unknown>) => api.post('/reseller/payments/receive', payload),
-    onSuccess: () => { refresh(); setReceiveFor(null) },
+    onSuccess: (res) => {
+      const doc = res.data.data
+      refresh()
+      if (doc) setReceipt(asParchi({ ...doc, party_name: doc.party_name ?? receiveFor?.name }))
+      setReceiveFor(null)
+    },
   })
 
   const recvRows = receivables.data ?? []
@@ -56,6 +81,19 @@ export default function ResellerPayments() {
     { key: 'party', label: 'Party', render: (h) => h.party },
     { key: 'direction', label: 'Type', sortable: true, render: (h) => <Badge color={h.direction === 'in' ? 'green' : 'red'}>{h.direction === 'in' ? 'IN' : 'OUT'}</Badge> },
     { key: 'amount', label: 'Amount', sortable: true, align: 'right', render: (h) => <span className="font-medium">{formatPaisa(h.amount)}</span> },
+    {
+      key: 'actions', label: '', align: 'right',
+      render: (h) => (
+        <RowActions>
+          <IconButton
+            icon={Printer}
+            label="Parchi dekhein / print karein"
+            tone="primary"
+            onClick={() => setReceipt(asParchi({ ...h, party_name: h.party_name ?? h.party }))}
+          />
+        </RowActions>
+      ),
+    },
   ]
 
   return (
@@ -153,6 +191,7 @@ export default function ResellerPayments() {
             onSubmit={(payload) => receive.mutate({ ...payload, customer_id: receiveFor.customer_id })} action="Receive" />
         </Modal>
       )}
+      {receipt && <PaymentReceipt payment={receipt} subtitle="Resellers Point" onClose={() => setReceipt(null)} />}
     </div>
   )
 }

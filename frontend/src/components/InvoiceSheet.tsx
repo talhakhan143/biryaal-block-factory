@@ -10,11 +10,15 @@ interface Props {
   number: string
   date: string
   customer: string
+  partyLabel?: string      // "Bill To" ki jaga kuch aur, jaise "Paisa Mila"
   meta?: string            // right-side small line (payment / type)
   details?: string[]       // extra left lines under customer (Driver, Kiraya, …)
   lines: InvoiceLine[]
   showRates?: boolean      // false = challan (only # / Item / Qty)
+  showQty?: boolean        // false = rasid/voucher (koi ginti nahi hoti)
+  showRate?: boolean       // false = sirf amount, rate ka column nahi
   totals?: InvoiceTotal[]  // omit for a challan
+  footNote?: string        // neeche ki chhoti line (tafseel, note)
   onClose: () => void
 }
 
@@ -22,7 +26,7 @@ interface Props {
  * Full A4-page invoice/challan. Screen preview mimics an A4 sheet; the shared
  * @media print CSS (print-area) prints it across a real A4 page.
  */
-export default function InvoiceSheet({ subtitle, docType, number, date, customer, meta, details, lines, showRates = true, totals, onClose }: Props) {
+export default function InvoiceSheet({ subtitle, docType, number, date, customer, partyLabel = 'Bill To', meta, details, lines, showRates = true, showQty = true, showRate = true, totals, footNote, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/50 p-4" onClick={onClose}>
       <div
@@ -50,7 +54,7 @@ export default function InvoiceSheet({ subtitle, docType, number, date, customer
           {/* Bill To / meta */}
           <div className="mt-6 flex items-start justify-between">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Bill To</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{partyLabel}</div>
               <div className="text-base font-semibold text-slate-900">{customer}</div>
               {details && details.length > 0 && (
                 <div className="mt-1 space-y-0.5 text-sm text-slate-600">
@@ -67,8 +71,8 @@ export default function InvoiceSheet({ subtitle, docType, number, date, customer
               <tr className="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-3 py-2 font-semibold">#</th>
                 <th className="px-3 py-2 font-semibold">Item</th>
-                <th className="px-3 py-2 text-right font-semibold">Qty</th>
-                {showRates && <th className="px-3 py-2 text-right font-semibold">Rate</th>}
+                {showQty && <th className="px-3 py-2 text-right font-semibold">Qty</th>}
+                {showRates && showRate && <th className="px-3 py-2 text-right font-semibold">Rate</th>}
                 {showRates && <th className="px-3 py-2 text-right font-semibold">Amount</th>}
               </tr>
             </thead>
@@ -77,8 +81,8 @@ export default function InvoiceSheet({ subtitle, docType, number, date, customer
                 <tr key={i} className="border-b border-slate-200">
                   <td className="px-3 py-2 text-slate-400">{i + 1}</td>
                   <td className="px-3 py-2 font-medium text-slate-800">{l.name}</td>
-                  <td className="px-3 py-2 text-right">{l.qty}</td>
-                  {showRates && <td className="px-3 py-2 text-right">{l.rate === undefined ? '' : formatPaisa(l.rate)}</td>}
+                  {showQty && <td className="px-3 py-2 text-right">{l.qty}</td>}
+                  {showRates && showRate && <td className="px-3 py-2 text-right">{l.rate === undefined ? '' : formatPaisa(l.rate)}</td>}
                   {showRates && <td className="px-3 py-2 text-right font-medium">{formatPaisa(l.total ?? 0)}</td>}
                 </tr>
               ))}
@@ -98,6 +102,8 @@ export default function InvoiceSheet({ subtitle, docType, number, date, customer
               </div>
             </div>
           )}
+
+          {footNote && <div className="mt-4 text-sm text-slate-600">{footNote}</div>}
 
           {/* Signature line for challan (no totals) */}
           {(!totals || totals.length === 0) && (

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ResellerPaymentResource;
 use App\Http\Resources\ResellerRentalResource;
 use App\Models\ResellerRental;
 use App\Services\Reseller\ResellerService;
@@ -49,7 +50,7 @@ class ResellerRentalController extends Controller
             'items.*.per_day_rate' => ['required', 'numeric', 'gt:0'],
         ]);
 
-        // Ek submit me kai items — har item ka apna rental (accrual/return alag).
+        // Ek submit me kai items, har item ka apna rental (accrual/return alag).
         $created = DB::transaction(fn () => collect($data['items'])->map(fn ($it) => $this->service->startRental([
             'customer_id' => $data['customer_id'],
             'start_date' => $data['start_date'],
@@ -84,8 +85,9 @@ class ResellerRentalController extends Controller
         ], ['bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.']);
         $data['amount'] = Money::toPaisa($data['amount']);
 
-        $this->service->collectRental($resellerRental, $data);
+        $payment = $this->service->collectRental($resellerRental, $data);
 
-        return new ResellerRentalResource($resellerRental->fresh()->load('customer'));
+        return (new ResellerRentalResource($resellerRental->fresh()->load('customer')))
+            ->additional(['payment' => new ResellerPaymentResource($payment->load(['supplier', 'customer', 'sale', 'purchase', 'rental', 'salesReturn']))]);
     }
 }

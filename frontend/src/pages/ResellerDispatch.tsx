@@ -101,19 +101,19 @@ export default function ResellerDispatch() {
               )}
             />
           ) : (
-            <Card><p className="text-sm" style={{ color: 'var(--muted)' }}>Koi pending order nahi — sab deliver ho gaye.</p></Card>
+            <Card><p className="text-sm" style={{ color: 'var(--muted)' }}>Koi pending order nahi, sab deliver ho gaye.</p></Card>
           )}
         </div>
       )}
 
       <div>
-        <PageHeader title="Dispatch / Challan" subtitle="Farokht ko deliver karein — challan ka record" />
+        <PageHeader title="Dispatch / Challan" subtitle="Farokht ko deliver karein, challan ka record" />
         <DataTable
           columns={[
             { key: 'reference', label: 'Challan', sortable: true, render: (d) => <span className="font-mono text-xs">{d.reference}</span> },
             { key: 'dispatch_date', label: 'Date', sortable: true, render: (d) => d.dispatch_date },
-            { key: 'customer', label: 'Customer', render: (d) => d.customer?.name ?? '—' },
-            { key: 'driver', label: 'Driver', render: (d) => d.driver?.name ?? '—' },
+            { key: 'customer', label: 'Customer', render: (d) => d.customer?.name ?? '·' },
+            { key: 'driver', label: 'Driver', render: (d) => d.driver?.name ?? '·' },
             { key: 'status', label: 'Status', sortable: true, render: (d) => <Badge color={d.status === 'delivered' ? 'green' : 'amber'}>{d.status}</Badge> },
             { key: 'actions', label: '', align: 'right', render: (d) => <RowActions><IconButton icon={FileText} label="Challan" tone="primary" onClick={() => setChallanId(d.id)} /></RowActions> },
           ] as Column<Dispatch>[]}
@@ -171,18 +171,18 @@ function DispatchForm({ prefill, onSubmit, busy, error }: { prefill: Prefill; on
             <span className="text-xs" style={{ color: 'var(--muted)' }}>/ {it.max} {it.unit} baqi</span>
           </div>
         ))}
-        <p className="text-xs" style={{ color: 'var(--muted)' }}>Ek gaari me jitna jaye wo qty rakho — baqi order pending list me rahega.</p>
+        <p className="text-xs" style={{ color: 'var(--muted)' }}>Ek gaari me jitna jaye wo qty rakho, baqi order pending list me rahega.</p>
       </div>
 
-      <Field label="Driver (gaadi saath) — zaroori">
+      <Field label="Driver (gaadi saath) (zaroori)">
         <Select value={form.driver_id} onChange={(e) => set('driver_id', e.target.value)} required>
           <option value="">Select driver…</option>
-          {drivers.data?.data.map((d) => <option key={d.id} value={d.id}>{d.name}{d.vehicle_name ? ` — ${d.vehicle_name}` : ''}</option>)}
+          {drivers.data?.data.map((d) => <option key={d.id} value={d.id}>{d.name}{d.vehicle_name ? `, ${d.vehicle_name}` : ''}</option>)}
         </Select>
       </Field>
       <Field label="Vehicle (optional)">
         <Select value={form.vehicle_id} onChange={(e) => set('vehicle_id', e.target.value)}>
-          <option value="">—</option>
+          <option value="">·</option>
           {vehicles.data?.data.map((v) => <option key={v.id} value={v.id}>{v.plate_no ?? v.name}</option>)}
         </Select>
       </Field>
@@ -211,10 +211,10 @@ function Challan({ id, onClose }: { id: string; onClose: () => void }) {
   if (isLoading || !data) {
     return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}><Spinner /></div>
   }
-  const gaadi = data.vehicle?.plate_no ?? data.vehicle?.name ?? data.driver?.vehicle_name ?? '—'
+  const gaadi = data.vehicle?.plate_no ?? data.vehicle?.name ?? data.driver?.vehicle_name ?? '·'
   const details = [
-    `Invoice: ${data.invoice_no ?? '—'}`,
-    `Driver: ${data.driver?.name ?? '—'} · Gaadi: ${gaadi}`,
+    `Invoice: ${data.invoice_no ?? '·'}`,
+    `Driver: ${data.driver?.name ?? '·'} · Gaadi: ${gaadi}`,
     ...(data.trip_rate > 0 ? [`Kiraya: ${formatPaisa(data.trip_rate)} · Diya: ${formatPaisa(data.trip_paid)} · Baqi: ${formatPaisa(data.trip_balance)}`] : []),
   ]
   return (

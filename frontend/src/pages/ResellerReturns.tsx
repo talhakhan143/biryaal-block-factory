@@ -4,8 +4,10 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, type Column, DataTable, Field, Input, Modal, MoneyInput, PageHeader, Select } from '../components/ui'
+import { Printer } from 'lucide-react'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, Modal, MoneyInput, PageHeader, RowActions, Select } from '../components/ui'
 import type { ResellerItem } from './ResellerItems'
+import { ReturnNote, type ReturnDoc } from '../components/receipts'
 
 interface Return {
   id: string
@@ -16,6 +18,7 @@ interface Return {
   deduction: number
   refund_amount: number
   refund_mode: string
+  notes?: string | null
 }
 
 export default function ResellerReturns() {
@@ -26,6 +29,8 @@ export default function ResellerReturns() {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('return_date')
   const [dir, setDir] = useState<'asc' | 'desc'>('desc')
+  // Maal wapsi ki parchi.
+  const [note, setNote] = useState<ReturnDoc | null>(null)
   const { data, isLoading } = useList<Return>('reseller/returns', { page, search, sort, dir })
   const manage = can('reseller.manage')
 
@@ -37,27 +42,35 @@ export default function ResellerReturns() {
 
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/reseller/returns', p),
-    onSuccess: () => {
+    onSuccess: (res) => {
       ['reseller/returns', 'reseller/items', 'reseller/sales', 'reseller/dashboard', 'reseller/receivables', 'reseller/payables', 'reseller/payments'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setCreating(false)
+      setNote(res.data.data)
     },
   })
 
   const columns: Column<Return>[] = [
     { key: 'reference', label: 'Ref', sortable: true, render: (r) => <span className="font-mono text-xs">{r.reference}</span> },
     { key: 'return_date', label: 'Date', sortable: true, render: (r) => r.return_date },
-    { key: 'customer', label: 'Customer', render: (r) => r.customer?.name ?? '—' },
+    { key: 'customer', label: 'Customer', render: (r) => r.customer?.name ?? '·' },
     { key: 'return_value', label: 'Value', align: 'right', render: (r) => formatPaisa(r.return_value) },
     { key: 'deduction', label: 'Deduction', align: 'right', render: (r) => formatPaisa(r.deduction) },
     { key: 'refund_amount', label: 'Refund', sortable: true, align: 'right', render: (r) => formatPaisa(r.refund_amount) },
     { key: 'refund_mode', label: 'Mode', render: (r) => <Badge color={r.refund_mode === 'cash' ? 'amber' : 'blue'}>{r.refund_mode}</Badge> },
+    {
+      key: 'actions', label: '', align: 'right', render: (r) => (
+        <RowActions>
+          <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setNote(r)} />
+        </RowActions>
+      ),
+    },
   ]
 
   return (
     <div>
       <PageHeader
         title="Reseller Returns"
-        subtitle="Maal wapas — stock wapas, udhaar/cash adjust"
+        subtitle="Maal wapas, stock wapas, udhaar/cash adjust"
         actions={manage && <Button onClick={() => setCreating(true)}>+ Return</Button>}
       />
       <DataTable
@@ -65,6 +78,7 @@ export default function ResellerReturns() {
         search={search} onSearch={(v) => { setSearch(v); setPage(1) }} searchPlaceholder="Ref se search…"
         sort={sort} dir={dir} onSort={onSort} meta={data?.meta} page={page} onPage={setPage}
       />
+      {note && <ReturnNote ret={note} subtitle="Resellers Point" onClose={() => setNote(null)} />}
       {creating && (
         <Modal title="Maal Wapas (Return)" onClose={() => setCreating(false)}>
           <ReturnForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />

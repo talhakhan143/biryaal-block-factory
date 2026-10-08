@@ -4,8 +4,9 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { SquarePen, Trash2, Wallet } from 'lucide-react'
+import { Printer, SquarePen, Trash2, Wallet } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select, useConfirm } from '../components/ui'
+import { PaymentReceipt, SalarySlip, type PaymentDoc } from '../components/receipts'
 
 interface Staff {
   id: string
@@ -36,6 +37,9 @@ export default function StaffPage() {
   const [editing, setEditing] = useState<Staff | null>(null)
   const [genSalary, setGenSalary] = useState(false)
   const [payId, setPayId] = useState<string | null>(null)
+  // Tankha dene par parchi khud khul jati hai; list se bhi dobara nikal sakte hain.
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
+  const [slip, setSlip] = useState<Salary | null>(null)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('created_at')
@@ -55,7 +59,7 @@ export default function StaffPage() {
 
   const staffColumns: Column<Staff>[] = [
     { key: 'name', label: 'Name', sortable: true, render: (s) => <span className="font-medium">{s.name}</span> },
-    { key: 'role', label: 'Role', render: (s) => s.role ?? '—' },
+    { key: 'role', label: 'Role', render: (s) => s.role ?? '·' },
     { key: 'monthly_salary', label: 'Monthly Salary', sortable: true, align: 'right', render: (s) => formatPaisa(s.monthly_salary) },
     { key: 'created_at', label: 'Kab bana', sortable: true, render: (r) => (r.created_at ? String(r.created_at).slice(0, 10) : '·') },
     {
@@ -78,7 +82,7 @@ export default function StaffPage() {
   })
   const delStaff = useMutation({ mutationFn: (id: string) => api.delete(`/staff/${id}`), onSuccess: refresh, onError: (e) => alert(apiError(e)) })
   const generate = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/salaries', p), onSuccess: () => { refresh(); setGenSalary(false) } })
-  const pay = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/salaries/${id}/pay`, payload), onSuccess: () => { refresh(); setPayId(null) } })
+  const pay = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/salaries/${id}/pay`, payload), onSuccess: (res) => { refresh(); setPayId(null); setReceipt(res.data.data) } })
 
   const salaryColumns: Column<Salary>[] = [
     { key: 'reference', label: 'Ref', render: (s) => <span className="font-mono text-xs">{s.reference}</span> },
@@ -90,9 +94,12 @@ export default function StaffPage() {
     { key: 'status', label: 'Haal', render: (s) => <Badge color={statusColor[s.status]}>{s.status}</Badge> },
     {
       key: 'actions', label: '', align: 'right',
-      render: (s) => (can('hr.manage') && s.status !== 'paid'
-        ? <RowActions><IconButton icon={Wallet} label="Tankha dein" tone="primary" onClick={() => setPayId(s.id)} /></RowActions>
-        : null),
+      render: (s) => (
+        <RowActions>
+          <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setSlip(s)} />
+          {can('hr.manage') && s.status !== 'paid' && <IconButton icon={Wallet} label="Tankha dein" tone="primary" onClick={() => setPayId(s.id)} />}
+        </RowActions>
+      ),
     },
   ]
 
@@ -159,6 +166,8 @@ export default function StaffPage() {
           />
         </Modal>
       )}
+      {slip && <SalarySlip salary={slip} onClose={() => setSlip(null)} />}
+      {receipt && <PaymentReceipt payment={receipt} onClose={() => setReceipt(null)} />}
     </div>
   )
 }
@@ -222,7 +231,7 @@ function PayForm({ outstanding, onSubmit, busy, error }: { outstanding: number; 
     <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, amount: Number(form.amount) }) }} className="space-y-3">
       <OutstandingNote label="Baqi tankha (remaining salary)" amount={outstanding} onFill={(rs) => set('amount', String(rs))} />
       {settled ? (
-        <p className="text-sm" style={{ color: 'var(--green)' }}>Sab clear — tankha poori ho chuki.</p>
+        <p className="text-sm" style={{ color: 'var(--green)' }}>Sab clear, tankha poori ho chuki.</p>
       ) : (
         <>
           <Field label="Date"><Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} required /></Field>

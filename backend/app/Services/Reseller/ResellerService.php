@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
- * Resellers Point business logic. Fully self-contained books — no posting to
+ * Resellers Point business logic. Fully self-contained books, no posting to
  * the block factory ledger. Money is tracked via supplier balances, purchase
  * paid_amount, rental paid_amount and the reseller_payments cash log.
  */
@@ -63,7 +63,7 @@ class ResellerService
                 'created_by' => Auth::id(),
             ]);
 
-            // moving-average landed cost — on stock BEFORE this batch
+            // moving-average landed cost, on stock BEFORE this batch
             $oldQty = (float) $item->stock_qty;
             $oldAvg = (int) $item->avg_cost;
             $newQty = $oldQty + $qty;
@@ -71,7 +71,7 @@ class ResellerService
                 $item->avg_cost = (int) round(($oldQty * $oldAvg + $totalCost) / $newQty);
             }
             $item->stock_qty = $newQty;
-            // Retail (customer) price bhi khareed ke waqt set/update ho — margin ke liye
+            // Retail (customer) price bhi khareed ke waqt set/update ho, margin ke liye
             if (isset($data['sale_price']) && (int) $data['sale_price'] > 0) {
                 $item->sale_price = (int) $data['sale_price'];
             }
@@ -125,7 +125,7 @@ class ResellerService
     }
 
     /**
-     * Lump payment to a supplier — settles their udhaar and spreads across
+     * Lump payment to a supplier, settles their udhaar and spreads across
      * their unpaid purchase bills (oldest first).
      *
      * @param  array{amount:int,payment_date:string,method?:string,bank_ref?:string}  $data
@@ -246,7 +246,7 @@ class ResellerService
     }
 
     /**
-     * Lump receipt from a customer — settles their reseller dues: sale udhaar
+     * Lump receipt from a customer, settles their reseller dues: sale udhaar
      * first (oldest), then kiraya (oldest). Only reseller books; customers.balance
      * (block factory) is never touched.
      *
@@ -298,7 +298,7 @@ class ResellerService
     }
 
     /**
-     * Pay a shared driver's OUTSTANDING reseller kiraya — spread across their
+     * Pay a shared driver's OUTSTANDING reseller kiraya, spread across their
      * challans (oldest first). Reseller cash only; the block factory driver
      * balance is untouched.
      *

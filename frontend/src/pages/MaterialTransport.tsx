@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Truck, UserPlus, Wallet } from 'lucide-react'
+import { ArrowRight, Printer, Truck, UserPlus, Wallet } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
@@ -11,6 +11,7 @@ import {
   Modal, MoneyInput, Note, OutstandingNote, PageHeader, RowActions, Select, StatTile,
 } from '../components/ui'
 import { MONEY_KEYS } from '../lib/queryKeys'
+import { KirayaVoucher, PaymentReceipt, type PaymentDoc } from '../components/receipts'
 
 interface Driver {
   id: string
@@ -53,6 +54,9 @@ export default function MaterialTransport() {
   const [addingTrip, setAddingTrip] = useState(false)
   const [payingDriver, setPayingDriver] = useState(false)
   const [payTrip, setPayTrip] = useState<Trip | null>(null)
+  // Kiraya likha ya paisa diya, dono par parchi.
+  const [voucher, setVoucher] = useState<Trip | null>(null)
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
 
@@ -73,17 +77,17 @@ export default function MaterialTransport() {
 
   const newTrip = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/transport-trips', { ...p, kind: 'in', driver_id: driverId }),
-    onSuccess: () => { refresh(); drivers.refetch(); setAddingTrip(false) },
+    onSuccess: (res) => { refresh(); drivers.refetch(); setAddingTrip(false); setVoucher(res.data.data) },
   })
 
   const payAll = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post(`/drivers/${driverId}/pay`, p),
-    onSuccess: () => { refresh(); drivers.refetch(); setPayingDriver(false) },
+    onSuccess: (res) => { refresh(); drivers.refetch(); setPayingDriver(false); setReceipt(res.data.data) },
   })
 
   const payOne = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/transport-trips/${id}/pay`, payload),
-    onSuccess: () => { refresh(); drivers.refetch(); setPayTrip(null) },
+    onSuccess: (res) => { refresh(); drivers.refetch(); setPayTrip(null); setReceipt(res.data.data) },
   })
 
   const columns: Column<Trip>[] = [
@@ -101,6 +105,7 @@ export default function MaterialTransport() {
       render: (t) => (
         <div onClick={(e) => e.stopPropagation()}>
           <RowActions>
+            <IconButton icon={Printer} label="Kiraye ki parchi" tone="primary" onClick={() => setVoucher(t)} />
             {can('payments.manage') && t.balance > 0 && (
               <IconButton icon={Wallet} label="Is trip ka paisa" tone="primary" onClick={() => setPayTrip(t)} />
             )}
@@ -133,7 +138,7 @@ export default function MaterialTransport() {
               <option value="">Saare drivers</option>
               {drivers.data?.data.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.name}{d.vehicle_name ? ` (${d.vehicle_name})` : ''}{d.balance > 0 ? ` — baqi ${(d.balance / 100).toLocaleString('en-PK')}` : ''}
+                  {d.name}{d.vehicle_name ? ` (${d.vehicle_name})` : ''}{d.balance > 0 ? `, baqi ${(d.balance / 100).toLocaleString('en-PK')}` : ''}
                 </option>
               ))}
             </Select>
@@ -196,6 +201,9 @@ export default function MaterialTransport() {
         onPage={setPage}
         onRowClick={(t) => t.driver && navigate(`/drivers/${t.driver.id}`)}
       />
+
+      {voucher && <KirayaVoucher trip={{ ...voucher, driver: voucher.driver ?? (selected ? { name: selected.name } : null) }} onClose={() => setVoucher(null)} />}
+      {receipt && <PaymentReceipt payment={receipt} party={selected?.name} onClose={() => setReceipt(null)} />}
 
       {addingDriver && (
         <Modal title="Naya Driver" onClose={() => setAddingDriver(false)}>

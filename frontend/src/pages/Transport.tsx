@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Wallet } from 'lucide-react'
+import { ArrowRight, Printer, Wallet } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions } from '../components/ui'
+import { KirayaVoucher, PaymentReceipt, type PaymentDoc, type TripDoc } from '../components/receipts'
 
 interface Trip {
   id: string
@@ -15,6 +16,9 @@ interface Trip {
   vehicle_label?: string
   driver?: { id: string; name: string }
   trip_date: string
+  from_location?: string
+  to_location?: string
+  notes?: string
   rate: number
   paid: number
   balance: number
@@ -32,6 +36,9 @@ export default function Transport() {
   const [sort, setSort] = useState('trip_date')
   const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [payFor, setPayFor] = useState<Trip | null>(null)
+  // Paisa dene ki parchi, aur kisi bhi trip ki kiraya parchi.
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
+  const [voucher, setVoucher] = useState<TripDoc | null>(null)
   const { data, isLoading } = useList<Trip>('transport-trips', { page, search, sort, dir })
 
   const onSort = (key: string) => {
@@ -42,17 +49,18 @@ export default function Transport() {
 
   const pay = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/transport-trips/${id}/pay`, payload),
-    onSuccess: () => {
+    onSuccess: (res) => {
       ['transport-trips', 'drivers', 'dashboard', 'payables'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setPayFor(null)
+      setReceipt(res.data.data)
     },
   })
 
   const columns: Column<Trip>[] = [
     { key: 'reference', label: 'Ref', sortable: true, render: (t) => <span className="font-mono text-xs">{t.reference}</span> },
     { key: 'trip_date', label: 'Date', sortable: true, render: (t) => t.trip_date },
-    { key: 'vehicle', label: 'Vehicle', render: (t) => t.vehicle_label ?? '—' },
-    { key: 'driver', label: 'Driver', render: (t) => t.driver?.name ?? '—' },
+    { key: 'vehicle', label: 'Vehicle', render: (t) => t.vehicle_label ?? '·' },
+    { key: 'driver', label: 'Driver', render: (t) => t.driver?.name ?? '·' },
     { key: 'kind', label: 'Simt', render: (t) => <Badge color={t.kind === 'in' ? 'amber' : 'blue'}>{t.kind === 'in' ? 'Maal laaya' : 'Maal bheja'}</Badge> },
     { key: 'rate', label: 'Rate', sortable: true, align: 'right', render: (t) => formatPaisa(t.rate) },
     { key: 'paid', label: 'Paid', sortable: true, align: 'right', render: (t) => formatPaisa(t.paid) },
@@ -62,6 +70,7 @@ export default function Transport() {
       key: 'actions', label: '', align: 'right', render: (t) => (
         <div onClick={(e) => e.stopPropagation()}>
           <RowActions>
+            <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setVoucher(t)} />
             {can('payments.manage') && t.status !== 'paid' && t.driver && (
               <IconButton icon={Wallet} label="Pay" tone="primary" onClick={() => setPayFor(t)} />
             )}
@@ -81,7 +90,7 @@ export default function Transport() {
         columns={columns}
         rows={data?.data}
         loading={isLoading}
-        emptyText="Koi trip nahi — dispatch pe kiraya daalo to yahan aayega."
+        emptyText="Koi trip nahi, dispatch pe kiraya daalo to yahan aayega."
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1) }}
         searchPlaceholder="Ref, driver ya vehicle se search…"
@@ -94,7 +103,7 @@ export default function Transport() {
         onRowClick={(t) => t.driver && navigate(`/drivers/${t.driver.id}`)}
       />
       {payFor && (
-        <Modal title={`Pay Driver — ${payFor.reference}`} onClose={() => setPayFor(null)}>
+        <Modal title={`Pay Driver, ${payFor.reference}`} onClose={() => setPayFor(null)}>
           <PayForm
             outstanding={payFor.balance}
             onSubmit={(payload) => pay.mutate({ id: payFor.id, payload })}
@@ -103,6 +112,8 @@ export default function Transport() {
           />
         </Modal>
       )}
+      {receipt && <PaymentReceipt payment={receipt} onClose={() => setReceipt(null)} />}
+      {voucher && <KirayaVoucher trip={voucher} onClose={() => setVoucher(null)} />}
     </div>
   )
 }

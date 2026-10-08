@@ -37,7 +37,7 @@ export default function ResetPassword() {
         <h1 className="mb-1 text-lg font-bold" style={{ color: 'var(--text)' }}>Reset Password</h1>
         <p className="mb-5 text-sm" style={{ color: 'var(--muted)' }}>{email || 'Naya password set karein'}</p>
         {done ? (
-          <p className="text-sm" style={{ color: 'var(--green)' }}>Password reset ho gaya — login par le ja rahe…</p>
+          <p className="text-sm" style={{ color: 'var(--green)' }}>Password reset ho gaya, login par le ja rahe…</p>
         ) : !token || !email ? (
           <p className="text-sm" style={{ color: 'var(--red)' }}>Invalid reset link. Email se dobara link kholein.</p>
         ) : (

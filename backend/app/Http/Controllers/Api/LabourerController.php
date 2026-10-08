@@ -66,10 +66,10 @@ class LabourerController extends Controller
         ]);
         $data['amount'] = Money::toPaisa($data['amount']);
 
-        return new PaymentResource($this->payments->settleParty($labourer, $data));
+        return new PaymentResource(($this->payments->settleParty($labourer, $data))->load(['party', 'allocatable']));
     }
 
-    /** Give an advance to a labourer (paisa diye bina baqi ke — balance jama ho jata hai). */
+    /** Give an advance to a labourer (paisa diye bina baqi ke, balance jama ho jata hai). */
     public function advance(Request $request, Labourer $labourer)
     {
         $data = $request->validate([
@@ -83,7 +83,7 @@ class LabourerController extends Controller
         ]);
         $data['amount'] = Money::toPaisa($data['amount']);
 
-        return new PaymentResource($this->payments->advanceToParty($labourer, $data));
+        return new PaymentResource(($this->payments->advanceToParty($labourer, $data))->load(['party', 'allocatable']));
     }
 
     /** Labourer ledger: rozana mazdoori (haazri se) + payments/advances. */

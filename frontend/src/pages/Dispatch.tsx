@@ -84,7 +84,7 @@ export default function DispatchPage() {
       {/* Pending orders from POS */}
       {can('dispatch.manage') && (
         <div>
-          <PageHeader title="Pending Orders" subtitle="POS se aaye orders — abhi tak dispatch nahi hue" />
+          <PageHeader title="Pending Orders" subtitle="POS se aaye orders, abhi tak dispatch nahi hue" />
           {pending.isLoading ? (
             <Spinner />
           ) : pending.data && pending.data.data.length > 0 ? (
@@ -111,7 +111,7 @@ export default function DispatchPage() {
               )}
             />
           ) : (
-            <Card><p className="text-sm" style={{ color: 'var(--muted)' }}>Koi pending order nahi — sab dispatch ho gaye.</p></Card>
+            <Card><p className="text-sm" style={{ color: 'var(--muted)' }}>Koi pending order nahi, sab dispatch ho gaye.</p></Card>
           )}
         </div>
       )}
@@ -119,15 +119,15 @@ export default function DispatchPage() {
       <div>
         <PageHeader
           title="Dispatch / Challan"
-          subtitle="POS order ko 'Dispatch' karein — yahan challan ka record"
+          subtitle="POS order ko 'Dispatch' karein, yahan challan ka record"
         />
         <DataTable
           columns={[
             { key: 'reference', label: 'Challan', sortable: true, render: (d) => <span className="font-mono text-xs">{d.reference}</span> },
             { key: 'dispatch_date', label: 'Date', sortable: true, render: (d) => d.dispatch_date },
-            { key: 'customer', label: 'Customer', render: (d) => d.customer?.name ?? '—' },
-            { key: 'vehicle', label: 'Vehicle', render: (d) => d.vehicle?.name ?? '—' },
-            { key: 'driver', label: 'Driver', render: (d) => d.driver?.name ?? '—' },
+            { key: 'customer', label: 'Customer', render: (d) => d.customer?.name ?? '·' },
+            { key: 'vehicle', label: 'Vehicle', render: (d) => d.vehicle?.name ?? '·' },
+            { key: 'driver', label: 'Driver', render: (d) => d.driver?.name ?? '·' },
             { key: 'status', label: 'Status', sortable: true, render: (d) => <Badge color={d.status === 'delivered' ? 'green' : 'amber'}>{d.status}</Badge> },
             { key: 'actions', label: '', align: 'right', render: (d) => <RowActions><IconButton icon={FileText} label="Challan" tone="primary" onClick={() => setChallanId(d.id)} /></RowActions> },
           ] as Column<Dispatch>[]}
@@ -212,7 +212,7 @@ function DispatchForm({ prefill, onSubmit, busy, error }: { prefill: Prefill | n
           const max = prefill?.items.find((x) => x.product_id === it.product_id)?.quantity ?? it.quantity
           return (
             <div key={idx} className="mb-2 flex items-center gap-2">
-              <span className="flex-1 text-sm" style={{ color: 'var(--text)' }}>{p?.name ?? '—'}</span>
+              <span className="flex-1 text-sm" style={{ color: 'var(--text)' }}>{p?.name ?? '·'}</span>
               <Input
                 type="number" min={1} max={Number(max)} value={it.quantity}
                 onChange={(e) => setItems(items.map((x, i) => (i === idx ? { ...x, quantity: e.target.value } : x)))}
@@ -222,26 +222,26 @@ function DispatchForm({ prefill, onSubmit, busy, error }: { prefill: Prefill | n
             </div>
           )
         })}
-        <p className="text-xs" style={{ color: 'var(--muted)' }}>Aik gaari me jitne jayen wo qty rakho — baqi order pending list me rahega.</p>
+        <p className="text-xs" style={{ color: 'var(--muted)' }}>Aik gaari me jitne jayen wo qty rakho, baqi order pending list me rahega.</p>
       </div>
 
-      <Field label="Driver (gaari saath aati hai) — zaroori">
+      <Field label="Driver (gaari saath aati hai) (zaroori)">
         <Select value={form.driver_id} onChange={(e) => set('driver_id', e.target.value)} required>
           <option value="">Select driver…</option>
-          {drivers.data?.data.map((d) => <option key={d.id} value={d.id}>{d.name}{d.vehicle_name ? ` — ${d.vehicle_name}` : ''}</option>)}
+          {drivers.data?.data.map((d) => <option key={d.id} value={d.id}>{d.name}{d.vehicle_name ? `, ${d.vehicle_name}` : ''}</option>)}
         </Select>
       </Field>
       {driverVehicle && <p className="text-xs" style={{ color: 'var(--muted)' }}>Gaari: {driverVehicle}</p>}
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Trip kiraya (Rs) — zaroori"><MoneyInput value={form.trip_rate} onChange={(v) => set('trip_rate', v)} /></Field>
+        <Field label="Trip kiraya (Rs) (zaroori)"><MoneyInput value={form.trip_rate} onChange={(v) => set('trip_rate', v)} /></Field>
         <Field label="Driver ko abhi diya (Rs)"><MoneyInput value={form.trip_paid} onChange={(v) => set('trip_paid', v)} /></Field>
       </div>
       <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
 
       <Field label="Date"><Input type="date" value={form.dispatch_date} onChange={(e) => set('dispatch_date', e.target.value)} required /></Field>
 
-      {noDriver && <p className="text-sm" style={{ color: 'var(--red)' }}>Driver chunna zaroori hai — challan gaadi par jata hai.</p>}
+      {noDriver && <p className="text-sm" style={{ color: 'var(--red)' }}>Driver chunna zaroori hai, challan gaadi par jata hai.</p>}
       {!noDriver && noFare && <p className="text-sm" style={{ color: 'var(--red)' }}>Kiraya (trip rate) likhna zaroori hai.</p>}
       {validItems.length === 0 && <p className="text-sm" style={{ color: 'var(--red)' }}>Kam az kam aik block ki qty daalein.</p>}
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
@@ -258,14 +258,14 @@ function Challan({ id, onClose }: { id: string; onClose: () => void }) {
   if (isLoading || !data) {
     return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}><Spinner /></div>
   }
-  const gaadi = `${data.driver?.vehicle_name ?? data.vehicle?.name ?? '—'}${data.driver?.vehicle_plate ? ` (${data.driver.vehicle_plate})` : ''}`
+  const gaadi = `${data.driver?.vehicle_name ?? data.vehicle?.name ?? '·'}${data.driver?.vehicle_plate ? ` (${data.driver.vehicle_plate})` : ''}`
   return (
     <InvoiceSheet
       docType="Dispatch Challan"
       number={data.reference}
       date={data.dispatch_date}
       customer={data.customer?.name ?? 'Walk-in'}
-      details={[`Driver: ${data.driver?.name ?? '—'} · Gaari: ${gaadi}`]}
+      details={[`Driver: ${data.driver?.name ?? '·'} · Gaari: ${gaadi}`]}
       showRates={false}
       lines={(data.items ?? []).map((it: { product_name: string; quantity: number }) => ({ name: it.product_name, qty: String(it.quantity) }))}
       onClose={onClose}

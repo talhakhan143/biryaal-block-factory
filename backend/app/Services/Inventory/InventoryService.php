@@ -86,7 +86,7 @@ class InventoryService
         $newValue = $stock->{$column} + $delta;
 
         if ($newValue < 0) {
-            throw new InvalidArgumentException("Adjustment se {$bucket} stock negative ho jayega — itna stock mojood nahi.");
+            throw new InvalidArgumentException("Adjustment se {$bucket} stock negative ho jayega, itna stock mojood nahi.");
         }
 
         $stock->update([$column => $newValue]);

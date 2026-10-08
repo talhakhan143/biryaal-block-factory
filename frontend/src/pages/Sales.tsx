@@ -7,6 +7,7 @@ import { useAuth } from '../lib/auth'
 import { Eye, HandCoins, Trash2 } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, useConfirm } from '../components/ui'
 import SaleInvoiceModal from '../components/SaleInvoiceModal'
+import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
 
 interface Sale {
   id: string
@@ -32,6 +33,8 @@ export default function Sales() {
   const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [viewId, setViewId] = useState<string | null>(null)
   const [receiveFor, setReceiveFor] = useState<Sale | null>(null)
+  // Paisa lene ki apni parchi, bill ki parchi se alag.
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
   const { data, isLoading } = useList<Sale>('sales', { search, page, sort, dir })
 
   const onSort = (key: string) => {
@@ -42,9 +45,10 @@ export default function Sales() {
 
   const receive = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/sales/${id}/receive`, payload),
-    onSuccess: () => {
+    onSuccess: (res) => {
       ['sales', 'customers', 'payments', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setReceiveFor(null)
+      setReceipt(res.data.data)
     },
   })
 
@@ -85,7 +89,7 @@ export default function Sales() {
 
   return (
     <div>
-      <PageHeader title="Sales" subtitle="Saari farokht — cash aur udhaar" />
+      <PageHeader title="Sales" subtitle="Saari farokht, cash aur udhaar" />
       <DataTable
         columns={columns}
         rows={data?.data}
@@ -101,9 +105,10 @@ export default function Sales() {
         page={page}
         onPage={setPage}
       />
+      {receipt && <PaymentReceipt payment={receipt} onClose={() => setReceipt(null)} />}
       {viewId && <SaleInvoiceModal id={viewId} onClose={() => setViewId(null)} />}
       {receiveFor && (
-        <Modal title={`Receive — ${receiveFor.invoice_no}`} onClose={() => setReceiveFor(null)}>
+        <Modal title={`Receive, ${receiveFor.invoice_no}`} onClose={() => setReceiveFor(null)}>
           <ReceiveForm
             outstanding={receiveFor.balance}
             onSubmit={(payload) => receive.mutate({ id: receiveFor.id, payload })}

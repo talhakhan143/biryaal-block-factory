@@ -4,7 +4,7 @@ import { useAuth } from './lib/auth'
 import Layout from './components/Layout'
 import { Spinner } from './components/ui'
 
-// Route-based code splitting — each page loads its own chunk on first visit,
+// Route-based code splitting, each page loads its own chunk on first visit,
 // so the initial bundle stays small and the app opens fast.
 const Login = lazy(() => import('./pages/Login'))
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))

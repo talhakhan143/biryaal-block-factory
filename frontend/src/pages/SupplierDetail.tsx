@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, MapPin, Phone, Wallet } from 'lucide-react'
+import { ArrowLeft, MapPin, Phone, Printer, Wallet } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
 import {
-  Badge, Button, Card, Field, Input, MethodField, Modal, MoneyInput, Note,
+  Badge, Button, Card, Field, IconButton, Input, MethodField, Modal, MoneyInput, Note,
   OutstandingNote, PagedTable, Spinner, StatTile, Tabs,
 } from '../components/ui'
+import { PaymentReceipt, PurchaseBill, type PaymentDoc, type PurchaseDoc } from '../components/receipts'
 import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface LedgerRow {
@@ -20,14 +21,15 @@ interface LedgerRow {
   credit: number
   running: number
 }
-interface Purchase {
-  id: string; reference: string; purchase_date: string
+/** Dono rows me poora bill/rasid chhapne ke liye sab kuch mojood hai. */
+interface Purchase extends PurchaseDoc {
+  id: string
   raw_material?: { name: string; unit?: string } | null
-  quantity: number; unit_cost: number; loading_cost: number; unloading_cost: number
-  total_cost: number; supplier_bill: number; paid_amount: number; payment_status: string
+  unit_cost: number; loading_cost: number; unloading_cost: number
+  supplier_bill: number; payment_status: string
   freight_driver?: { driver_name?: string; rate: number; balance: number } | null
 }
-interface PaymentRow { id: string; reference: string; payment_date: string; amount: number; method: string; bank_ref?: string }
+interface PaymentRow extends PaymentDoc { id: string; method: string; bank_ref?: string }
 interface AdjRow { id: string; reference: string; mode: string; adjustment_date: string; amount: number; reason: string }
 interface History {
   supplier: { id: string; name: string; phone?: string; address?: string; balance: number }
@@ -60,6 +62,9 @@ export default function SupplierDetail() {
   const { can } = useAuth()
   const [tab, setTab] = useState<TabKey>('statement')
   const [paying, setPaying] = useState(false)
+  // Paise ki rasid aur maal ka bill, dono chhapne ke liye.
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
+  const [bill, setBill] = useState<PurchaseDoc | null>(null)
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['supplier-history', id],
@@ -68,9 +73,10 @@ export default function SupplierDetail() {
 
   const pay = useMutation({
     mutationFn: (payload: Record<string, unknown>) => api.post('/payments/supplier', { ...payload, supplier_id: id }),
-    onSuccess: () => {
+    onSuccess: (res) => {
       ;[...MONEY_KEYS, 'supplier-history'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setPaying(false)
+      setReceipt(res.data.data)
     },
   })
 
@@ -136,9 +142,12 @@ export default function SupplierDetail() {
       <Tabs tabs={tabs} active={tab} onChange={setTab} />
 
       {tab === 'statement' && <Statement rows={data.ledger} balance={s.balance} />}
-      {tab === 'purchases' && <Purchases rows={data.purchases} />}
-      {tab === 'payments' && <Payments rows={data.payments} />}
+      {tab === 'purchases' && <Purchases rows={data.purchases} onPrint={(p) => setBill({ ...p, supplier: { name: sp.name } })} />}
+      {tab === 'payments' && <Payments rows={data.payments} onPrint={setReceipt} />}
       {tab === 'adjustments' && <Adjustments rows={data.adjustments} />}
+
+      {receipt && <PaymentReceipt payment={receipt} party={sp.name} onClose={() => setReceipt(null)} />}
+      {bill && <PurchaseBill purchase={bill} onClose={() => setBill(null)} />}
 
       {paying && (
         <Modal title={`Paisa dein: ${sp.name}`} onClose={() => setPaying(false)}>
@@ -194,11 +203,11 @@ function Statement({ rows, balance }: { rows: LedgerRow[]; balance: number }) {
   )
 }
 
-function Purchases({ rows }: { rows: Purchase[] }) {
+function Purchases({ rows, onPrint }: { rows: Purchase[]; onPrint: (p: Purchase) => void }) {
   if (rows.length === 0) return <Empty>Is supplier se abhi kuch nahi khareeda.</Empty>
   return (
     <PagedTable
-      head={['Ref', 'Date', 'Maal', { label: 'Kitna', align: 'right' }, { label: 'Bill', align: 'right' }, { label: 'Diya', align: 'right' }, 'Laaya', 'Haal']}
+      head={['Ref', 'Date', 'Maal', { label: 'Kitna', align: 'right' }, { label: 'Bill', align: 'right' }, { label: 'Diya', align: 'right' }, 'Laaya', 'Haal', { label: 'Parchi', align: 'right' }]}
       rows={rows}
       searchText={(p) => `${p.reference} ${p.purchase_date} ${p.raw_material?.name ?? ''} ${p.freight_driver?.driver_name ?? ''} ${p.payment_status}`}
       searchPlaceholder="Ref, date ya maal se dhoondein…"
@@ -214,18 +223,21 @@ function Purchases({ rows }: { rows: Purchase[] }) {
             {p.freight_driver ? `${p.freight_driver.driver_name} (${formatPaisa(p.freight_driver.rate)})` : '·'}
           </td>
           <td className="px-4 py-2"><Badge color={statusColor[p.payment_status]}>{p.payment_status}</Badge></td>
+          <td className="px-4 py-2 text-right">
+            <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => onPrint(p)} />
+          </td>
         </tr>
       )}
     />
   )
 }
 
-function Payments({ rows }: { rows: PaymentRow[] }) {
+function Payments({ rows, onPrint }: { rows: PaymentRow[]; onPrint: (r: PaymentRow) => void }) {
   if (rows.length === 0) return <Empty>Is supplier ko abhi koi paisa nahi diya.</Empty>
   const total = rows.reduce((a, r) => a + r.amount, 0)
   return (
     <PagedTable
-      head={['Ref', 'Date', 'Cash ya bank', 'Bank detail', { label: 'Kitna diya', align: 'right' }]}
+      head={['Ref', 'Date', 'Cash ya bank', 'Bank detail', { label: 'Kitna diya', align: 'right' }, { label: 'Parchi', align: 'right' }]}
       rows={rows}
       searchText={(r) => `${r.reference} ${r.payment_date} ${r.method} ${r.bank_ref ?? ''}`}
       searchPlaceholder="Ref ya date se dhoondein…"
@@ -233,6 +245,7 @@ function Payments({ rows }: { rows: PaymentRow[] }) {
         <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
           <td className="px-4 py-2.5 font-bold" colSpan={4}>Kul paisa diya</td>
           <td className="px-4 py-2.5 text-right font-bold" style={{ color: 'var(--green)' }}>{formatPaisa(total)}</td>
+          <td />
         </tr>
       )}
       row={(r) => (
@@ -242,6 +255,9 @@ function Payments({ rows }: { rows: PaymentRow[] }) {
           <td className="px-4 py-2 capitalize">{r.method}</td>
           <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>{r.bank_ref || '·'}</td>
           <td className="px-4 py-2 text-right font-medium" style={{ color: 'var(--green)' }}>{formatPaisa(r.amount)}</td>
+          <td className="px-4 py-2 text-right">
+            <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => onPrint(r)} />
+          </td>
         </tr>
       )}
     />

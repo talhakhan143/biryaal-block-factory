@@ -2,12 +2,20 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
-import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { SquarePen, ArrowRight, BookText, Coins, Trash2, Wallet } from 'lucide-react'
-import { AdvanceForm, Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, Table, useConfirm } from '../components/ui'
+import { AdvanceForm, Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, StatTile, Table, Tabs, useConfirm } from '../components/ui'
+import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
+import type { Paginated } from '../lib/hooks'
 
+/** Aik taraf ka kiraya: kitna bana, kitna diya, kitna baqi. */
+interface KirayaSide {
+  trips: number
+  kiraya: number
+  paid: number
+  due: number
+}
 interface Driver {
   id: string
   name: string
@@ -17,7 +25,12 @@ interface Driver {
   vehicle_plate?: string
   balance: number
   created_at?: string
+  /** Sirf tab aata hai jab list kisi aik kaam ki kism par chhani ho. */
+  kind_summary?: KirayaSide
 }
+
+/** Kaam ki kism. Khali = sab. */
+type Kind = '' | 'in' | 'out'
 
 export default function Drivers() {
   const { can } = useAuth()
@@ -33,7 +46,20 @@ export default function Drivers() {
   const [payId, setPayId] = useState<string | null>(null)
   const [advanceId, setAdvanceId] = useState<string | null>(null)
   const [ledgerId, setLedgerId] = useState<string | null>(null)
-  const { data, isLoading } = useList<Driver>('drivers', { search, page, sort, dir })
+  const [kind, setKind] = useState<Kind>('')
+  // Paisa dene ke foran baad parchi: driver ke haath me kaghaz jaana chahiye.
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
+
+  // useList ki jagah seedha useQuery, kyun ke yahan `totals` bhi aate hain.
+  // Key ka pehla hissa 'drivers' hi rakha hai taake paisa hilne par invalidate ho.
+  const params = { search, page, sort, dir, kind: kind || undefined }
+  const { data, isLoading } = useQuery({
+    queryKey: ['drivers', params],
+    queryFn: async () => (await api.get<Paginated<Driver> & { totals: { in: KirayaSide; out: KirayaSide } }>('/drivers', { params })).data,
+  })
+
+  const totals = data?.totals
+  const rs = (n: number) => formatPaisa(n)
 
   const onSort = (key: string) => {
     if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
@@ -43,9 +69,15 @@ export default function Drivers() {
 
   const columns: Column<Driver>[] = [
     { key: 'name', label: 'Name', sortable: true, render: (d) => <span className="font-medium">{d.name}</span> },
-    { key: 'phone', label: 'Phone', sortable: true, render: (d) => d.phone ?? '—' },
-    { key: 'vehicle_name', label: 'Vehicle (gaari)', sortable: true, render: (d) => d.vehicle_name ? `${d.vehicle_name}${d.vehicle_plate ? ` (${d.vehicle_plate})` : ''}` : '—' },
+    { key: 'phone', label: 'Phone', sortable: true, render: (d) => d.phone ?? '·' },
+    { key: 'vehicle_name', label: 'Vehicle (gaari)', sortable: true, render: (d) => d.vehicle_name ? `${d.vehicle_name}${d.vehicle_plate ? ` (${d.vehicle_plate})` : ''}` : '·' },
     { key: 'balance', label: 'Dues / Advance', sortable: true, align: 'right', render: (d) => d.balance > 0 ? <Badge color="red">{formatPaisa(d.balance)}</Badge> : d.balance < 0 ? <Badge color="blue">Advance {formatPaisa(-d.balance)}</Badge> : <Badge color="green">Settled</Badge> },
+    ...(kind ? [
+      { key: 'kind_kiraya', label: kind === 'in' ? 'Maal laane ka kiraya' : 'Maal bhejne ka kiraya', align: 'right' as const, render: (d: Driver) => formatPaisa(d.kind_summary?.kiraya ?? 0) },
+      { key: 'kind_paid', label: 'Diya', align: 'right' as const, render: (d: Driver) => <span style={{ color: 'var(--green)' }}>{formatPaisa(d.kind_summary?.paid ?? 0)}</span> },
+      { key: 'kind_due', label: 'Baqi', align: 'right' as const, render: (d: Driver) => ((d.kind_summary?.due ?? 0) > 0 ? <Badge color="amber">{formatPaisa(d.kind_summary!.due)}</Badge> : <Badge color="green">Saaf</Badge>) },
+      { key: 'kind_trips', label: 'Trip', align: 'right' as const, render: (d: Driver) => d.kind_summary?.trips ?? 0 },
+    ] : []),
     { key: 'created_at', label: 'Kab bana', sortable: true, render: (r) => (r.created_at ? String(r.created_at).slice(0, 10) : '·') },
     {
       key: 'actions', label: '', align: 'right', render: (d) => (
@@ -73,11 +105,11 @@ export default function Drivers() {
   })
   const pay = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/drivers/${id}/pay`, payload),
-    onSuccess: () => { ['drivers', 'transport-trips', 'payments', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); setPayId(null) },
+    onSuccess: (res) => { ['drivers', 'transport-trips', 'payments', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); setPayId(null); setReceipt(res.data.data) },
   })
   const advance = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/drivers/${id}/advance`, payload),
-    onSuccess: () => { ['drivers', 'payments', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); setAdvanceId(null) },
+    onSuccess: (res) => { ['drivers', 'payments', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); setAdvanceId(null); setReceipt(res.data.data) },
   })
   const del = useMutation({
     mutationFn: (id: string) => api.delete(`/drivers/${id}`),
@@ -88,11 +120,41 @@ export default function Drivers() {
   return (
     <div>
       <PageHeader title="Drivers" subtitle="Kisi bhi naam par click karein, poori history khul jayegi. Driver ka baqi aur payment" actions={can('transport.manage') && <Button onClick={() => setCreating(true)}>+ Driver</Button>} />
+
+      {/* Kiraya do tarah ka hai. Dono ka jorh hamesha saamne rehta hai, aur
+          neeche wali list jis kism par chuni jaye usi ka hisaab dikhati hai. */}
+      {totals && (
+        <div className="bf-stagger mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <StatTile
+            label="Maal laane ka kiraya"
+            value={rs(totals.in.kiraya)}
+            hint={`Purchases ke liye · ${totals.in.trips} trip · diya ${rs(totals.in.paid)} · baqi ${rs(totals.in.due)}`}
+            tone={totals.in.due > 0 ? 'amber' : 'primary'}
+          />
+          <StatTile
+            label="Maal bhejne ka kiraya"
+            value={rs(totals.out.kiraya)}
+            hint={`Block sell ke liye · ${totals.out.trips} trip · diya ${rs(totals.out.paid)} · baqi ${rs(totals.out.due)}`}
+            tone={totals.out.due > 0 ? 'amber' : 'primary'}
+          />
+        </div>
+      )}
+
+      <Tabs
+        tabs={[
+          { key: '', label: 'Saare drivers' },
+          { key: 'in', label: 'Maal laane wale' },
+          { key: 'out', label: 'Maal bhejne wale' },
+        ]}
+        active={kind}
+        onChange={(k) => { setKind(k as Kind); setPage(1) }}
+      />
+
       <DataTable
         columns={columns}
         rows={data?.data}
         loading={isLoading}
-        emptyText="Koi driver nahi."
+        emptyText={kind === 'in' ? 'Abhi kisi driver ne maal laane ka kaam nahi kiya.' : kind === 'out' ? 'Abhi kisi driver ne maal bhejne ka kaam nahi kiya.' : 'Koi driver nahi.'}
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1) }}
         searchPlaceholder="Name, phone ya gaari se search…"
@@ -120,7 +182,7 @@ export default function Drivers() {
         </Modal>
       )}
       {advanceId && (
-        <Modal title="Advance — Driver" onClose={() => setAdvanceId(null)}>
+        <Modal title="Advance, Driver" onClose={() => setAdvanceId(null)}>
           <AdvanceForm
             who="Driver"
             balance={data?.data.find((d) => d.id === advanceId)?.balance ?? 0}
@@ -130,6 +192,7 @@ export default function Drivers() {
           />
         </Modal>
       )}
+      {receipt && <PaymentReceipt payment={receipt} onClose={() => setReceipt(null)} />}
       {ledgerId && <LedgerModal id={ledgerId} onClose={() => setLedgerId(null)} />}
     </div>
   )
@@ -147,11 +210,11 @@ function DriverForm({ driver, onSubmit, busy, error, submitLabel = 'Save' }: { d
   const blockSubmit = !form.name.trim() || !form.phone.trim() || !form.vehicle_name.trim()
   return (
     <form onSubmit={(e) => { e.preventDefault(); if (blockSubmit) return; onSubmit(form) }} className="space-y-3">
-      <Field label="Name — zaroori"><Input value={form.name} onChange={(e) => set('name', e.target.value)} required /></Field>
-      <Field label="Phone — zaroori"><Input value={form.phone} onChange={(e) => set('phone', e.target.value)} required /></Field>
+      <Field label="Name (zaroori)"><Input value={form.name} onChange={(e) => set('name', e.target.value)} required /></Field>
+      <Field label="Phone (zaroori)"><Input value={form.phone} onChange={(e) => set('phone', e.target.value)} required /></Field>
       <Field label="License No (optional)"><Input value={form.license_no} onChange={(e) => set('license_no', e.target.value)} /></Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Vehicle (gaari ka naam) — zaroori"><Input value={form.vehicle_name} onChange={(e) => set('vehicle_name', e.target.value)} placeholder="Mazda" required /></Field>
+        <Field label="Vehicle (gaari ka naam) (zaroori)"><Input value={form.vehicle_name} onChange={(e) => set('vehicle_name', e.target.value)} placeholder="Mazda" required /></Field>
         <Field label="Plate no (optional)"><Input value={form.vehicle_plate} onChange={(e) => set('vehicle_plate', e.target.value)} placeholder="LEX-123" /></Field>
       </div>
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
@@ -169,13 +232,13 @@ function PayForm({ outstanding, onSubmit, busy, error }: { outstanding: number; 
     <form onSubmit={(e) => { e.preventDefault(); if (over) return; onSubmit({ ...form, amount: Number(form.amount) }) }} className="space-y-3">
       <OutstandingNote label="Driver ko dene hain (baqi)" amount={outstanding} onFill={(rs) => set('amount', String(rs))} />
       {settled ? (
-        <p className="text-sm" style={{ color: 'var(--green)' }}>Sab clear — koi payment baqi nahi. Zyada dena ho to "Advance" use karein.</p>
+        <p className="text-sm" style={{ color: 'var(--green)' }}>Sab clear, koi payment baqi nahi. Zyada dena ho to "Advance" use karein.</p>
       ) : (
         <>
           <Field label="Date"><Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} required /></Field>
           <Field label="Amount (Rs)"><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} required /></Field>
           <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
-          {over && <p className="text-sm" style={{ color: 'var(--red)' }}>Baqi se zyada — sirf {formatPaisa(outstanding)} de sakte hain. Zyada ke liye "Advance" use karein.</p>}
+          {over && <p className="text-sm" style={{ color: 'var(--red)' }}>Baqi se zyada, sirf {formatPaisa(outstanding)} de sakte hain. Zyada ke liye "Advance" use karein.</p>}
         </>
       )}
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
@@ -193,15 +256,15 @@ function LedgerModal({ id, onClose }: { id: string; onClose: () => void }) {
     <Modal title="Driver Ledger" onClose={onClose}>
       {isLoading || !data ? <Spinner /> : (
         <div>
-          <div className="mb-3 text-sm">{data.driver.name} — Dues: <strong>{formatPaisa(data.balance)}</strong></div>
+          <div className="mb-3 text-sm">{data.driver.name}, Dues: <strong>{formatPaisa(data.balance)}</strong></div>
           <Table head={['Date', 'Ref', 'Desc', 'Charge', 'Paid']}>
             {data.rows.map((r: Record<string, string | number>, i: number) => (
               <tr key={i}>
                 <td className="px-4 py-2">{r.date}</td>
                 <td className="px-4 py-2">{r.reference}</td>
                 <td className="px-4 py-2">{r.description}</td>
-                <td className="px-4 py-2">{r.credit ? formatPaisa(Number(r.credit)) : '—'}</td>
-                <td className="px-4 py-2">{r.debit ? formatPaisa(Number(r.debit)) : '—'}</td>
+                <td className="px-4 py-2">{r.credit ? formatPaisa(Number(r.credit)) : '·'}</td>
+                <td className="px-4 py-2">{r.debit ? formatPaisa(Number(r.debit)) : '·'}</td>
               </tr>
             ))}
           </Table>

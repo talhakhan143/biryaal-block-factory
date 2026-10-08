@@ -8,6 +8,7 @@ import { useAuth } from '../lib/auth'
 import { ArrowRight, BookText, HandCoins, SquarePen } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, Table } from '../components/ui'
 import CustomerForm from '../components/CustomerForm'
+import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
 import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface Customer {
@@ -36,6 +37,8 @@ export default function Customers() {
   const [editing, setEditing] = useState<Customer | null>(null)
   const [ledgerId, setLedgerId] = useState<string | null>(null)
   const [receiveFor, setReceiveFor] = useState<Customer | null>(null)
+  // Paisa jama hone ke foran baad parchi, taake bande ke haath me kaghaz jaye.
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
   const { data, isLoading } = useList<Customer>('customers', { search, page, sort, dir, has_advance: onlyAdvance ? 1 : undefined })
 
   const onSort = (key: string) => {
@@ -56,15 +59,16 @@ export default function Customers() {
 
   const receive = useMutation({
     mutationFn: (payload: Record<string, unknown>) => api.post('/payments/receipt', payload),
-    onSuccess: () => {
+    onSuccess: (res) => {
       MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setReceiveFor(null)
+      setReceipt(res.data.data)
     },
   })
 
   const columns: Column<Customer>[] = [
     { key: 'name', label: 'Name', sortable: true, render: (c) => <span className="font-medium">{c.name}</span> },
-    { key: 'phone', label: 'Phone', sortable: true, render: (c) => c.phone ?? '—' },
+    { key: 'phone', label: 'Phone', sortable: true, render: (c) => c.phone ?? '·' },
     {
       key: 'balance', label: 'Haal', sortable: true, align: 'right',
       render: (c) => (
@@ -145,10 +149,12 @@ export default function Customers() {
         </Modal>
       )}
 
+      {receipt && <PaymentReceipt payment={receipt} onClose={() => setReceipt(null)} />}
+
       {ledgerId && <LedgerModal id={ledgerId} onClose={() => setLedgerId(null)} />}
 
       {receiveFor && (
-        <Modal title={`Receive — ${receiveFor.name}`} onClose={() => setReceiveFor(null)}>
+        <Modal title={`Receive, ${receiveFor.name}`} onClose={() => setReceiveFor(null)}>
           <ReceiveForm
             outstanding={receiveFor.balance}
             onSubmit={(payload) => receive.mutate({ ...payload, customer_id: receiveFor.id })}
@@ -188,7 +194,7 @@ function LedgerModal({ id, onClose }: { id: string; onClose: () => void }) {
       ) : (
         <div>
           <div className="mb-3 text-sm">
-            {data.customer.name} — Balance: <strong>{formatPaisa(data.balance)}</strong>
+            {data.customer.name}, Balance: <strong>{formatPaisa(data.balance)}</strong>
           </div>
           <Table head={['Date', 'Ref', 'Desc', { label: 'Debit', align: 'right' }, { label: 'Credit', align: 'right' }]}>
             {data.rows.map((r: Record<string, string | number>, i: number) => (
@@ -196,8 +202,8 @@ function LedgerModal({ id, onClose }: { id: string; onClose: () => void }) {
                 <td className="px-4 py-2">{r.date}</td>
                 <td className="px-4 py-2">{r.reference}</td>
                 <td className="px-4 py-2">{r.description}</td>
-                <td className="px-4 py-2">{r.debit ? formatPaisa(Number(r.debit)) : '—'}</td>
-                <td className="px-4 py-2">{r.credit ? formatPaisa(Number(r.credit)) : '—'}</td>
+                <td className="px-4 py-2">{r.debit ? formatPaisa(Number(r.debit)) : '·'}</td>
+                <td className="px-4 py-2">{r.credit ? formatPaisa(Number(r.credit)) : '·'}</td>
               </tr>
             ))}
           </Table>

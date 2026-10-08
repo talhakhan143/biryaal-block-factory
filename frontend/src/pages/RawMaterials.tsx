@@ -130,7 +130,7 @@ function MaterialForm({ material, onSubmit, busy, error }: { material: RawMateri
         <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
         Active
       </label>
-      <p className="text-xs" style={{ color: 'var(--muted)' }}>Stock (on-hand) purchase se barhta hai — yahan manually nahi.</p>
+      <p className="text-xs" style={{ color: 'var(--muted)' }}>Stock (on-hand) purchase se barhta hai, yahan manually nahi.</p>
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
       <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Save'}</Button>
     </form>

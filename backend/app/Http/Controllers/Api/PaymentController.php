@@ -26,7 +26,7 @@ class PaymentController extends Controller
     public function index(Request $request)
     {
         $query = Payment::query()
-            ->with('party')
+            ->with(['party', 'allocatable'])
             ->when($request->direction, fn ($q, $d) => $q->where('direction', $d))
             ->when($request->from, fn ($q, $d) => $q->whereDate('payment_date', '>=', $d))
             ->when($request->to, fn ($q, $d) => $q->whereDate('payment_date', '<=', $d));
@@ -45,7 +45,7 @@ class PaymentController extends Controller
     }
 
     /**
-     * Every party we owe money to, in one list — suppliers, drivers, labourers
+     * Every party we owe money to, in one list, suppliers, drivers, labourers
      * and unpaid staff salaries. So no single person is left out of payables.
      */
     public function payables()
@@ -65,7 +65,7 @@ class PaymentController extends Controller
             ->each(fn ($sal) => $rows->push([
                 'type' => 'salary',
                 'id' => $sal->id,
-                'name' => ($sal->staff?->name ?? 'Staff').' — '.$sal->month,
+                'name' => ($sal->staff?->name ?? 'Staff').', '.$sal->month,
                 'balance' => (int) $sal->balance,
             ]));
 
@@ -73,7 +73,7 @@ class PaymentController extends Controller
     }
 
     /**
-     * Everyone who is holding an advance from us — i.e. a NEGATIVE balance,
+     * Everyone who is holding an advance from us, i.e. a NEGATIVE balance,
      * money we paid before any dues existed. Returned as a positive `advance`
      * amount. These work off automatically as future wages/charges accrue.
      */
@@ -94,7 +94,7 @@ class PaymentController extends Controller
             ->each(fn ($sal) => $rows->push([
                 'type' => 'salary',
                 'id' => $sal->id,
-                'name' => ($sal->staff?->name ?? 'Staff').' — '.$sal->month,
+                'name' => ($sal->staff?->name ?? 'Staff').', '.$sal->month,
                 'advance' => (int) abs((int) $sal->balance),
             ]));
 
@@ -121,7 +121,7 @@ class PaymentController extends Controller
 
         $payment = $this->service->advanceFromCustomer($customer, $data);
 
-        return (new PaymentResource($payment->load('party')))
+        return (new PaymentResource($payment->load(['party', 'allocatable'])))
             ->additional(['customer' => new CustomerResource($customer->fresh())])
             ->response()
             ->setStatusCode(201);
@@ -143,7 +143,7 @@ class PaymentController extends Controller
 
         $payment = $this->service->receiveFromCustomer($data);
 
-        return new PaymentResource($payment->load('party'));
+        return new PaymentResource($payment->load(['party', 'allocatable']));
     }
 
     public function payment(Request $request)
@@ -162,6 +162,6 @@ class PaymentController extends Controller
 
         $payment = $this->service->payToSupplier($data);
 
-        return new PaymentResource($payment->load('party'));
+        return new PaymentResource($payment->load(['party', 'allocatable']));
     }
 }

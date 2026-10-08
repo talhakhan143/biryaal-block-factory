@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 /**
- * Resellers Point dashboard — its own books, independent of the block factory.
+ * Resellers Point dashboard, its own books, independent of the block factory.
  * All money in paisa.
  */
 class ResellerDashboardController extends Controller
@@ -90,7 +90,7 @@ class ResellerDashboardController extends Controller
             'low_stock_threshold' => (float) $i->low_stock_threshold,
         ])->values();
 
-        // Purchases: total maal khareeda (all-time cost) — for context
+        // Purchases: total maal khareeda (all-time cost), for context
         $purchaseTotal = (int) ResellerPurchase::sum('total_cost');
 
         return response()->json([

@@ -43,7 +43,7 @@ class RolePermissionSeeder extends Seeder
             Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
         }
 
-        // Super Admin (developer) — full access; also bypasses via Gate::before.
+        // Super Admin (developer), full access; also bypasses via Gate::before.
         $superAdmin = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
         $superAdmin->syncPermissions($permissions);
 
@@ -71,7 +71,7 @@ class RolePermissionSeeder extends Seeder
             'labour.view', 'labour.manage', 'labour.delete',
         ]);
 
-        // Sales User — runs the whole operation (sales, production, dispatch, stock,
+        // Sales User, runs the whole operation (sales, production, dispatch, stock,
         // attendance, expenses) but CANNOT commit theft: no money-out (driver/labour/
         // supplier pay, advances), no manual adjustments, and no deletes anywhere.
         // Can only RECEIVE customer money (payments.receive), not pay it out.

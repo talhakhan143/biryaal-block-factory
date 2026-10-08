@@ -4,8 +4,9 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { BookText, CalendarDays, Coins, Power, PowerOff, SquarePen, Trash2, Wallet } from 'lucide-react'
+import { BookText, CalendarDays, Coins, Power, PowerOff, Printer, SquarePen, Trash2, Wallet } from 'lucide-react'
 import { AdvanceForm, Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select, Spinner, Table, useConfirm } from '../components/ui'
+import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
 
 interface Labourer {
   id: string
@@ -32,6 +33,8 @@ export default function Labour() {
   const [advanceId, setAdvanceId] = useState<string | null>(null)
   const [ledgerId, setLedgerId] = useState<string | null>(null)
   const [calId, setCalId] = useState<string | null>(null)
+  // Paisa dene ke foran baad parchi khul jati hai, taake mazdoor ke haath me kaghaz jaye.
+  const [receipt, setReceipt] = useState<{ doc: PaymentDoc; reason: string } | null>(null)
   const { data, isLoading } = useList<Labourer>('labourers', { search, page, sort, dir })
   const invalidate = () => { ['labourers', 'payments', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] })) }
 
@@ -44,14 +47,14 @@ export default function Labour() {
   const create = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/labourers', p), onSuccess: () => { invalidate(); setCreating(false) } })
   const update = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.put(`/labourers/${id}`, payload), onSuccess: () => { invalidate(); setEditing(null) }, onError: (e) => alert(apiError(e)) })
   const mark = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/attendances', p), onSuccess: () => { invalidate(); setMarking(false) } })
-  const pay = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/labourers/${id}/pay`, payload), onSuccess: () => { invalidate(); setPayId(null) } })
-  const advance = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/labourers/${id}/advance`, payload), onSuccess: () => { invalidate(); setAdvanceId(null) } })
+  const pay = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/labourers/${id}/pay`, payload), onSuccess: (res) => { invalidate(); setPayId(null); setReceipt({ doc: res.data.data, reason: 'Mazdoori' }) } })
+  const advance = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/labourers/${id}/advance`, payload), onSuccess: (res) => { invalidate(); setAdvanceId(null); setReceipt({ doc: res.data.data, reason: 'Advance (peshgi mazdoori)' }) } })
   const del = useMutation({ mutationFn: (id: string) => api.delete(`/labourers/${id}`), onSuccess: invalidate, onError: (e) => alert(apiError(e)) })
   const toggle = useMutation({ mutationFn: (l: Labourer) => api.put(`/labourers/${l.id}`, { name: l.name, phone: l.phone ?? '', daily_wage: l.daily_wage / 100, is_active: !l.is_active }), onSuccess: invalidate, onError: (e) => alert(apiError(e)) })
 
   const columns: Column<Labourer>[] = [
     { key: 'name', label: 'Name', sortable: true, render: (l) => <span className="font-medium" style={{ opacity: l.is_active ? 1 : 0.55 }}>{l.name}</span> },
-    { key: 'phone', label: 'Phone', sortable: true, render: (l) => l.phone ?? '—' },
+    { key: 'phone', label: 'Phone', sortable: true, render: (l) => l.phone ?? '·' },
     { key: 'daily_wage', label: 'Daily Wage', sortable: true, align: 'right', render: (l) => formatPaisa(l.daily_wage) },
     { key: 'balance', label: 'Dues / Advance', sortable: true, align: 'right', render: (l) => l.balance > 0 ? <Badge color="red">{formatPaisa(l.balance)}</Badge> : l.balance < 0 ? <Badge color="blue">Advance {formatPaisa(-l.balance)}</Badge> : <Badge color="green">Settled</Badge> },
     { key: 'is_active', label: 'Status', sortable: true, render: (l) => l.is_active ? <Badge color="green">Active</Badge> : <Badge color="amber">Off</Badge> },
@@ -133,7 +136,7 @@ export default function Labour() {
         </Modal>
       )}
       {advanceId && (
-        <Modal title="Advance — Mazdoor" onClose={() => setAdvanceId(null)}>
+        <Modal title="Advance, Mazdoor" onClose={() => setAdvanceId(null)}>
           <AdvanceForm
             who="Mazdoor"
             balance={data?.data.find((l) => l.id === advanceId)?.balance ?? 0}
@@ -150,6 +153,7 @@ export default function Labour() {
           onClose={() => setCalId(null)}
         />
       )}
+      {receipt && <PaymentReceipt payment={receipt.doc} reason={receipt.reason} onClose={() => setReceipt(null)} />}
     </div>
   )
 }
@@ -160,31 +164,55 @@ function LedgerModal({ id, onClose }: { id: string; onClose: () => void }) {
     queryFn: async () => (await api.get(`/labourers/${id}/ledger`)).data,
   })
   const bal = data ? Number(data.balance) : 0
+  // Khate ki jo line paisa dene ki hai, usi ki parchi dobara nikal sakte hain.
+  const [receipt, setReceipt] = useState<{ doc: PaymentDoc; reason: string } | null>(null)
   return (
     <Modal title="Mazdoor Ledger" onClose={onClose}>
       {isLoading || !data ? <Spinner /> : (
         <div>
           <div className="mb-3 text-sm">
-            {data.labourer.name} —{' '}
+            {data.labourer.name}{', '}
             {bal > 0
               ? <>Baqi dene hain: <strong style={{ color: 'var(--red)' }}>{formatPaisa(bal)}</strong></>
               : bal < 0
                 ? <>Advance jama: <strong style={{ color: 'var(--primary)' }}>{formatPaisa(-bal)}</strong></>
                 : <strong style={{ color: 'var(--green)' }}>Sab clear</strong>}
           </div>
-          <Table head={['Date', 'Ref', 'Desc', { label: 'Mazdoori', align: 'right' }, { label: 'Diya', align: 'right' }]}>
+          <Table head={['Date', 'Ref', 'Desc', { label: 'Mazdoori', align: 'right' }, { label: 'Diya', align: 'right' }, '']}>
             {data.rows.map((r: Record<string, string | number>, i: number) => (
               <tr key={i}>
                 <td className="px-4 py-2">{r.date}</td>
                 <td className="px-4 py-2">{r.reference}</td>
                 <td className="px-4 py-2">{r.description}</td>
-                <td className="px-4 py-2">{r.credit ? formatPaisa(Number(r.credit)) : '—'}</td>
-                <td className="px-4 py-2">{r.debit ? formatPaisa(Number(r.debit)) : '—'}</td>
+                <td className="px-4 py-2">{r.credit ? formatPaisa(Number(r.credit)) : '·'}</td>
+                <td className="px-4 py-2">{r.debit ? formatPaisa(Number(r.debit)) : '·'}</td>
+                <td className="px-4 py-2 text-right">
+                  {Number(r.debit) > 0 && (
+                    <RowActions>
+                      <IconButton
+                        icon={Printer}
+                        label="Parchi dekhein / print karein"
+                        tone="primary"
+                        onClick={() => setReceipt({
+                          doc: {
+                            reference: String(r.reference),
+                            direction: 'payment',
+                            party_name: data.labourer.name,
+                            payment_date: String(r.date),
+                            amount: Number(r.debit),
+                          },
+                          reason: String(r.description || 'Mazdoori'),
+                        })}
+                      />
+                    </RowActions>
+                  )}
+                </td>
               </tr>
             ))}
           </Table>
         </div>
       )}
+      {receipt && <PaymentReceipt payment={receipt.doc} reason={receipt.reason} onClose={() => setReceipt(null)} />}
     </Modal>
   )
 }
@@ -240,13 +268,13 @@ function PayForm({ outstanding, onSubmit, busy, error }: { outstanding: number; 
     <form onSubmit={(e) => { e.preventDefault(); if (over) return; onSubmit({ ...form, amount: Number(form.amount) }) }} className="space-y-3">
       <OutstandingNote label="Mazdoor ko dene hain (baqi)" amount={outstanding} onFill={(rs) => set('amount', String(rs))} />
       {settled ? (
-        <p className="text-sm" style={{ color: 'var(--green)' }}>Sab clear — koi mazdoori baqi nahi. Zyada dena ho to "Advance" use karein.</p>
+        <p className="text-sm" style={{ color: 'var(--green)' }}>Sab clear, koi mazdoori baqi nahi. Zyada dena ho to "Advance" use karein.</p>
       ) : (
         <>
           <Field label="Date"><Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} required /></Field>
           <Field label="Amount (Rs)"><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} required /></Field>
           <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
-          {over && <p className="text-sm" style={{ color: 'var(--red)' }}>Baqi se zyada — sirf {formatPaisa(outstanding)} de sakte hain. Zyada ke liye "Advance" use karein.</p>}
+          {over && <p className="text-sm" style={{ color: 'var(--red)' }}>Baqi se zyada, sirf {formatPaisa(outstanding)} de sakte hain. Zyada ke liye "Advance" use karein.</p>}
         </>
       )}
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
@@ -316,7 +344,7 @@ function AttendanceCalendar({ labourer, onClose }: { labourer: Labourer; onClose
   }
 
   return (
-    <Modal title={`Haazri — ${labourer?.name ?? ''}`} onClose={onClose} wide>
+    <Modal title={`Haazri, ${labourer?.name ?? ''}`} onClose={onClose} wide>
       <div className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Saal (year)"><Select value={String(year)} onChange={(e) => changeYear(Number(e.target.value))}>{years.map((y) => <option key={y} value={y}>{y}</option>)}</Select></Field>
@@ -325,7 +353,7 @@ function AttendanceCalendar({ labourer, onClose }: { labourer: Labourer; onClose
         </div>
 
         <p className="text-xs" style={{ color: 'var(--muted)' }}>
-          Khaali din pe click karke select karein (ek ya kayi), phir niche "Mark" dabayein. Jis din pehle se haazri lag chuki wo <b>locked</b> hai — galti theek karni ho to Adjustments se.
+          Khaali din pe click karke select karein (ek ya kayi), phir niche "Mark" dabayein. Jis din pehle se haazri lag chuki wo <b>locked</b> hai, galti theek karni ho to Adjustments se.
         </p>
 
         {isLoading ? <Spinner /> : (
@@ -344,7 +372,7 @@ function AttendanceCalendar({ labourer, onClose }: { labourer: Labourer; onClose
                 if (st) {
                   const info = statusInfo[st] ?? statusInfo.present
                   return (
-                    <div key={day} className="rounded-lg border px-1 py-1.5 text-center" style={{ borderColor: info.c, background: `color-mix(in srgb, ${info.c} 14%, transparent)`, cursor: 'not-allowed' }} title={`${dateStr} — ${st} (locked)`}>
+                    <div key={day} className="rounded-lg border px-1 py-1.5 text-center" style={{ borderColor: info.c, background: `color-mix(in srgb, ${info.c} 14%, transparent)`, cursor: 'not-allowed' }} title={`${dateStr}, ${st} (locked)`}>
                       <div className="text-sm font-bold" style={{ color: info.c }}>{day}</div>
                       <div className="text-[9px]" style={{ color: 'var(--muted)' }}>{dow}</div>
                       <div className="text-[10px] font-bold" style={{ color: info.c }}>{info.t}</div>
@@ -365,7 +393,7 @@ function AttendanceCalendar({ labourer, onClose }: { labourer: Labourer; onClose
                       opacity: isFuture ? 0.35 : 1,
                       cursor: isFuture ? 'not-allowed' : 'pointer',
                     }}
-                    title={isFuture ? `${dateStr} — future (locked)` : dateStr}
+                    title={isFuture ? `${dateStr}, future (locked)` : dateStr}
                   >
                     <div className="text-sm font-bold">{day}</div>
                     <div className="text-[9px]" style={{ color: isSel ? 'var(--primary-fg)' : 'var(--muted)' }}>{dow}</div>
@@ -386,7 +414,7 @@ function AttendanceCalendar({ labourer, onClose }: { labourer: Labourer; onClose
 
         {mark.error && <p className="text-sm" style={{ color: 'var(--red)' }}>{apiError(mark.error)}</p>}
         <Button type="button" disabled={sel.size === 0 || mark.isPending} className="w-full" onClick={() => mark.mutate()}>
-          {mark.isPending ? 'Saving…' : `Mark ${sel.size || ''} din — ${status === 'present' ? 'Present' : status === 'half' ? 'Half' : 'Absent'}`}
+          {mark.isPending ? 'Saving…' : `Mark ${sel.size || ''} din, ${status === 'present' ? 'Present' : status === 'half' ? 'Half' : 'Absent'}`}
         </Button>
       </div>
     </Modal>

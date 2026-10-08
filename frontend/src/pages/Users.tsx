@@ -39,7 +39,7 @@ export default function Users() {
   const columns: Column<AppUser>[] = [
     { key: 'name', label: 'Name', sortable: true, render: (u) => <span className="font-medium">{u.name}</span> },
     { key: 'email', label: 'Email', sortable: true, render: (u) => u.email },
-    { key: 'phone', label: 'Phone', render: (u) => u.phone ?? '—' },
+    { key: 'phone', label: 'Phone', render: (u) => u.phone ?? '·' },
     { key: 'role', label: 'Role', render: (u) => u.roles.map((r) => <Badge key={r} color="blue">{r}</Badge>) },
     { key: 'status', label: 'Status', render: (u) => u.is_active ? <Badge color="green">Active</Badge> : <Badge color="red">Disabled</Badge> },
     { key: 'created_at', label: 'Kab bana', sortable: true, render: (r) => (r.created_at ? String(r.created_at).slice(0, 10) : '·') },
@@ -219,15 +219,15 @@ function DangerZone() {
   return (
     <div className="mt-10">
       <h2 className="mb-2 flex items-center gap-2 text-sm font-bold" style={{ color: 'var(--red)' }}>
-        <ShieldAlert size={16} /> Danger Zone — Owner / Super Admin
+        <ShieldAlert size={16} /> Danger Zone, Owner / Super Admin
       </h2>
       <Card accent="red">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="font-semibold" style={{ color: 'var(--text)' }}>Hard Reset — saara data wipe</div>
+            <div className="font-semibold" style={{ color: 'var(--text)' }}>Hard Reset, saara data wipe</div>
             <p className="mt-0.5 text-sm" style={{ color: 'var(--muted)' }}>
               Client demo ke baad sab kuch clear: sales, purchases, payments, production, dispatch, transport, customers,
-              suppliers, drivers, mazdoor, staff, products, stock, ledger — sab. <strong>Users, roles aur accounts safe rahenge.</strong>
+              suppliers, drivers, mazdoor, staff, products, stock, ledger, sab. <strong>Users, roles aur accounts safe rahenge.</strong>
               {' '}Yeh wapas nahi aata.
             </p>
           </div>
@@ -238,7 +238,7 @@ function DangerZone() {
       </Card>
 
       {open && (
-        <Modal title="Hard Reset — pakka?" onClose={close}>
+        <Modal title="Hard Reset, pakka?" onClose={close}>
           {done ? (
             <div className="space-y-4">
               <p className="text-sm" style={{ color: 'var(--green)' }}>{done}</p>

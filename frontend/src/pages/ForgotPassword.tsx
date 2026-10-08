@@ -27,7 +27,7 @@ export default function ForgotPassword() {
     <div className="flex h-full flex-col items-center justify-center px-4" style={{ background: 'var(--bg)' }}>
       <Card className="w-full max-w-sm">
         <h1 className="mb-1 text-lg font-bold" style={{ color: 'var(--text)' }}>Forgot Password</h1>
-        <p className="mb-5 text-sm" style={{ color: 'var(--muted)' }}>Apni email daalein — reset link wahin aayega.</p>
+        <p className="mb-5 text-sm" style={{ color: 'var(--muted)' }}>Apni email daalein, reset link wahin aayega.</p>
         {sent ? (
           <p className="text-sm" style={{ color: 'var(--green)' }}>{sent}</p>
         ) : (

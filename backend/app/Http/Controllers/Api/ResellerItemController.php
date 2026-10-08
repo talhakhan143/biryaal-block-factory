@@ -50,7 +50,7 @@ class ResellerItemController extends Controller
         try {
             $resellerItem->delete();
         } catch (QueryException $e) {
-            return response()->json(['message' => 'Ye item use me hai (purchase) — delete nahi ho sakta. "Active" off kar dein.'], 422);
+            return response()->json(['message' => 'Ye item use me hai (purchase), delete nahi ho sakta. "Active" off kar dein.'], 422);
         }
 
         return response()->noContent();

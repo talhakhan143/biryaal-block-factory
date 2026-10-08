@@ -4,9 +4,10 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Undo2, HandCoins } from 'lucide-react'
+import { Undo2, HandCoins, Printer } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, IconButton, Select } from '../components/ui'
 import { UNITS } from './ResellerItems'
+import { PaymentReceipt, RentalVoucher, type PaymentDoc, type RentalDoc } from '../components/receipts'
 
 interface Rental {
   id: string
@@ -23,6 +24,7 @@ interface Rental {
   paid_amount: number
   outstanding: number
   status: string
+  notes?: string | null
 }
 
 export default function ResellerKiraya() {
@@ -36,6 +38,10 @@ export default function ResellerKiraya() {
   const [statusF, setStatusF] = useState('')
   const [sort, setSort] = useState('start_date')
   const [dir, setDir] = useState<'asc' | 'desc'>('desc')
+  // Kiraya bill ki parchiyan qatar me: ek submit se kai rentals ban sakte hain,
+  // is liye ek ke baad doosri khulti hai, koi parchi reh na jaye.
+  const [bills, setBills] = useState<RentalDoc[]>([])
+  const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
   const { data, isLoading } = useList<Rental>('reseller/rentals', { page, search, sort, dir, status: statusF || undefined })
   const manage = can('reseller.manage')
 
@@ -45,15 +51,17 @@ export default function ResellerKiraya() {
     setPage(1)
   }
 
-  // Kiraya bhi money hub (receivable/dashboard) ko affect karta — sab refresh
+  // Kiraya bhi money hub (receivable/dashboard) ko affect karta, sab refresh
   const invalidate = () => ['reseller/rentals', 'reseller/receivables', 'reseller/payments', 'reseller/dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
-  const create = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/reseller/rentals', p), onSuccess: () => { invalidate(); setCreating(false) } })
-  const doReturn = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/reseller/rentals/${id}/return`, payload), onSuccess: () => { invalidate(); setReturning(null) } })
-  const collect = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/reseller/rentals/${id}/collect`, payload), onSuccess: () => { invalidate(); setCollecting(null) } })
+  // Naya kiraya: har item ka apna rental banta hai, is liye jawab me poori list aati hai.
+  const create = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/reseller/rentals', p), onSuccess: (res) => { invalidate(); setCreating(false); setBills(res.data.data ?? []) } })
+  const doReturn = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/reseller/rentals/${id}/return`, payload), onSuccess: (res) => { invalidate(); setReturning(null); setBills([res.data.data]) } })
+  // Yahan parent rental wapas aata hai, parchi alag se `payment` me.
+  const collect = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/reseller/rentals/${id}/collect`, payload), onSuccess: (res) => { invalidate(); setCollecting(null); setReceipt(res.data.payment) } })
 
   const columns: Column<Rental>[] = [
     { key: 'reference', label: 'Ref', sortable: true, render: (r) => <span className="font-mono text-xs">{r.reference}</span> },
-    { key: 'customer', label: 'Customer', render: (r) => r.customer?.name ?? '—' },
+    { key: 'customer', label: 'Customer', render: (r) => r.customer?.name ?? '·' },
     { key: 'item_name', label: 'Item', render: (r) => <span>{r.item_name} <span style={{ color: 'var(--muted)' }}>× {r.quantity} {r.unit}</span></span> },
     { key: 'per_day_rate', label: 'Rate/day', align: 'right', render: (r) => formatPaisa(r.per_day_rate) },
     { key: 'start_date', label: 'Start', sortable: true, render: (r) => r.start_date },
@@ -63,12 +71,11 @@ export default function ResellerKiraya() {
     { key: 'status', label: 'Status', render: (r) => r.status === 'active' ? <Badge color="blue">Active</Badge> : <Badge color="slate">Returned</Badge> },
     {
       key: 'actions', label: '', align: 'right', render: (r) => (
-        manage ? (
-          <RowActions>
-            {r.status === 'active' && <IconButton icon={Undo2} label="Return" tone="primary" onClick={() => setReturning(r)} />}
-            {r.outstanding > 0 && <IconButton icon={HandCoins} label="Collect" tone="green" onClick={() => setCollecting(r)} />}
-          </RowActions>
-        ) : null
+        <RowActions>
+          <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setBills([r])} />
+          {manage && r.status === 'active' && <IconButton icon={Undo2} label="Return" tone="primary" onClick={() => setReturning(r)} />}
+          {manage && r.outstanding > 0 && <IconButton icon={HandCoins} label="Collect" tone="green" onClick={() => setCollecting(r)} />}
+        </RowActions>
       ),
     },
   ]
@@ -77,7 +84,7 @@ export default function ResellerKiraya() {
     <div>
       <PageHeader
         title="Kiraya (Rental)"
-        subtitle="Customer ne items le jayin — har din charge jama, return pe band"
+        subtitle="Customer ne items le jayin, har din charge jama, return pe band"
         actions={manage && <Button onClick={() => setCreating(true)}>+ Naya Kiraya</Button>}
       />
       <div className="mb-3 flex gap-2">
@@ -95,18 +102,20 @@ export default function ResellerKiraya() {
         search={search} onSearch={(v) => { setSearch(v); setPage(1) }} searchPlaceholder="Ref ya item se search…"
         sort={sort} dir={dir} onSort={onSort} meta={data?.meta} page={page} onPage={setPage}
       />
+      {bills.length > 0 && <RentalVoucher rental={bills[0]} onClose={() => setBills((b) => b.slice(1))} />}
+      {receipt && <PaymentReceipt payment={receipt} subtitle="Resellers Point" onClose={() => setReceipt(null)} />}
       {creating && (
         <Modal title="Naya Kiraya" onClose={() => setCreating(false)}>
           <RentalForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />
         </Modal>
       )}
       {returning && (
-        <Modal title={`Return — ${returning.reference}`} onClose={() => setReturning(null)}>
+        <Modal title={`Return, ${returning.reference}`} onClose={() => setReturning(null)}>
           <ReturnForm rental={returning} onSubmit={(payload) => doReturn.mutate({ id: returning.id, payload })} busy={doReturn.isPending} error={doReturn.error ? apiError(doReturn.error) : ''} />
         </Modal>
       )}
       {collecting && (
-        <Modal title={`Kiraya Collect — ${collecting.reference}`} onClose={() => setCollecting(null)}>
+        <Modal title={`Kiraya Collect, ${collecting.reference}`} onClose={() => setCollecting(null)}>
           <CollectForm rental={collecting} onSubmit={(payload) => collect.mutate({ id: collecting.id, payload })} busy={collect.isPending} error={collect.error ? apiError(collect.error) : ''} />
         </Modal>
       )}

@@ -80,7 +80,7 @@ export default function Products() {
     <div>
       <PageHeader
         title="Products / Rates"
-        subtitle="Block categories — naam, rate, curing din set karo"
+        subtitle="Block categories, naam, rate, curing din set karo"
         actions={manage && <Button onClick={() => setCreating(true)}>+ Product</Button>}
       />
       <DataTable

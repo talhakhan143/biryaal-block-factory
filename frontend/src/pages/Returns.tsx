@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Printer } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, type Column, DataTable, Field, Input, MethodField, Modal, MoneyInput, PageHeader, Select } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, PageHeader, RowActions, Select, Spinner } from '../components/ui'
+import { ReturnNote, type ReturnDoc } from '../components/receipts'
 
 interface SalesReturn {
   id: string
@@ -21,6 +23,10 @@ export default function Returns() {
   const { can } = useAuth()
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
+  // Abhi bana return: jawab me items bhi aate hain, is liye seedha parchi.
+  const [note, setNote] = useState<ReturnDoc | null>(null)
+  // Purani row: list me items nahi hote, is liye poora return mangwa kar parchi.
+  const [printId, setPrintId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('return_date')
@@ -35,7 +41,12 @@ export default function Returns() {
 
   const create = useMutation({
     mutationFn: (p: Record<string, unknown>) => api.post('/sales-returns', p),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sales-returns'] }); setCreating(false) },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['sales-returns'] })
+      setCreating(false)
+      // Paisa wapas hua hai, to kaghaz saath hi nikal aana chahiye.
+      setNote(res.data.data)
+    },
   })
 
   const columns: Column<SalesReturn>[] = [
@@ -46,13 +57,20 @@ export default function Returns() {
     { key: 'deduction', label: 'Deduction', sortable: true, align: 'right', render: (r) => formatPaisa(r.deduction) },
     { key: 'refund_amount', label: 'Refund', sortable: true, align: 'right', render: (r) => <span className="font-semibold">{formatPaisa(r.refund_amount)}</span> },
     { key: 'refund_mode', label: 'Mode', sortable: true, render: (r) => <Badge color="blue">{r.refund_mode}</Badge> },
+    {
+      key: 'actions', label: '', align: 'right', render: (r) => (
+        <RowActions>
+          <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setPrintId(r.id)} />
+        </RowActions>
+      ),
+    },
   ]
 
   return (
     <div>
       <PageHeader
         title="Block Return (Wapsi)"
-        subtitle="Block wapas — stock me wapas, paisa refund (kiraya/cut ke baad)"
+        subtitle="Block wapas, stock me wapas, paisa refund (kiraya/cut ke baad)"
         actions={can('sales.manage') && <Button onClick={() => setCreating(true)}>+ Return</Button>}
       />
       <DataTable
@@ -70,6 +88,9 @@ export default function Returns() {
         page={page}
         onPage={setPage}
       />
+      {note && <ReturnNote ret={note} onClose={() => setNote(null)} />}
+      {printId && <ReturnNoteById id={printId} onClose={() => setPrintId(null)} />}
+
       {creating && (
         <Modal title="New Block Return" onClose={() => setCreating(false)}>
           <ReturnForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />
@@ -77,6 +98,23 @@ export default function Returns() {
       )}
     </div>
   )
+}
+
+/**
+ * List ki row me wapas aaye blocks ki tafseel nahi hoti, is liye parchi ke liye
+ * poora return mangwa lete hain. Isi tarah sale ka bill bhi khulta hai.
+ */
+function ReturnNoteById({ id, onClose }: { id: string; onClose: () => void }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['sales-return', id],
+    queryFn: async () => (await api.get<{ data: ReturnDoc }>(`/sales-returns/${id}`)).data.data,
+  })
+
+  if (isLoading || !data) {
+    return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}><Spinner /></div>
+  }
+
+  return <ReturnNote ret={data} onClose={onClose} />
 }
 
 function ReturnForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {

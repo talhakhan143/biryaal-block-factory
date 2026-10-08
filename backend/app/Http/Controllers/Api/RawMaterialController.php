@@ -49,7 +49,7 @@ class RawMaterialController extends Controller
         try {
             $rawMaterial->delete();
         } catch (QueryException) {
-            return response()->json(['message' => 'Ye material purchases me use hua — delete nahi ho sakta. "Active" off karein.'], 422);
+            return response()->json(['message' => 'Ye material purchases me use hua, delete nahi ho sakta. "Active" off karein.'], 422);
         }
 
         return response()->noContent();

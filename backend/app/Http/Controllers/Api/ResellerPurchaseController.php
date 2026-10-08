@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ResellerPaymentResource;
 use App\Http\Resources\ResellerPurchaseResource;
 use App\Models\ResellerPurchase;
 use App\Services\Reseller\ResellerService;
@@ -72,8 +73,9 @@ class ResellerPurchaseController extends Controller
         ], ['bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.']);
         $data['amount'] = Money::toPaisa($data['amount']);
 
-        $this->service->payPurchase($resellerPurchase, $data);
+        $payment = $this->service->payPurchase($resellerPurchase, $data);
 
-        return new ResellerPurchaseResource($resellerPurchase->fresh()->load(['supplier', 'item']));
+        return (new ResellerPurchaseResource($resellerPurchase->fresh()->load(['supplier', 'item'])))
+            ->additional(['payment' => new ResellerPaymentResource($payment->load(['supplier', 'customer', 'sale', 'purchase', 'rental', 'salesReturn']))]);
     }
 }

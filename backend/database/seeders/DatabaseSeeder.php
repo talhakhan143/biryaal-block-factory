@@ -40,7 +40,7 @@ class DatabaseSeeder extends Seeder
     }
 
     /**
-     * Create the account if it is missing, never touch an existing one — a reseed
+     * Create the account if it is missing, never touch an existing one, a reseed
      * must not reset a password somebody has already changed.
      *
      * No password is ever hardcoded here: pass one through the environment
@@ -67,6 +67,6 @@ class DatabaseSeeder extends Seeder
         ]);
         $user->syncRoles([$role]);
 
-        $this->command?->warn("Created {$role}: {$email} / {$password}  — note it down, it is not shown again.");
+        $this->command?->warn("Created {$role}: {$email} / {$password} , note it down, it is not shown again.");
     }
 }

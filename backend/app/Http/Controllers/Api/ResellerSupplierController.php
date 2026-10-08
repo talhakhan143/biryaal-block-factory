@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ResellerPaymentResource;
 use App\Http\Resources\ResellerSupplierResource;
 use App\Models\ResellerSupplier;
 use App\Services\Reseller\ResellerService;
@@ -38,7 +39,7 @@ class ResellerSupplierController extends Controller
         return new ResellerSupplierResource($resellerSupplier);
     }
 
-    /** Pay off (part of) a supplier's udhaar — spread across their bills. */
+    /** Pay off (part of) a supplier's udhaar, spread across their bills. */
     public function pay(Request $request, ResellerSupplier $resellerSupplier)
     {
         $data = $request->validate([
@@ -49,15 +50,16 @@ class ResellerSupplierController extends Controller
         ], ['bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.']);
         $data['amount'] = Money::toPaisa($data['amount']);
 
-        $this->service->paySupplier($resellerSupplier, $data);
+        $payment = $this->service->paySupplier($resellerSupplier, $data);
 
-        return new ResellerSupplierResource($resellerSupplier->fresh());
+        return (new ResellerSupplierResource($resellerSupplier->fresh()))
+            ->additional(['payment' => new ResellerPaymentResource($payment->load(['supplier', 'customer', 'sale', 'purchase', 'rental', 'salesReturn']))]);
     }
 
     public function destroy(ResellerSupplier $resellerSupplier)
     {
         if ((int) $resellerSupplier->balance !== 0) {
-            return response()->json(['message' => 'Is supplier ka hisab baqi hai — pehle clear karein.'], 422);
+            return response()->json(['message' => 'Is supplier ka hisab baqi hai, pehle clear karein.'], 422);
         }
         $resellerSupplier->delete();
 

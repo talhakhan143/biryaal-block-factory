@@ -12,7 +12,7 @@ return new class extends Migration
      * The original seed created demo logins (owner@blockfactory.test / "password",
      * accountant@blockfactory.test) that the login page used to pre-fill. The
      * pre-fill and the seeder entries are gone, but any database seeded before
-     * that still carries those rows — so anyone who knows the address can sign in.
+     * that still carries those rows, so anyone who knows the address can sign in.
      *
      * Deactivate them, scramble the password and revoke their API tokens. The
      * rows stay so `created_by` audit trails keep resolving.

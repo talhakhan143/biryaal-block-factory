@@ -71,7 +71,7 @@ export default function ResellerPOS() {
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
       <div>
-        <h1 className="mb-1 text-xl font-bold" style={{ color: 'var(--text)' }}>Resellers Point — Farokht</h1>
+        <h1 className="mb-1 text-xl font-bold" style={{ color: 'var(--text)' }}>Resellers Point, Farokht</h1>
         <p className="mb-4 text-sm" style={{ color: 'var(--muted)' }}>Item pe tap karke cart me dalein</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {items.data?.data.map((it) => (
@@ -110,7 +110,7 @@ export default function ResellerPOS() {
         )}
 
         <div className="mt-4 space-y-3 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
-          <Field label={isCredit ? 'Customer — zaroori (udhaar)' : 'Customer — optional'}>
+          <Field label={isCredit ? 'Customer, zaroori (udhaar)' : 'Customer (optional)'}>
             <Select value={customerId} onChange={(e) => setCustomerId(e.target.value)} required={isCredit}>
               <option value="">{isCredit ? 'Select…' : 'Walk-in'}</option>
               {customers.data?.data.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -118,8 +118,8 @@ export default function ResellerPOS() {
           </Field>
           <Field label="Discount (Rs)"><MoneyInput value={discount} onChange={setDiscount} /></Field>
           <Field label="Transport / kiraya (Rs)"><MoneyInput value={transport} onChange={setTransport} /></Field>
-          {/* Paid now hamesha — khali = poora paisa; kam likho to baqi udhaar */}
-          <Field label="Paid now (Rs) — khali = poora">
+          {/* Paid now hamesha, khali = poora paisa; kam likho to baqi udhaar */}
+          <Field label="Paid now (Rs), khali = poora">
             <MoneyInput value={paid} onChange={setPaid} placeholder={String(total / 100)} />
           </Field>
           {paidVal > 0 && (

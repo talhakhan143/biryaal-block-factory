@@ -333,8 +333,8 @@ export function MethodField({ method, bankRef, onChange }: { method: string; ban
         </Select>
       </Field>
       {method === 'bank' && (
-        <Field label="Bank / reference (kaunsa bank, cheque/transfer #) — zaroori">
-          <Input value={bankRef} onChange={(e) => onChange(method, e.target.value)} placeholder="e.g. Meezan — cheque 123" required />
+        <Field label="Bank / reference (kaunsa bank, cheque/transfer #) (zaroori)">
+          <Input value={bankRef} onChange={(e) => onChange(method, e.target.value)} placeholder="e.g. Meezan, cheque 123" required />
         </Field>
       )}
     </>
@@ -384,7 +384,7 @@ export function OutstandingNote({ label, amount, onFill }: { label: string; amou
 }
 
 /**
- * Advance payment form — give money before any dues exist. Unlike a settlement
+ * Advance payment form, give money before any dues exist. Unlike a settlement
  * there is NO outstanding cap; the party's balance simply moves into advance
  * (goes negative) and future wages/charges work it off automatically.
  */
@@ -588,7 +588,7 @@ export function Row({ children }: { children: ReactNode }) {
 
 /**
  * Compact icon action button for table rows (Edit / Delete / Ledger / Pay).
- * Tone tints the icon and gives a matching soft hover — looks VIP, no childish text links.
+ * Tone tints the icon and gives a matching soft hover, looks VIP, no childish text links.
  */
 export function IconButton({
   icon: Icon,

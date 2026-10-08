@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ResellerPaymentResource;
 use App\Http\Resources\ResellerSaleResource;
 use App\Models\ResellerSale;
 use App\Services\Reseller\ResellerSalesService;
@@ -57,7 +58,7 @@ class ResellerSaleController extends Controller
             'items.*.quantity' => ['required', 'numeric', 'gt:0'],
             'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
         ], [
-            'customer_id.required_if' => 'Udhaar bikri ke liye customer zaroori hai.',
+            'customer_id.required_if' => 'Udhaar wale bill ke liye customer zaroori hai.',
             'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
         ]);
 
@@ -86,9 +87,10 @@ class ResellerSaleController extends Controller
         ], ['bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.']);
         $data['amount'] = Money::toPaisa($data['amount']);
 
-        $this->service->receiveForSale($resellerSale, $data);
+        $payment = $this->service->receiveForSale($resellerSale, $data);
 
-        return new ResellerSaleResource($resellerSale->fresh()->load('items.item', 'customer'));
+        return (new ResellerSaleResource($resellerSale->fresh()->load('items.item', 'customer')))
+            ->additional(['payment' => new ResellerPaymentResource($payment->load(['supplier', 'customer', 'sale', 'purchase', 'rental', 'salesReturn']))]);
     }
 
     public function destroy(ResellerSale $resellerSale)
