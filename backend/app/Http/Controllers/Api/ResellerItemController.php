@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ResellerItemResource;
 use App\Models\ResellerItem;
 use App\Support\Money;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 
 class ResellerItemController extends Controller
@@ -48,7 +49,7 @@ class ResellerItemController extends Controller
     {
         try {
             $resellerItem->delete();
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             return response()->json(['message' => 'Ye item use me hai (purchase) — delete nahi ho sakta. "Active" off kar dein.'], 422);
         }
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\RawMaterialResource;
 use App\Models\RawMaterial;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 
 class RawMaterialController extends Controller
@@ -47,7 +48,7 @@ class RawMaterialController extends Controller
     {
         try {
             $rawMaterial->delete();
-        } catch (\Illuminate\Database\QueryException) {
+        } catch (QueryException) {
             return response()->json(['message' => 'Ye material purchases me use hua — delete nahi ho sakta. "Active" off karein.'], 422);
         }
 

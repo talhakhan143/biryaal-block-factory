@@ -4,7 +4,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Trash2, Wallet } from 'lucide-react'
+import { SquarePen, Trash2, Wallet } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select, useConfirm } from '../components/ui'
 
 interface Staff {
@@ -13,6 +13,7 @@ interface Staff {
   role?: string
   monthly_salary: number
   created_at?: string
+  phone?: string
 }
 interface Salary {
   id: string
@@ -32,6 +33,7 @@ export default function StaffPage() {
   const confirm = useConfirm()
   const qc = useQueryClient()
   const [addStaff, setAddStaff] = useState(false)
+  const [editing, setEditing] = useState<Staff | null>(null)
   const [genSalary, setGenSalary] = useState(false)
   const [payId, setPayId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
@@ -58,18 +60,22 @@ export default function StaffPage() {
     { key: 'created_at', label: 'Kab bana', sortable: true, render: (r) => (r.created_at ? String(r.created_at).slice(0, 10) : '·') },
     {
       key: 'actions', label: '', align: 'right', render: (s) => (
-        can('hr.delete') ? (
+        can('hr.manage') || can('hr.delete') ? (
           <RowActions>
-            <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
+            {can('hr.manage') && <IconButton icon={SquarePen} label="Theek karein" tone="primary" onClick={() => setEditing(s)} />}
+            {can('hr.delete') && <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
               if (await confirm({ title: 'Staff delete karein?', message: `"${s.name}" delete ho jayega.`, confirmText: 'Delete' })) delStaff.mutate(s.id)
-            }} />
+            }} />}
           </RowActions>
         ) : null
       ),
     },
   ]
 
-  const createStaff = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/staff', p), onSuccess: () => { refresh(); setAddStaff(false) } })
+  const saveStaff = useMutation({
+    mutationFn: (p: Record<string, unknown>) => (editing ? api.put(`/staff/${editing.id}`, p) : api.post('/staff', p)),
+    onSuccess: () => { refresh(); setAddStaff(false); setEditing(null) },
+  })
   const delStaff = useMutation({ mutationFn: (id: string) => api.delete(`/staff/${id}`), onSuccess: refresh, onError: (e) => alert(apiError(e)) })
   const generate = useMutation({ mutationFn: (p: Record<string, unknown>) => api.post('/salaries', p), onSuccess: () => { refresh(); setGenSalary(false) } })
   const pay = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/salaries/${id}/pay`, payload), onSuccess: () => { refresh(); setPayId(null) } })
@@ -127,9 +133,15 @@ export default function StaffPage() {
         />
       </div>
 
-      {addStaff && (
-        <Modal title="New Staff" onClose={() => setAddStaff(false)}>
-          <StaffForm onSubmit={(p) => createStaff.mutate(p)} busy={createStaff.isPending} error={createStaff.error ? apiError(createStaff.error) : ''} />
+      {(addStaff || editing) && (
+        <Modal title={editing ? `Theek karein: ${editing.name}` : 'Naya Staff'} onClose={() => { setAddStaff(false); setEditing(null) }}>
+          <StaffForm
+            staff={editing}
+            onSubmit={(p) => saveStaff.mutate(p)}
+            busy={saveStaff.isPending}
+            error={saveStaff.error ? apiError(saveStaff.error) : ''}
+            submitLabel={editing ? 'Save karein' : 'Add karein'}
+          />
         </Modal>
       )}
       {genSalary && (
@@ -151,8 +163,13 @@ export default function StaffPage() {
   )
 }
 
-function StaffForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
-  const [form, setForm] = useState({ name: '', role: '', phone: '', monthly_salary: '' })
+function StaffForm({ staff, onSubmit, busy, error, submitLabel = 'Save' }: { staff?: Staff | null; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string; submitLabel?: string }) {
+  const [form, setForm] = useState({
+    name: staff?.name ?? '',
+    role: staff?.role ?? '',
+    phone: staff?.phone ?? '',
+    monthly_salary: staff ? String(staff.monthly_salary / 100) : '',
+  })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, monthly_salary: Number(form.monthly_salary) }) }} className="space-y-3">
@@ -163,7 +180,7 @@ function StaffForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, unk
       </div>
       <Field label="Monthly salary (Rs)"><MoneyInput value={form.monthly_salary} onChange={(v) => set('monthly_salary', v)} required /></Field>
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Save'}</Button>
+      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : submitLabel}</Button>
     </form>
   )
 }

@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { SquarePen } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Button, type Column, DataTable, Field, Input, Modal, MoneyInput, PageHeader } from '../components/ui'
+import {Button, type Column, DataTable, Field, Input, Modal, MoneyInput, PageHeader, IconButton, RowActions } from '../components/ui'
 
 interface Vehicle {
   id: string
@@ -19,6 +20,7 @@ export default function Vehicles() {
   const { can } = useAuth()
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState<Vehicle | null>(null)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState('created_at')
@@ -32,10 +34,11 @@ export default function Vehicles() {
   }
 
   const create = useMutation({
-    mutationFn: (p: Record<string, unknown>) => api.post('/vehicles', p),
+    mutationFn: (p: Record<string, unknown>) => editing ? api.put(`/vehicles/${editing.id}`, p) : api.post('/vehicles', p),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['vehicles'] })
       setCreating(false)
+      setEditing(null)
     },
   })
 
@@ -45,6 +48,12 @@ export default function Vehicles() {
     { key: 'type', label: 'Type', sortable: true, render: (v) => v.type ?? '·' },
     { key: 'default_trip_rate', label: 'Default Rate', sortable: true, align: 'right', render: (v) => formatPaisa(v.default_trip_rate) },
     { key: 'created_at', label: 'Kab bana', sortable: true, render: (r) => (r.created_at ? String(r.created_at).slice(0, 10) : '·') },
+    {
+      key: 'actions', label: '', align: 'right',
+      render: (v) => (can('transport.manage')
+        ? <RowActions><IconButton icon={SquarePen} label="Theek karein" tone="primary" onClick={() => setEditing(v)} /></RowActions>
+        : null),
+    },
   ]
 
   return (
@@ -65,17 +74,22 @@ export default function Vehicles() {
         page={page}
         onPage={setPage}
       />
-      {creating && (
-        <Modal title="New Vehicle" onClose={() => setCreating(false)}>
-          <VehicleForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />
+      {(creating || editing) && (
+        <Modal title={editing ? `Theek karein: ${editing.name}` : 'Nayi Gaari'} onClose={() => { setCreating(false); setEditing(null) }}>
+          <VehicleForm vehicle={editing} onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} submitLabel={editing ? 'Save karein' : 'Add karein'} />
         </Modal>
       )}
     </div>
   )
 }
 
-function VehicleForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
-  const [form, setForm] = useState({ name: '', plate: '', type: '', default_trip_rate: '0' })
+function VehicleForm({ vehicle, onSubmit, busy, error, submitLabel = 'Save' }: { vehicle?: Vehicle | null; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string; submitLabel?: string }) {
+  const [form, setForm] = useState({
+    name: vehicle?.name ?? '',
+    plate: vehicle?.plate ?? '',
+    type: vehicle?.type ?? '',
+    default_trip_rate: vehicle ? String(vehicle.default_trip_rate / 100) : '0',
+  })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, default_trip_rate: Number(form.default_trip_rate) }) }} className="space-y-3">
@@ -86,7 +100,7 @@ function VehicleForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, u
       </div>
       <Field label="Default trip rate (Rs)"><MoneyInput value={form.default_trip_rate} onChange={(v) => set('default_trip_rate', v)} /></Field>
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Save'}</Button>
+      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : submitLabel}</Button>
     </form>
   )
 }

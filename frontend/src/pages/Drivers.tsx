@@ -5,7 +5,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { ArrowRight, BookText, Coins, Trash2, Wallet } from 'lucide-react'
+import { SquarePen, ArrowRight, BookText, Coins, Trash2, Wallet } from 'lucide-react'
 import { AdvanceForm, Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, Table, useConfirm } from '../components/ui'
 
 interface Driver {
@@ -25,6 +25,7 @@ export default function Drivers() {
   const confirm = useConfirm()
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState<Driver | null>(null)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState('created_at')
@@ -51,6 +52,7 @@ export default function Drivers() {
         <div onClick={(e) => e.stopPropagation()}>
         <RowActions>
           <IconButton icon={BookText} label="Khata (quick)" onClick={() => setLedgerId(d.id)} />
+          {can('transport.manage') && <IconButton icon={SquarePen} label="Naam, phone ya gaari theek karein" tone="primary" onClick={() => setEditing(d)} />}
           <IconButton icon={ArrowRight} label="Poori history" tone="primary" onClick={() => navigate(`/drivers/${d.id}`)} />
           {can('payments.manage') && <IconButton icon={Wallet} label="Pay driver" tone="primary" onClick={() => setPayId(d.id)} />}
           {can('payments.manage') && <IconButton icon={Coins} label="Advance dein" tone="amber" onClick={() => setAdvanceId(d.id)} />}
@@ -66,8 +68,8 @@ export default function Drivers() {
   ]
 
   const create = useMutation({
-    mutationFn: (p: Record<string, string>) => api.post('/drivers', p),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['drivers'] }); setCreating(false) },
+    mutationFn: (p: Record<string, string>) => editing ? api.put(`/drivers/${editing.id}`, p) : api.post('/drivers', p),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['drivers'] }); setCreating(false); setEditing(null) },
   })
   const pay = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/drivers/${id}/pay`, payload),
@@ -102,9 +104,9 @@ export default function Drivers() {
         onPage={setPage}
         onRowClick={(d) => navigate(`/drivers/${d.id}`)}
       />
-      {creating && (
-        <Modal title="New Driver" onClose={() => setCreating(false)}>
-          <DriverForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />
+      {(creating || editing) && (
+        <Modal title={editing ? `Theek karein: ${editing.name}` : 'Naya Driver'} onClose={() => { setCreating(false); setEditing(null) }}>
+          <DriverForm driver={editing} onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} submitLabel={editing ? 'Save karein' : 'Add karein'} />
         </Modal>
       )}
       {payId && (
@@ -133,8 +135,14 @@ export default function Drivers() {
   )
 }
 
-function DriverForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, string>) => void; busy: boolean; error: string }) {
-  const [form, setForm] = useState({ name: '', phone: '', license_no: '', vehicle_name: '', vehicle_plate: '' })
+function DriverForm({ driver, onSubmit, busy, error, submitLabel = 'Save' }: { driver?: Driver | null; onSubmit: (p: Record<string, string>) => void; busy: boolean; error: string; submitLabel?: string }) {
+  const [form, setForm] = useState({
+    name: driver?.name ?? '',
+    phone: driver?.phone ?? '',
+    license_no: driver?.license_no ?? '',
+    vehicle_name: driver?.vehicle_name ?? '',
+    vehicle_plate: driver?.vehicle_plate ?? '',
+  })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
   const blockSubmit = !form.name.trim() || !form.phone.trim() || !form.vehicle_name.trim()
   return (
@@ -147,7 +155,7 @@ function DriverForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, st
         <Field label="Plate no (optional)"><Input value={form.vehicle_plate} onChange={(e) => set('vehicle_plate', e.target.value)} placeholder="LEX-123" /></Field>
       </div>
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
-      <Button type="submit" disabled={busy || blockSubmit} className="w-full">{busy ? 'Saving…' : 'Save'}</Button>
+      <Button type="submit" disabled={busy || blockSubmit} className="w-full">{busy ? 'Saving…' : submitLabel}</Button>
     </form>
   )
 }

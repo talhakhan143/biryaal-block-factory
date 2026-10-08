@@ -5,7 +5,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { ArrowRight, BookText, Power, PowerOff, Trash2 } from 'lucide-react'
+import { SquarePen, ArrowRight, BookText, Power, PowerOff, Trash2 } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, Modal, PageHeader, RowActions, Spinner, Table, useConfirm } from '../components/ui'
 
 interface Supplier {
@@ -28,6 +28,7 @@ export default function Suppliers() {
   const [sort, setSort] = useState('created_at')
   const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState<Supplier | null>(null)
   const [ledgerId, setLedgerId] = useState<string | null>(null)
   const { data, isLoading } = useList<Supplier>('suppliers', { search, page, sort, dir })
 
@@ -40,10 +41,11 @@ export default function Suppliers() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ['suppliers'] })
 
   const create = useMutation({
-    mutationFn: (payload: Record<string, string>) => api.post('/suppliers', payload),
+    mutationFn: (payload: Record<string, string>) => editing ? api.put(`/suppliers/${editing.id}`, payload) : api.post('/suppliers', payload),
     onSuccess: () => {
       invalidate()
       setCreating(false)
+      setEditing(null)
     },
   })
 
@@ -70,6 +72,7 @@ export default function Suppliers() {
         <div onClick={(e) => e.stopPropagation()}>
         <RowActions>
           <IconButton icon={BookText} label="Khata (quick)" onClick={() => setLedgerId(s.id)} />
+          {can('suppliers.manage') && <IconButton icon={SquarePen} label="Naam, phone ya address theek karein" tone="primary" onClick={() => setEditing(s)} />}
           <IconButton icon={ArrowRight} label="Poori history" tone="primary" onClick={() => navigate(`/suppliers/${s.id}`)} />
           {can('suppliers.manage') && (
             <IconButton icon={s.is_active ? PowerOff : Power} label={s.is_active ? 'Deactivate' : 'Activate'} tone="amber" onClick={() => toggle.mutate(s)} />
@@ -110,9 +113,9 @@ export default function Suppliers() {
         onRowClick={(s) => navigate(`/suppliers/${s.id}`)}
       />
 
-      {creating && (
-        <Modal title="New Supplier" onClose={() => setCreating(false)}>
-          <SupplierForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />
+      {(creating || editing) && (
+        <Modal title={editing ? `Theek karein: ${editing.name}` : 'Naya Supplier'} onClose={() => { setCreating(false); setEditing(null) }}>
+          <SupplierForm supplier={editing} onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} submitLabel={editing ? 'Save karein' : 'Add karein'} />
         </Modal>
       )}
 
@@ -121,8 +124,12 @@ export default function Suppliers() {
   )
 }
 
-function SupplierForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, string>) => void; busy: boolean; error: string }) {
-  const [form, setForm] = useState({ name: '', phone: '', address: '' })
+function SupplierForm({ supplier, onSubmit, busy, error, submitLabel = 'Save' }: { supplier?: Supplier | null; onSubmit: (p: Record<string, string>) => void; busy: boolean; error: string; submitLabel?: string }) {
+  const [form, setForm] = useState({
+    name: supplier?.name ?? '',
+    phone: supplier?.phone ?? '',
+    address: supplier?.address ?? '',
+  })
   return (
     <form
       onSubmit={(e) => {
@@ -135,7 +142,7 @@ function SupplierForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
       <Field label="Phone"><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
       <Field label="Address"><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field>
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Save'}</Button>
+      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : submitLabel}</Button>
     </form>
   )
 }

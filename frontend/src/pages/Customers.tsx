@@ -5,7 +5,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { ArrowRight, BookText, HandCoins } from 'lucide-react'
+import { ArrowRight, BookText, HandCoins, SquarePen } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, Table } from '../components/ui'
 import CustomerForm from '../components/CustomerForm'
 import { MONEY_KEYS } from '../lib/queryKeys'
@@ -18,6 +18,8 @@ interface Customer {
   /** Minus balance = customer ka paisa hamare paas pada hai. */
   advance: number
   created_at?: string
+  address?: string
+  notes?: string
 }
 
 export default function Customers() {
@@ -31,6 +33,7 @@ export default function Customers() {
   const [sort, setSort] = useState('created_at')
   const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState<Customer | null>(null)
   const [ledgerId, setLedgerId] = useState<string | null>(null)
   const [receiveFor, setReceiveFor] = useState<Customer | null>(null)
   const { data, isLoading } = useList<Customer>('customers', { search, page, sort, dir, has_advance: onlyAdvance ? 1 : undefined })
@@ -41,11 +44,13 @@ export default function Customers() {
     setPage(1)
   }
 
-  const create = useMutation({
-    mutationFn: (payload: Record<string, string>) => api.post('/customers', payload),
+  const save = useMutation({
+    mutationFn: (payload: Record<string, string>) =>
+      editing ? api.put(`/customers/${editing.id}`, payload) : api.post('/customers', payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['customers'] })
+      MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setCreating(false)
+      setEditing(null)
     },
   })
 
@@ -76,6 +81,7 @@ export default function Customers() {
           <RowActions>
             {can('payments.receive') && c.balance > 0 && <IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => setReceiveFor(c)} />}
             <IconButton icon={BookText} label="Khata (quick)" onClick={() => setLedgerId(c.id)} />
+            {can('customers.manage') && <IconButton icon={SquarePen} label="Naam, phone ya address theek karein" tone="primary" onClick={() => setEditing(c)} />}
             <IconButton icon={ArrowRight} label="Poori history" tone="primary" onClick={() => navigate(`/customers/${c.id}`)} />
           </RowActions>
         </div>
@@ -126,9 +132,16 @@ export default function Customers() {
         onRowClick={(c) => navigate(`/customers/${c.id}`)}
       />
 
-      {creating && (
-        <Modal title="New Customer" onClose={() => setCreating(false)}>
-          <CustomerForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />
+      {(creating || editing) && (
+        <Modal title={editing ? `Theek karein: ${editing.name}` : 'Naya Customer'} onClose={() => { setCreating(false); setEditing(null) }}>
+          <CustomerForm
+            customer={editing}
+            onSubmit={(p) => save.mutate(p)}
+            busy={save.isPending}
+            error={save.error ? apiError(save.error) : ''}
+            submitLabel={editing ? 'Save karein' : 'Add karein'}
+            autoFocus
+          />
         </Modal>
       )}
 
