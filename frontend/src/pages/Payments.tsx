@@ -1,12 +1,14 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Coins, HandCoins, Printer, SquarePen, Undo2, Wallet } from 'lucide-react'
+import { ArrowRight, Coins, HandCoins, Printer, SquarePen, Undo2, Wallet } from 'lucide-react'
 import { AdvanceForm, Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Select, Spinner, Table, useConfirm } from '../components/ui'
 import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
+import PaymentEditForm from '../components/PaymentEditForm'
 
 interface Payment extends PaymentDoc {
   id: string
@@ -18,6 +20,8 @@ interface Party { id: string; name: string; balance: number }
 type PayableType = 'supplier' | 'driver' | 'labourer' | 'salary'
 interface Payable { type: PayableType; id: string; name: string; balance: number }
 interface Advance { type: PayableType; id: string; name: string; advance: number }
+/** Customer ka advance: wo paisa jo humne pakad rakha hai, diya nahi. */
+interface HeldAdvance { id: string; name: string; phone?: string; advance: number }
 
 // Only labour & driver advances can be topped up (they have an advance endpoint).
 const advanceUrl = (row: Advance) =>
@@ -34,6 +38,7 @@ const payUrl = (row: Payable) =>
 const typeLabel: Record<PayableType, string> = { supplier: 'Supplier', driver: 'Driver', labourer: 'Mazdoor', salary: 'Staff' }
 
 export default function Payments() {
+  const navigate = useNavigate()
   const { can } = useAuth()
   const qc = useQueryClient()
   const confirm = useConfirm()
@@ -101,7 +106,7 @@ export default function Payments() {
   })
   const advances = useQuery({
     queryKey: ['advances'],
-    queryFn: async () => (await api.get<{ data: Advance[] }>('/payments/advances')).data.data,
+    queryFn: async () => (await api.get<{ data: Advance[]; received: HeldAdvance[] }>('/payments/advances')).data,
   })
 
   const invalidateAll = () => {
@@ -142,7 +147,8 @@ export default function Payments() {
 
   const open = (kind: 'receipt' | 'supplier', partyId = '') => { setPreset(partyId); setModal(kind) }
 
-  const advRows = advances.data ?? []
+  const advRows = advances.data?.data ?? []
+  const heldRows = advances.data?.received ?? []
 
   // Payables come as one full list, paginate on the client so the page never grows endless.
   const PAY_PER = 10
@@ -210,6 +216,31 @@ export default function Payments() {
             <Pagination meta={payMeta} page={payPage} onPage={setPayPage} />
           </>
         )}
+      </div>
+
+      {/* Customers ka advance jo humare paas para hai (ulta taraf ka paisa) */}
+      <div>
+        <h2 className="mb-2 text-sm font-bold" style={{ color: 'var(--text)' }}>
+          Advance mila (customers se) <span className="font-normal" style={{ color: 'var(--muted)' }}>(jo paisa humne pakad rakha hai, agli khareed me se katega)</span>
+        </h2>
+        <Table head={['Kis se', 'Phone', 'Advance jama', '']}>
+          {heldRows.map((h) => (
+            <tr key={h.id}>
+              <td className="px-4 py-3 font-medium">{h.name}</td>
+              <td className="px-4 py-3" style={{ color: 'var(--muted)' }}>{h.phone || '\u00b7'}</td>
+              <td className="px-4 py-3"><Badge color="green">{formatPaisa(h.advance)}</Badge></td>
+              <td className="px-4 py-3">
+                <RowActions>
+                  <IconButton icon={ArrowRight} label="Poori history (yahin se theek bhi hota hai)" tone="primary" onClick={() => navigate(`/customers/${h.id}`)} />
+                </RowActions>
+              </td>
+            </tr>
+          ))}
+          {heldRows.length === 0 && <tr><td colSpan={4} className="px-4 py-4 text-center text-sm" style={{ color: 'var(--muted)' }}>Kisi customer ka advance jama nahi.</td></tr>}
+        </Table>
+        <p className="mt-1.5 text-xs" style={{ color: 'var(--muted)' }}>
+          Rakam theek karni ho ya poori wapas leni ho to neeche "Saari payments" me usi ADV wali row par Edit aur Rollback ke button hain.
+        </p>
       </div>
 
       {/* Advances given, negative balances; work off against future dues */}
@@ -283,7 +314,7 @@ export default function Payments() {
 
       {editing && (
         <Modal title={`Theek karein: ${editing.reference}`} onClose={() => setEditing(null)}>
-          <EditPaymentForm
+          <PaymentEditForm
             payment={editing}
             onSubmit={(payload) => editMut.mutate({ id: editing.id, payload })}
             busy={editMut.isPending}
@@ -304,39 +335,6 @@ export default function Payments() {
         </Modal>
       )}
     </div>
-  )
-}
-
-/**
- * Galat rakam ya tareekh theek karna. Reference wahi rehta hai jo parchi par
- * bande ko diya ja chuka hai, sirf andar ka hisaab dobara lagta hai.
- */
-function EditPaymentForm({ payment, onSubmit, busy, error }: { payment: Payment; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
-  const [form, setForm] = useState({
-    payment_date: payment.payment_date,
-    amount: String((payment.amount ?? 0) / 100),
-    method: payment.method ?? 'cash',
-    bank_ref: payment.bank_ref ?? '',
-  })
-  const set = (k: string, v: string) => setForm({ ...form, [k]: v })
-  const amt = Number(form.amount)
-  const bad = !Number.isFinite(amt) || amt <= 0
-
-  return (
-    <form
-      onSubmit={(e) => { e.preventDefault(); if (bad) return; onSubmit({ ...form, amount: amt }) }}
-      className="space-y-3"
-    >
-      <div className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-        <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Kis ka</span><span>{payment.party_name ?? '\u00b7'}</span></div>
-        <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Abhi likha hua</span><span>{formatPaisa(payment.amount ?? 0)}</span></div>
-      </div>
-      <Field label="Date"><Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} required /></Field>
-      <Field label="Amount (Rs)"><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} required /></Field>
-      <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
-      {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
-      <Button type="submit" disabled={busy || bad} className="w-full">{busy ? 'Saving\u2026' : 'Save karein'}</Button>
-    </form>
   )
 }
 

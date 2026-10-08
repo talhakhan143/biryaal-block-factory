@@ -1,16 +1,17 @@
 import { Fragment, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, FileText, HandCoins, Phone, MapPin, Printer } from 'lucide-react'
+import { ArrowLeft, FileText, HandCoins, Phone, MapPin, Printer, SquarePen, Undo2 } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
 import {
   Badge, Button, Card, Field, IconButton, Input, MethodField, Modal, MoneyInput, Note,
-  OutstandingNote, PagedTable, RowActions, Spinner, StatTile, Tabs,
+  OutstandingNote, PagedTable, RowActions, Spinner, StatTile, Tabs, useConfirm,
 } from '../components/ui'
 import SaleInvoiceModal from '../components/SaleInvoiceModal'
 import { AdjustmentVoucher, PaymentReceipt, ReturnNote, type AdjustmentDoc, type PaymentDoc, type ReturnDoc } from '../components/receipts'
+import PaymentEditForm from '../components/PaymentEditForm'
 import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface LedgerRow {
@@ -32,6 +33,8 @@ interface Sale {
 interface Receipt {
   id: string; reference: string; payment_date: string; amount: number; method: string; bank_ref?: string
   direction?: string; notes?: string | null; against?: { type: string; reference?: string | null } | null
+  /** Bhara hua ho to ye paisa kisi aik bill se juda hai aur yahan se nahi badalta. */
+  allocatable_id?: string | null
 }
 interface Return {
   id: string; reference: string; return_date: string; return_value: number
@@ -172,7 +175,7 @@ export default function CustomerDetail() {
 
       {tab === 'statement' && <Statement rows={data.ledger} balance={s.factory.balance} />}
       {tab === 'sales' && <Sales rows={data.sales} />}
-      {tab === 'receipts' && <Receipts rows={data.receipts} party={c.name} />}
+      {tab === 'receipts' && <Receipts rows={data.receipts} party={c.name} canManage={can('payments.manage')} />}
       {tab === 'returns' && <Returns returns={data.returns} adjustments={data.adjustments} party={c.name} />}
       {tab === 'dispatches' && <Dispatches rows={data.dispatches} />}
 
@@ -305,8 +308,24 @@ function Sales({ rows }: { rows: Sale[] }) {
   )
 }
 
-function Receipts({ rows, party }: { rows: Receipt[]; party: string }) {
+function Receipts({ rows, party, canManage }: { rows: Receipt[]; party: string; canManage: boolean }) {
+  const qc = useQueryClient()
+  const confirm = useConfirm()
   const [slip, setSlip] = useState<PaymentDoc | null>(null)
+  const [editing, setEditing] = useState<Receipt | null>(null)
+
+  const refresh = () => [...MONEY_KEYS, 'customer-history'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+
+  const rollback = useMutation({
+    mutationFn: (id: string) => api.delete(`/payments/${id}`),
+    onSuccess: refresh,
+    onError: (e) => alert(apiError(e)),
+  })
+  const edit = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.patch(`/payments/${id}`, payload),
+    onSuccess: () => { refresh(); setEditing(null) },
+  })
+
   if (rows.length === 0) return <Empty>Is customer se abhi koi paisa nahi aaya.</Empty>
   const total = rows.reduce((a, r) => a + r.amount, 0)
   return (
@@ -338,12 +357,44 @@ function Receipts({ rows, party }: { rows: Receipt[]; party: string }) {
                 tone="primary"
                 onClick={() => setSlip({ ...r, direction: r.direction ?? 'receipt' })}
               />
+              {/* Jo paisa kisi aik bill se juda hai wo yahan se nahi badalta,
+                  usay usi bill ki jagah se handle kiya jata hai. */}
+              {canManage && !r.allocatable_id && (
+                <IconButton icon={SquarePen} label="Rakam ya tareekh theek karein" tone="primary" onClick={() => setEditing(r)} />
+              )}
+              {canManage && !r.allocatable_id && (
+                <IconButton icon={Undo2} label="Rollback (ye entry wapas lein)" tone="red" onClick={async () => {
+                  const ok = await confirm({
+                    title: `Rollback: ${r.reference}`,
+                    message: (
+                      <>
+                        Ye entry poori wapas le li jayegi aur sab kuch pehle wali haalat par aa jayega:
+                        cash, is bande ka khata, aur jo bill is paise se chuke the wo dobara khul jayenge.
+                      </>
+                    ),
+                    confirmText: 'Rollback karein',
+                    requireText: 'rollback',
+                  })
+                  if (ok) rollback.mutate(r.id)
+                }} />
+              )}
             </RowActions>
           </td>
         </tr>
       )}
     />
     {slip && <PaymentReceipt payment={slip} party={party} onClose={() => setSlip(null)} />}
+    {editing && (
+      <Modal title={`Theek karein: ${editing.reference}`} onClose={() => setEditing(null)}>
+        <PaymentEditForm
+          payment={editing}
+          party={party}
+          onSubmit={(payload) => edit.mutate({ id: editing.id, payload })}
+          busy={edit.isPending}
+          error={edit.error ? apiError(edit.error) : ''}
+        />
+      </Modal>
+    )}
     </>
   )
 }
