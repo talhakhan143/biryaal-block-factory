@@ -273,38 +273,51 @@ export default function Layout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
+        {/*
+          Chhoti screen par sab kuch aik line me nahi aata tha: daayen wale
+          buttons itne chaude the ke wo search aur menu wale button ke upar
+          chadh jate the. Ab header wrap karta hai: phone par pehli line me
+          menu aur buttons, aur search niche apni poori chaudai wali line me.
+          Bari screen par wahi purana aik line wala layout (order-* se).
+        */}
         <header
-          className="no-print flex items-center justify-between gap-2 border-b px-4 py-3 sm:px-6"
+          className="no-print flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:gap-3 sm:px-6"
           style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
         >
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setNavOpen(true)}
-              className="rounded-lg border p-2 lg:hidden"
-              style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
-              aria-label="Open menu"
-            >
-              <Menu size={18} />
-            </button>
-            <div className="hidden truncate text-sm font-medium xl:block" style={{ color: 'var(--muted)' }}>{user?.roles.join(', ')}</div>
+          <button
+            type="button"
+            onClick={() => setNavOpen(true)}
+            className="order-1 shrink-0 rounded-lg border p-2 lg:hidden"
+            style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
+            aria-label="Open menu"
+          >
+            <Menu size={18} />
+          </button>
+
+          <div className="order-2 hidden shrink-0 truncate text-sm font-medium xl:block" style={{ color: 'var(--muted)' }}>{user?.roles.join(', ')}</div>
+
+          {/* Phone par ye poori line leta hai (order-4), bari screen par beech me. */}
+          <div className="order-4 w-full min-w-0 sm:order-3 sm:w-auto sm:max-w-sm sm:flex-1">
             <GlobalSearch />
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
+
+          <div className="order-3 ml-auto flex shrink-0 items-center gap-2 sm:order-4 sm:ml-0 sm:gap-3">
             <button
               onClick={toggleLang}
               title="Language"
-              className="flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-semibold transition hover:opacity-80"
+              className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-semibold transition hover:opacity-80 sm:px-3"
               style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
             >
-              <Languages size={16} /> {ur ? 'English' : 'اردو'}
+              <Languages size={16} /> <span className="hidden sm:inline">{ur ? 'English' : 'اردو'}</span>
             </button>
-            <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{user?.name}</span>
+            {/* Naam chhoti screen par jagah kha jata tha, aur bande ko pata hi
+                hota hai ke wo kaun hai. Is liye sirf bari screen par. */}
+            <span className="hidden max-w-[12rem] truncate text-sm font-semibold sm:inline" style={{ color: 'var(--text)' }}>{user?.name}</span>
             {canChangePw && (
               <button
                 onClick={() => setPwOpen(true)}
                 title={ur ? 'پاس ورڈ تبدیل کریں' : 'Change Password'}
-                className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition hover:opacity-80"
+                className="flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm transition hover:opacity-80 sm:px-3"
                 style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
               >
                 <KeyRound size={15} /> <span className="hidden sm:inline">{ur ? 'پاس ورڈ' : 'Password'}</span>
@@ -315,7 +328,7 @@ export default function Layout() {
                 await logout()
                 navigate('/login')
               }}
-              className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition hover:opacity-80"
+              className="flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm transition hover:opacity-80 sm:px-3"
               style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
             >
               <LogOut size={15} /> {ur ? 'لاگ آؤٹ' : 'Logout'}

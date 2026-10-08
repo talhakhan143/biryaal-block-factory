@@ -47,7 +47,14 @@ export default function POS() {
     return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null
   }
   const subtotal = useMemo(() => cart.reduce((s, l) => s + l.product.sale_price * l.qty, 0), [cart])
-  const discountP = rsToPaisa(discount)
+  const totalQty = useMemo(() => cart.reduce((s, l) => s + l.qty, 0), [cart])
+
+  // Discount per BLOCK likha jata hai, kul rakam nahi. Owner is tarah sochta
+  // hai: "is bande ko ek rupya block chhoot de do". 100 block par 1 likho to
+  // discount Rs 100 banta hai. Bill par dono cheezein nazar aati hain taake
+  // koi shak na rahe.
+  const discountRateP = rsToPaisa(discount)
+  const discountP = discountRateP === null ? null : discountRateP * totalQty
   const transportP = rsToPaisa(transport)
   const badDiscount = discountP === null
   const badTransport = transportP === null
@@ -233,7 +240,7 @@ export default function POS() {
               bhi de raha hai to "Paid now" me utni raqam likh dein.
             </Note>
           )}
-          <Field label="Discount (Rs)">
+          <Field label="Discount (Rs per block)">
             <MoneyInput value={discount} onChange={setDiscount} />
           </Field>
           <Field label="Transport / kiraya (Rs), customer deta hai">
@@ -249,6 +256,12 @@ export default function POS() {
           )}
 
           <div className="flex justify-between text-sm"><span>Subtotal</span><span>{formatPaisa(subtotal)}</span></div>
+          {(discountP ?? 0) > 0 && (
+            <div className="flex justify-between text-sm">
+              <span style={{ color: 'var(--muted)' }}>Discount ({formatPaisa(discountRateP ?? 0)} x {totalQty} block)</span>
+              <span style={{ color: 'var(--green)' }}>-{formatPaisa(discountP ?? 0)}</span>
+            </div>
+          )}
           {Number(transport) > 0 && <div className="flex justify-between text-sm"><span>Transport (kiraya)</span><span>{formatPaisa(Number(transport) * 100)}</span></div>}
           <div className="flex justify-between text-lg font-bold"><span>Total</span><span>{formatPaisa(total)}</span></div>
           <div className="flex justify-between text-sm"><span>Paid now</span><span>{formatPaisa(paidVal)}</span></div>
