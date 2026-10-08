@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CustomerResource;
 use App\Http\Resources\PaymentResource;
+use App\Models\Customer;
 use App\Models\Driver;
 use App\Models\Labourer;
 use App\Models\Payment;
 use App\Models\Salary;
+use App\Models\Staff;
 use App\Models\Supplier;
 use App\Services\Payments\PaymentService;
 use App\Support\Money;
@@ -15,32 +19,29 @@ use Illuminate\Http\Request;
 
 class PaymentController extends Controller
 {
+    use HasTableQuery;
+
     public function __construct(private PaymentService $service) {}
 
     public function index(Request $request)
     {
-        $sortable = ['payment_date', 'amount', 'direction', 'method', 'reference'];
-        $sort = in_array($request->sort, $sortable, true) ? $request->sort : 'payment_date';
-        $dir = $request->dir === 'asc' ? 'asc' : 'desc';
-
-        $payments = Payment::query()
+        $query = Payment::query()
             ->with('party')
-            ->when($request->search, function ($q, $s) {
-                $q->where('reference', 'like', "%{$s}%")
-                    ->orWhereHasMorph(
-                        'party',
-                        [\App\Models\Customer::class, \App\Models\Supplier::class, \App\Models\Driver::class, \App\Models\Labourer::class, \App\Models\Staff::class],
-                        fn ($q) => $q->where('name', 'like', "%{$s}%"),
-                    );
-            })
             ->when($request->direction, fn ($q, $d) => $q->where('direction', $d))
             ->when($request->from, fn ($q, $d) => $q->whereDate('payment_date', '>=', $d))
-            ->when($request->to, fn ($q, $d) => $q->whereDate('payment_date', '<=', $d))
-            ->orderBy($sort, $dir)
-            ->orderBy('created_at', 'desc')
-            ->paginate($request->integer('per_page', 15));
+            ->when($request->to, fn ($q, $d) => $q->whereDate('payment_date', '<=', $d));
 
-        return PaymentResource::collection($payments);
+        $this->applyTableQuery(
+            $query,
+            $request,
+            ['payment_date', 'amount', 'direction', 'method', 'reference'],
+            ['reference', 'notes'],
+            'payment_date',
+            [],
+            ['party' => [Customer::class, Supplier::class, Driver::class, Labourer::class, Staff::class]],
+        );
+
+        return PaymentResource::collection($query->paginate($request->integer('per_page', 15)));
     }
 
     /**
@@ -98,6 +99,32 @@ class PaymentController extends Controller
             ]));
 
         return response()->json(['data' => $rows->sortByDesc('advance')->values()]);
+    }
+
+    /**
+     * Advance from a customer: paisa pehle, maal baad me. Har agli sale khud
+     * is me se kat jati hai, kyunki dono aik hi receivable account par chalti
+     * hain. Receipt ki tarah hi `payments.receive` par hai.
+     */
+    public function advance(Request $request, Customer $customer)
+    {
+        $data = $request->validate([
+            'payment_date' => ['required', 'date'],
+            'amount' => ['required', 'numeric', 'gt:0'],
+            'method' => ['nullable', 'in:cash,bank'],
+            'bank_ref' => ['nullable', 'string', 'max:255', 'required_if:method,bank'],
+            'notes' => ['nullable', 'string'],
+        ], [
+            'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
+        ]);
+        $data['amount'] = Money::toPaisa($data['amount']);
+
+        $payment = $this->service->advanceFromCustomer($customer, $data);
+
+        return (new PaymentResource($payment->load('party')))
+            ->additional(['customer' => new CustomerResource($customer->fresh())])
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function receipt(Request $request)

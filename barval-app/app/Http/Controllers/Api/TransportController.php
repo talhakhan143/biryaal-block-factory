@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PaymentResource;
 use App\Http\Resources\TransportTripResource;
@@ -13,28 +14,28 @@ use Illuminate\Http\Request;
 
 class TransportController extends Controller
 {
+    use HasTableQuery;
+
     public function __construct(private TransportService $service, private PaymentService $payments) {}
 
     public function index(Request $request)
     {
-        $sortable = ['trip_date', 'rate', 'paid', 'balance', 'status', 'reference'];
-        $sort = in_array($request->sort, $sortable, true) ? $request->sort : 'trip_date';
-        $dir = $request->dir === 'asc' ? 'asc' : 'desc';
-
-        $trips = TransportTrip::query()
+        $query = TransportTrip::query()
             ->with(['vehicle', 'driver'])
             ->when($request->driver_id, fn ($q, $id) => $q->where('driver_id', $id))
-            ->when($request->status, fn ($q, $s) => $q->where('status', $s))
-            ->when($request->search, fn ($q, $s) => $q->where(function ($q) use ($s) {
-                $q->where('reference', 'like', "%{$s}%")
-                    ->orWhereHas('driver', fn ($q) => $q->where('name', 'like', "%{$s}%"))
-                    ->orWhereHas('vehicle', fn ($q) => $q->where('name', 'like', "%{$s}%"));
-            }))
-            ->orderBy($sort, $dir)
-            ->orderBy('created_at', 'desc') // newest-first tiebreak
-            ->paginate($request->integer('per_page', 15));
+            ->when($request->kind, fn ($q, $k) => $q->where('kind', $k))
+            ->when($request->status, fn ($q, $s) => $q->where('status', $s));
 
-        return TransportTripResource::collection($trips);
+        $this->applyTableQuery(
+            $query,
+            $request,
+            ['trip_date', 'rate', 'paid', 'balance', 'status', 'reference'],
+            ['reference', 'vehicle_label', 'from_location', 'to_location'],
+            'trip_date',
+            ['driver' => ['name'], 'vehicle' => ['name', 'plate']],
+        );
+
+        return TransportTripResource::collection($query->paginate($request->integer('per_page', 15)));
     }
 
     public function store(Request $request)
@@ -43,6 +44,8 @@ class TransportController extends Controller
             'vehicle_id' => ['nullable', 'uuid', 'exists:vehicles,id'],
             'driver_id' => ['required', 'uuid', 'exists:drivers,id'],
             'dispatch_id' => ['nullable', 'uuid', 'exists:dispatches,id'],
+            'material_purchase_id' => ['nullable', 'uuid', 'exists:material_purchases,id'],
+            'kind' => ['nullable', 'in:in,out'],
             'trip_date' => ['required', 'date'],
             'from_location' => ['nullable', 'string', 'max:255'],
             'to_location' => ['nullable', 'string', 'max:255'],

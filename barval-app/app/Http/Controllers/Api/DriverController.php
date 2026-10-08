@@ -6,11 +6,14 @@ use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DriverResource;
 use App\Http\Resources\PaymentResource;
+use App\Http\Resources\TransportTripResource;
 use App\Models\Driver;
 use App\Models\Payment;
 use App\Models\TransportTrip;
 use App\Services\Payments\PaymentService;
+use App\Services\Transport\DriverHistoryService;
 use App\Support\Money;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 
 class DriverController extends Controller
@@ -79,7 +82,7 @@ class DriverController extends Controller
     {
         try {
             $driver->delete();
-        } catch (\Illuminate\Database\QueryException) {
+        } catch (QueryException) {
             return response()->json(['message' => 'Driver ka record use me hai — delete nahi ho sakta. Inactive karein.'], 422);
         }
 
@@ -109,6 +112,20 @@ class DriverController extends Controller
             'driver' => new DriverResource($driver),
             'balance' => (int) $driver->balance,
             'rows' => $trips->concat($payments)->sortBy('date')->values(),
+        ]);
+    }
+
+    /** Poori history: KPIs, khata, har trip (aata aur jaata) aur har payment. */
+    public function history(Driver $driver, DriverHistoryService $service)
+    {
+        $data = $service->history($driver);
+
+        return response()->json([
+            'driver' => new DriverResource($data['driver']),
+            'summary' => $data['summary'],
+            'ledger' => $data['ledger'],
+            'trips' => TransportTripResource::collection($data['trips']),
+            'payments' => PaymentResource::collection($data['payments']),
         ]);
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\VehicleResource;
 use App\Models\Vehicle;
@@ -10,14 +11,21 @@ use Illuminate\Http\Request;
 
 class VehicleController extends Controller
 {
+    use HasTableQuery;
+
     public function index(Request $request)
     {
-        $vehicles = Vehicle::query()
-            ->when($request->search, fn ($q, $s) => $q->where('name', 'like', "%{$s}%")->orWhere('plate', 'like', "%{$s}%"))
-            ->orderBy('name')
-            ->paginate($request->integer('per_page', 50));
+        $query = Vehicle::query();
 
-        return VehicleResource::collection($vehicles);
+        $this->applyTableQuery(
+            $query,
+            $request,
+            ['name', 'plate', 'type', 'default_trip_rate', 'is_active'],
+            ['name', 'plate', 'type'],
+            'name',
+        );
+
+        return VehicleResource::collection($query->paginate($request->integer('per_page', 50)));
     }
 
     public function store(Request $request)

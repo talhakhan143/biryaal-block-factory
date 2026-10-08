@@ -12,6 +12,7 @@ use App\Models\Supplier;
 use App\Models\TransportTrip;
 use App\Services\Accounting\CashAccountResolver;
 use App\Services\Accounting\LedgerService;
+use App\Services\Sales\InvoiceAllocator;
 use App\Support\Money;
 use App\Support\Sequence;
 use Illuminate\Database\Eloquent\Model;
@@ -22,7 +23,7 @@ use InvalidArgumentException;
 
 class PaymentService
 {
-    public function __construct(private LedgerService $ledger) {}
+    public function __construct(private LedgerService $ledger, private InvoiceAllocator $allocator) {}
 
     /**
      * Record money received from a customer (settles receivable).
@@ -128,11 +129,19 @@ class PaymentService
     public function payForPurchase(MaterialPurchase $purchase, array $data): Payment
     {
         return DB::transaction(function () use ($purchase, $data) {
-            $remaining = (int) $purchase->total_cost - (int) $purchase->paid_amount;
+            // Kiraya driver ko gaya ho to wo supplier ke bill me nahi hai.
+            $remaining = $purchase->supplierBill() - (int) $purchase->paid_amount;
             $amount = min((int) $data['amount'], $remaining);
             $this->assertPositive($amount);
 
             $supplier = $purchase->supplier;
+            // Doosri layer: bill par baqi dikhe magar supplier ka khata saaf ho
+            // to paisa bahar nahi jana chahiye.
+            if ($amount > (int) $supplier->balance) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Is supplier ka baqi sirf '.Money::format(max((int) $supplier->balance, 0)).' hai, us se zyada nahi diya ja sakta.',
+                ]);
+            }
             $payment = Payment::create([
                 'reference' => Sequence::next('PAY'),
                 'direction' => Payment::PAYMENT,
@@ -150,7 +159,7 @@ class PaymentService
             $paid = (int) $purchase->paid_amount + $amount;
             $purchase->update([
                 'paid_amount' => $paid,
-                'payment_status' => $paid >= (int) $purchase->total_cost ? 'paid' : 'partial',
+                'payment_status' => $paid >= $purchase->supplierBill() ? 'paid' : 'partial',
             ]);
             $supplier->decrement('balance', $amount);
 
@@ -319,6 +328,61 @@ class PaymentService
     }
 
     /**
+     * Take an ADVANCE from a customer: paisa pehle, maal baad me.
+     *
+     * The customer's balance goes NEGATIVE, which is exactly what a credit
+     * balance on the receivable control account means: we are holding their
+     * money. Every later sale to them draws it down automatically, because a
+     * sale debits the same account.
+     *
+     * Reference prefix is ADV so an advance is tellable from an ordinary
+     * receipt anywhere it is listed, without a new column.
+     *
+     * @param  array{payment_date:string,amount:int,method?:string,bank_ref?:string,notes?:string}  $data
+     */
+    public function advanceFromCustomer(Customer $customer, array $data): Payment
+    {
+        return DB::transaction(function () use ($customer, $data) {
+            $amount = (int) $data['amount'];
+            $this->assertPositive($amount);
+
+            $payment = Payment::create([
+                'reference' => Sequence::next('ADV'),
+                'direction' => Payment::RECEIPT,
+                'party_type' => $customer->getMorphClass(),
+                'party_id' => $customer->id,
+                'payment_date' => $data['payment_date'],
+                'amount' => $amount,
+                'method' => $data['method'] ?? 'cash',
+                'bank_ref' => $data['bank_ref'] ?? null,
+                'notes' => trim('Advance. '.($data['notes'] ?? '')),
+                'created_by' => Auth::id(),
+            ]);
+
+            // Minus balance = jo paisa hum ne pakad rakha hai.
+            $customer->decrement('balance', $amount);
+
+            // Agar is waqt koi bill khula para hai to advance usi par lagta hai,
+            // warna customers.balance aur sales.balance alag alag kahani kehte
+            // hain aur beech ka paisa na wasool hota hai na wapas.
+            $this->allocator->rebuild($customer->refresh());
+
+            $cashAccount = CashAccountResolver::code($data['method'] ?? 'cash');
+            $this->ledger->post(
+                $data['payment_date'],
+                "Advance {$payment->reference} from {$customer->name}",
+                [
+                    ['account' => $cashAccount, 'debit' => $amount],
+                    ['account' => Account::RECEIVABLE, 'credit' => $amount, 'memo' => $customer->name],
+                ],
+                $payment,
+            );
+
+            return $payment;
+        });
+    }
+
+    /**
      * Pay an ADVANCE to a party that carries a `balance` column (Driver,
      * Labourer) — money given before any dues exist. This intentionally drives
      * the balance NEGATIVE; that negative balance is the outstanding advance
@@ -431,24 +495,31 @@ class PaymentService
     {
         $remaining = $amount;
 
-        $purchases = MaterialPurchase::where('supplier_id', $supplier->getKey())
+        // Filter PHP me, SQL me nahi: jis purchase ka kiraya driver ko gaya hai
+        // us ka supplier bill total_cost se kam hai, aur wo SQL column nahi.
+        $purchases = MaterialPurchase::with('trip')
+            ->where('supplier_id', $supplier->getKey())
+            // supplierBill() hamesha total_cost se kam ya barabar hoti hai, is
+            // liye ye sasta SQL filter kuch chhorta nahi, bas kaam ghata deta hai.
             ->whereColumn('paid_amount', '<', 'total_cost')
             ->orderBy('purchase_date')
             ->orderBy('created_at')
-            ->get();
+            ->get()
+            ->filter(fn (MaterialPurchase $p) => (int) $p->paid_amount < $p->supplierBill());
 
         foreach ($purchases as $purchase) {
             if ($remaining <= 0) {
                 break;
             }
 
-            $due = (int) $purchase->total_cost - (int) $purchase->paid_amount;
+            $bill = $purchase->supplierBill();
+            $due = $bill - (int) $purchase->paid_amount;
             $apply = min($remaining, $due);
             $paid = (int) $purchase->paid_amount + $apply;
 
             $purchase->update([
                 'paid_amount' => $paid,
-                'payment_status' => $paid >= (int) $purchase->total_cost ? 'paid' : ($paid > 0 ? 'partial' : 'unpaid'),
+                'payment_status' => $paid >= $bill ? 'paid' : ($paid > 0 ? 'partial' : 'unpaid'),
             ]);
 
             $remaining -= $apply;

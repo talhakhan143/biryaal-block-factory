@@ -18,11 +18,14 @@ class TransportService
      * Record a transport trip. The trip cost is a transport expense; any unpaid
      * portion becomes a payable owed to the driver.
      *
-     * @param  array{vehicle_id?:string,driver_id?:string,dispatch_id?:string,trip_date:string,from_location?:string,to_location?:string,rate:int,paid?:int,method?:string,notes?:string}  $data
+     * @param  array{vehicle_id?:string,driver_id?:string,dispatch_id?:string,material_purchase_id?:string,kind?:string,trip_date:string,from_location?:string,to_location?:string,rate:int,paid?:int,method?:string,notes?:string}  $data
      */
     public function recordTrip(array $data): TransportTrip
     {
         return DB::transaction(function () use ($data) {
+            $kind = ($data['kind'] ?? TransportTrip::OUTBOUND) === TransportTrip::INBOUND
+                ? TransportTrip::INBOUND
+                : TransportTrip::OUTBOUND;
             $rate = (int) $data['rate'];
             $paid = min((int) ($data['paid'] ?? 0), $rate);
             $balance = $rate - $paid;
@@ -33,6 +36,8 @@ class TransportService
                 'vehicle_label' => $data['vehicle_label'] ?? null,
                 'driver_id' => $data['driver_id'] ?? null,
                 'dispatch_id' => $data['dispatch_id'] ?? null,
+                'material_purchase_id' => $data['material_purchase_id'] ?? null,
+                'kind' => $kind,
                 'trip_date' => $data['trip_date'],
                 'from_location' => $data['from_location'] ?? null,
                 'to_location' => $data['to_location'] ?? null,
@@ -50,8 +55,18 @@ class TransportService
 
             $isBank = ($data['method'] ?? 'cash') === 'bank';
             $cashAccount = $isBank ? Account::BANK : Account::CASH;
-            // Freight is paid from what the customer paid (clearing), not a factory expense.
-            $lines = [['account' => Account::TRANSPORT_CLEARING, 'debit' => $rate, 'memo' => 'Driver freight']];
+
+            // Kiraya kis khate me jaye:
+            //  - Customer ko maal bhejna: customer ne kiraya diya tha, wo 2100
+            //    clearing me para hai, yahan se nikal jata hai. Pass through.
+            //  - Purchase se judi inbound trip: purchase ne 2100 credit kiya tha
+            //    (kiraya maal ki lagat me hai), yahan se wash ho jata hai.
+            //  - Akeli inbound trip: koi clearing nahi, ye seedha factory ka
+            //    kharcha hai.
+            $costAccount = ($kind === TransportTrip::INBOUND && empty($data['material_purchase_id']))
+                ? Account::EXPENSE
+                : Account::TRANSPORT_CLEARING;
+            $lines = [['account' => $costAccount, 'debit' => $rate, 'memo' => $kind === TransportTrip::INBOUND ? 'Maal laane ka kiraya' : 'Driver freight']];
             if ($paid > 0) {
                 $lines[] = ['account' => $cashAccount, 'credit' => $paid, 'memo' => $isBank ? ($data['bank_ref'] ?? null) : null];
             }

@@ -14,7 +14,7 @@ class ResellerDispatchResource extends JsonResource
             'reference' => $this->reference,
             'reseller_sale_id' => $this->reseller_sale_id,
             'invoice_no' => $this->whenLoaded('sale', fn () => $this->sale?->invoice_no),
-            'customer' => new CustomerResource($this->whenLoaded('customer')),
+            'customer' => new ResellerCustomerResource($this->whenLoaded('customer')),
             'customer_id' => $this->customer_id,
             'driver' => new DriverResource($this->whenLoaded('driver')),
             'driver_id' => $this->driver_id,

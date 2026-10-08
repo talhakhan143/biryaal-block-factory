@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductionController;
 use App\Http\Controllers\Api\RawMaterialController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\ResellerCustomerController;
 use App\Http\Controllers\Api\ResellerDashboardController;
 use App\Http\Controllers\Api\ResellerDispatchController;
 use App\Http\Controllers\Api\ResellerItemController;
@@ -31,6 +32,7 @@ use App\Http\Controllers\Api\ResellerSupplierController;
 use App\Http\Controllers\Api\SalaryController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SalesReturnController;
+use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\SystemController;
@@ -59,6 +61,7 @@ Route::prefix('v1')->group(function () {
             Route::get('suppliers', [SupplierController::class, 'index']);
             Route::get('suppliers/{supplier}', [SupplierController::class, 'show']);
             Route::get('suppliers/{supplier}/ledger', [SupplierController::class, 'ledger']);
+            Route::get('suppliers/{supplier}/history', [SupplierController::class, 'history']);
         });
         Route::middleware('permission:suppliers.manage')->group(function () {
             Route::post('suppliers', [SupplierController::class, 'store']);
@@ -66,11 +69,16 @@ Route::prefix('v1')->group(function () {
         });
         Route::delete('suppliers/{supplier}', [SupplierController::class, 'destroy'])->middleware('permission:suppliers.delete');
 
+        // Aik hi dabbe se poore system me dhoondna. Har group apne apne
+        // permission ke peechay hai, service ke andar check hota hai.
+        Route::get('search', [SearchController::class, 'index']);
+
         // Customers
         Route::middleware('permission:customers.view')->group(function () {
             Route::get('customers', [CustomerController::class, 'index']);
             Route::get('customers/{customer}', [CustomerController::class, 'show']);
             Route::get('customers/{customer}/ledger', [CustomerController::class, 'ledger']);
+            Route::get('customers/{customer}/history', [CustomerController::class, 'history']);
         });
         Route::middleware('permission:customers.manage')->group(function () {
             Route::post('customers', [CustomerController::class, 'store']);
@@ -139,11 +147,14 @@ Route::prefix('v1')->group(function () {
         Route::get('payments/advances', [PaymentController::class, 'advances'])->middleware('permission:payments.view');
         // Customer money IN — receipts (allowed for sales staff).
         Route::post('payments/receipt', [PaymentController::class, 'receipt'])->middleware('permission:payments.receive');
+        // Advance: paisa pehle, maal baad me.
+        Route::post('customers/{customer}/advance', [PaymentController::class, 'advance'])->middleware('permission:payments.receive');
         // Money OUT to suppliers — theft-sensitive, manage only.
         Route::post('payments/supplier', [PaymentController::class, 'payment'])->middleware('permission:payments.manage');
 
         // Expenses
         Route::get('expenses', [ExpenseController::class, 'index'])->middleware('permission:expenses.view');
+        Route::get('expenses/summary', [ExpenseController::class, 'summary'])->middleware('permission:expenses.view');
         Route::get('expenses/{expense}', [ExpenseController::class, 'show'])->middleware('permission:expenses.view');
         Route::post('expenses', [ExpenseController::class, 'store'])->middleware('permission:expenses.manage');
 
@@ -156,6 +167,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:transport.view')->group(function () {
             Route::get('drivers', [DriverController::class, 'index']);
             Route::get('drivers/{driver}/ledger', [DriverController::class, 'ledger']);
+            Route::get('drivers/{driver}/history', [DriverController::class, 'history']);
         });
         Route::middleware('permission:transport.manage')->group(function () {
             Route::post('drivers', [DriverController::class, 'store']);
@@ -256,6 +268,9 @@ Route::prefix('v1')->group(function () {
             Route::get('reseller/payments', [ResellerPaymentController::class, 'index']);
             Route::get('reseller/payables', [ResellerPaymentController::class, 'payables']);
             Route::get('reseller/receivables', [ResellerPaymentController::class, 'receivables']);
+            // Customers: naam/phone shared hai, paisa nahi. Ye sirf reseller books.
+            Route::get('reseller/customers', [ResellerCustomerController::class, 'index']);
+            Route::get('reseller/customers/{customer}', [ResellerCustomerController::class, 'show']);
         });
         Route::middleware('permission:reseller.manage')->group(function () {
             Route::post('reseller/items', [ResellerItemController::class, 'store']);

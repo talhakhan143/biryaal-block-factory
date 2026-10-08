@@ -12,9 +12,9 @@ use App\Models\Labourer;
 use App\Models\Payment;
 use App\Models\ProductionBatch;
 use App\Models\RawMaterial;
+use App\Models\Salary;
 use App\Models\Sale;
 use App\Models\SaleItem;
-use App\Models\Salary;
 use App\Models\Supplier;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -64,6 +64,9 @@ class DashboardController extends Controller
         //      keeps both figures honest — the PAYABLE control account is just
         //      their net, so the books still reconcile. ----
         $receivables = (int) Customer::where('balance', '>', 0)->sum('balance');
+        // Customers ka wo paisa jo hamare paas pehle se jama hai (minus balance).
+        // Ye humara dena hai, lena nahi, is liye receivables se bilkul alag.
+        $customerAdvances = (int) abs((int) Customer::where('balance', '<', 0)->sum('balance'));
         $payableBreakdown = [
             'suppliers' => (int) Supplier::where('balance', '>', 0)->sum('balance'),
             'drivers' => (int) Driver::where('balance', '>', 0)->sum('balance'),
@@ -80,6 +83,7 @@ class DashboardController extends Controller
         $advances = array_sum($advanceBreakdown);
         $dueCounts = [
             'customers' => Customer::where('balance', '>', 0)->count(),
+            'customers_with_advance' => Customer::where('balance', '<', 0)->count(),
             'suppliers' => Supplier::where('balance', '>', 0)->count(),
             'drivers' => Driver::where('balance', '>', 0)->count(),
             'labourers' => Labourer::where('balance', '>', 0)->count(),
@@ -135,6 +139,7 @@ class DashboardController extends Controller
             'bank_balance' => $bank,
             'total_cash' => $cash + $bank,
             'receivables' => $receivables,
+            'customer_advances' => $customerAdvances,
             'payables' => $payables,
             'payable_breakdown' => $payableBreakdown,
             'advances' => $advances,

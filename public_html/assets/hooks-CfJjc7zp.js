@@ -1,1 +1,0 @@
-import{D as e}from"./ui-DUwmBCXw.js";import{t}from"./useQuery-DbhubqPC.js";function n(n,r={}){return t({queryKey:[n,r],queryFn:async()=>(await e.get(`/${n}`,{params:r})).data})}export{n as t};

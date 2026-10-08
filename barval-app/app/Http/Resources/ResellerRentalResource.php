@@ -15,7 +15,7 @@ class ResellerRentalResource extends JsonResource
         return [
             'id' => $this->id,
             'reference' => $this->reference,
-            'customer' => new CustomerResource($this->whenLoaded('customer')),
+            'customer' => new ResellerCustomerResource($this->whenLoaded('customer')),
             'customer_id' => $this->customer_id,
             'item_name' => $this->item_name,
             'unit' => $this->unit,
