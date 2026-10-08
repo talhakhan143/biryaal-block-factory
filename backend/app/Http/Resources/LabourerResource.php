@@ -16,6 +16,7 @@ class LabourerResource extends JsonResource
             'daily_wage' => (int) $this->daily_wage,
             'balance' => (int) $this->balance,
             'is_active' => (bool) $this->is_active,
+            'created_at' => $this->created_at,
         ];
     }
 }

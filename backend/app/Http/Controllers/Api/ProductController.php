@@ -20,7 +20,7 @@ class ProductController extends Controller
             ->with('stock')
             ->when($request->boolean('active_only'), fn ($q) => $q->where('is_active', true));
 
-        $this->applyTableQuery($query, $request, ['name', 'sale_price', 'unit'], ['name', 'sku'], 'name');
+        $this->applyTableQuery($query, $request, ['name', 'sale_price', 'unit', 'created_at'], ['name', 'sku'], 'created_at');
 
         $products = $query->paginate($request->integer('per_page', 50));
 

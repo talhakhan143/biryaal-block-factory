@@ -21,7 +21,7 @@ class ResellerSupplierController extends Controller
         $query = ResellerSupplier::query()
             ->when($request->boolean('active_only'), fn ($q) => $q->where('is_active', true));
 
-        $this->applyTableQuery($query, $request, ['name', 'balance'], ['name', 'phone'], 'name');
+        $this->applyTableQuery($query, $request, ['name', 'balance', 'created_at'], ['name', 'phone'], 'created_at');
 
         return ResellerSupplierResource::collection($query->paginate($request->integer('per_page', 100)));
     }

@@ -15,6 +15,7 @@ interface Supplier {
   address?: string
   balance: number
   is_active: boolean
+  created_at?: string
 }
 
 export default function Suppliers() {
@@ -24,15 +25,15 @@ export default function Suppliers() {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [sort, setSort] = useState('name')
-  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
+  const [sort, setSort] = useState('created_at')
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [creating, setCreating] = useState(false)
   const [ledgerId, setLedgerId] = useState<string | null>(null)
   const { data, isLoading } = useList<Supplier>('suppliers', { search, page, sort, dir })
 
   const onSort = (key: string) => {
     if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
-    else { setSort(key); setDir('asc') }
+    else { setSort(key); setDir(key === 'created_at' ? 'desc' : 'asc') }
     setPage(1)
   }
 
@@ -63,6 +64,7 @@ export default function Suppliers() {
     { key: 'phone', label: 'Phone', sortable: true, render: (s) => s.phone ?? '—' },
     { key: 'balance', label: 'Balance (we owe)', sortable: true, align: 'right', render: (s) => (s.balance > 0 ? <Badge color="red">{formatPaisa(s.balance)}</Badge> : <Badge color="green">Settled</Badge>) },
     { key: 'is_active', label: 'Status', sortable: true, render: (s) => (s.is_active ? <Badge color="green">Active</Badge> : <Badge color="amber">Off</Badge>) },
+    { key: 'created_at', label: 'Kab bana', sortable: true, render: (r) => (r.created_at ? String(r.created_at).slice(0, 10) : '·') },
     {
       key: 'actions', label: '', align: 'right', render: (s) => (
         <div onClick={(e) => e.stopPropagation()}>

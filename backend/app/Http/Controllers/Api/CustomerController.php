@@ -28,7 +28,7 @@ class CustomerController extends Controller
             // Minus balance = in ka paisa hamare paas jama hai.
             ->when($request->boolean('has_advance'), fn ($q) => $q->where('balance', '<', 0));
 
-        $this->applyTableQuery($query, $request, ['name', 'balance', 'phone'], ['name', 'phone'], 'name');
+        $this->applyTableQuery($query, $request, ['name', 'balance', 'phone', 'created_at'], ['name', 'phone'], 'created_at');
 
         return CustomerResource::collection($query->paginate($request->integer('per_page', 15)));
     }

@@ -24,6 +24,7 @@ class ProductResource extends JsonResource
                 'ready_qty' => (int) $this->stock->ready_qty,
                 'damaged_qty' => (int) $this->stock->damaged_qty,
             ]),
+            'created_at' => $this->created_at,
         ];
     }
 }

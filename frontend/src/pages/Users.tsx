@@ -13,6 +13,7 @@ interface AppUser {
   phone?: string
   is_active: boolean
   roles: string[]
+  created_at?: string
 }
 
 export default function Users() {
@@ -24,14 +25,14 @@ export default function Users() {
   const [creating, setCreating] = useState(false)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [sort, setSort] = useState('name')
-  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
+  const [sort, setSort] = useState('created_at')
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const { data, isLoading } = useList<AppUser>('users', { search, page, sort, dir })
   const roles = useQuery({ queryKey: ['roles'], queryFn: async () => (await api.get<string[]>('/roles')).data })
 
   const onSort = (key: string) => {
     if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
-    else { setSort(key); setDir('asc') }
+    else { setSort(key); setDir(key === 'created_at' ? 'desc' : 'asc') }
     setPage(1)
   }
 
@@ -41,6 +42,7 @@ export default function Users() {
     { key: 'phone', label: 'Phone', render: (u) => u.phone ?? '—' },
     { key: 'role', label: 'Role', render: (u) => u.roles.map((r) => <Badge key={r} color="blue">{r}</Badge>) },
     { key: 'status', label: 'Status', render: (u) => u.is_active ? <Badge color="green">Active</Badge> : <Badge color="red">Disabled</Badge> },
+    { key: 'created_at', label: 'Kab bana', sortable: true, render: (r) => (r.created_at ? String(r.created_at).slice(0, 10) : '·') },
     {
       key: 'actions', label: '', align: 'right', render: (u) => {
         const self = u.id === user?.id

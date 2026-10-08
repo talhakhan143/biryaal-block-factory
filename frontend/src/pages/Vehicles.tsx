@@ -12,6 +12,7 @@ interface Vehicle {
   plate?: string
   type?: string
   default_trip_rate: number
+  created_at?: string
 }
 
 export default function Vehicles() {
@@ -20,13 +21,13 @@ export default function Vehicles() {
   const [creating, setCreating] = useState(false)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [sort, setSort] = useState('name')
-  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
+  const [sort, setSort] = useState('created_at')
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const { data, isLoading } = useList<Vehicle>('vehicles', { search, page, sort, dir })
 
   const onSort = (key: string) => {
     if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
-    else { setSort(key); setDir('asc') }
+    else { setSort(key); setDir(key === 'created_at' ? 'desc' : 'asc') }
     setPage(1)
   }
 
@@ -43,6 +44,7 @@ export default function Vehicles() {
     { key: 'plate', label: 'Plate', sortable: true, render: (v) => v.plate ?? '·' },
     { key: 'type', label: 'Type', sortable: true, render: (v) => v.type ?? '·' },
     { key: 'default_trip_rate', label: 'Default Rate', sortable: true, align: 'right', render: (v) => formatPaisa(v.default_trip_rate) },
+    { key: 'created_at', label: 'Kab bana', sortable: true, render: (r) => (r.created_at ? String(r.created_at).slice(0, 10) : '·') },
   ]
 
   return (

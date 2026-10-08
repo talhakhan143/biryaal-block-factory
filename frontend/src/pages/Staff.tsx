@@ -12,6 +12,7 @@ interface Staff {
   name: string
   role?: string
   monthly_salary: number
+  created_at?: string
 }
 interface Salary {
   id: string
@@ -35,8 +36,8 @@ export default function StaffPage() {
   const [payId, setPayId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [sort, setSort] = useState('name')
-  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
+  const [sort, setSort] = useState('created_at')
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const staff = useList<Staff>('staff', { page, search, sort, dir })
   const allStaff = useList<Staff>('staff', { per_page: 200 }) // full list for the salary dropdown
   const [salPage, setSalPage] = useState(1)
@@ -46,7 +47,7 @@ export default function StaffPage() {
 
   const onSort = (key: string) => {
     if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
-    else { setSort(key); setDir('asc') }
+    else { setSort(key); setDir(key === 'created_at' ? 'desc' : 'asc') }
     setPage(1)
   }
 
@@ -54,6 +55,7 @@ export default function StaffPage() {
     { key: 'name', label: 'Name', sortable: true, render: (s) => <span className="font-medium">{s.name}</span> },
     { key: 'role', label: 'Role', render: (s) => s.role ?? '—' },
     { key: 'monthly_salary', label: 'Monthly Salary', sortable: true, align: 'right', render: (s) => formatPaisa(s.monthly_salary) },
+    { key: 'created_at', label: 'Kab bana', sortable: true, render: (r) => (r.created_at ? String(r.created_at).slice(0, 10) : '·') },
     {
       key: 'actions', label: '', align: 'right', render: (s) => (
         can('hr.delete') ? (

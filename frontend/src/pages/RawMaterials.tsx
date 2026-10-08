@@ -14,6 +14,7 @@ interface RawMaterial {
   low_stock_threshold: number
   is_low: boolean
   is_active: boolean
+  created_at?: string
 }
 
 export default function RawMaterials() {
@@ -24,14 +25,14 @@ export default function RawMaterials() {
   const [editing, setEditing] = useState<RawMaterial | null>(null)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [sort, setSort] = useState('name')
-  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
+  const [sort, setSort] = useState('created_at')
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const { data, isLoading } = useList<RawMaterial>('raw-materials', { page, search, sort, dir })
   const manage = can('materials.manage')
 
   const onSort = (key: string) => {
     if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
-    else { setSort(key); setDir('asc') }
+    else { setSort(key); setDir(key === 'created_at' ? 'desc' : 'asc') }
     setPage(1)
   }
 
@@ -58,6 +59,7 @@ export default function RawMaterials() {
     { key: 'current_qty', label: 'On Hand', sortable: true, align: 'right', render: (m) => m.current_qty },
     { key: 'low_stock_threshold', label: 'Low Alert', align: 'right', render: (m) => m.low_stock_threshold },
     { key: 'status', label: 'Status', render: (m) => (!m.is_active ? <Badge color="slate">Off</Badge> : m.is_low ? <Badge color="red">Low</Badge> : <Badge color="green">OK</Badge>) },
+    { key: 'created_at', label: 'Kab bana', sortable: true, render: (r) => (r.created_at ? String(r.created_at).slice(0, 10) : '·') },
     {
       key: 'actions', label: '', align: 'right', render: (m) => (
         manage ? (

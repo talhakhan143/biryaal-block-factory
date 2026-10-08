@@ -16,7 +16,7 @@ class StaffController extends Controller
     public function index(Request $request)
     {
         $query = Staff::query();
-        $this->applyTableQuery($query, $request, ['name', 'monthly_salary'], ['name', 'phone'], 'name');
+        $this->applyTableQuery($query, $request, ['name', 'monthly_salary', 'created_at'], ['name', 'phone'], 'created_at');
 
         return StaffResource::collection($query->paginate($request->integer('per_page', 50)));
     }

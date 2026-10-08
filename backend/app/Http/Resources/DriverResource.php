@@ -18,6 +18,7 @@ class DriverResource extends JsonResource
             'vehicle_plate' => $this->vehicle_plate,
             'balance' => (int) $this->balance,
             'is_active' => (bool) $this->is_active,
+            'created_at' => $this->created_at,
         ];
     }
 }

@@ -17,6 +17,7 @@ interface Customer {
   balance: number
   /** Minus balance = customer ka paisa hamare paas pada hai. */
   advance: number
+  created_at?: string
 }
 
 export default function Customers() {
@@ -27,8 +28,8 @@ export default function Customers() {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [sort, setSort] = useState('name')
-  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
+  const [sort, setSort] = useState('created_at')
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [creating, setCreating] = useState(false)
   const [ledgerId, setLedgerId] = useState<string | null>(null)
   const [receiveFor, setReceiveFor] = useState<Customer | null>(null)
@@ -36,7 +37,7 @@ export default function Customers() {
 
   const onSort = (key: string) => {
     if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
-    else { setSort(key); setDir('asc') }
+    else { setSort(key); setDir(key === 'created_at' ? 'desc' : 'asc') }
     setPage(1)
   }
 
@@ -67,6 +68,7 @@ export default function Customers() {
             : <Badge color="green">Sab clear</Badge>
       ),
     },
+    { key: 'created_at', label: 'Kab bana', sortable: true, render: (r) => (r.created_at ? String(r.created_at).slice(0, 10) : '·') },
     {
       key: 'actions', label: '', align: 'right', render: (c) => (
         // Apna click rakhte hain, warna row wala click bhi chal jata hai.

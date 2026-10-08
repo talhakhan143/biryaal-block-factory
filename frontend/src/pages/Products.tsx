@@ -17,6 +17,7 @@ interface Product {
   sale_price: number
   low_stock_threshold: number
   is_active: boolean
+  created_at?: string
 }
 
 export default function Products() {
@@ -27,14 +28,14 @@ export default function Products() {
   const [creating, setCreating] = useState(false)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [sort, setSort] = useState('name')
-  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
+  const [sort, setSort] = useState('created_at')
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const { data, isLoading } = useList<Product>('products', { page, search, sort, dir })
   const manage = can('inventory.manage')
 
   const onSort = (key: string) => {
     if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
-    else { setSort(key); setDir('asc') }
+    else { setSort(key); setDir(key === 'created_at' ? 'desc' : 'asc') }
     setPage(1)
   }
 
@@ -62,6 +63,7 @@ export default function Products() {
     { key: 'curing', label: 'Curing Days', align: 'right', render: (p) => `${p.default_curing_days} din` },
     { key: 'sale_price', label: 'Sale Rate', sortable: true, align: 'right', render: (p) => formatPaisa(p.sale_price) },
     { key: 'status', label: 'Status', render: (p) => (p.is_active ? <Badge color="green">Active</Badge> : <Badge color="slate">Off</Badge>) },
+    { key: 'created_at', label: 'Kab bana', sortable: true, render: (r) => (r.created_at ? String(r.created_at).slice(0, 10) : '·') },
     {
       key: 'actions', label: '', align: 'right', render: (p) => (
         manage ? (

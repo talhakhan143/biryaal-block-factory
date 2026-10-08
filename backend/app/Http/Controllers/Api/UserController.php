@@ -21,7 +21,7 @@ class UserController extends Controller
             // Hide Super Admin (developer) accounts from everyone except another Super Admin.
             ->unless($this->isSuperAdmin($request), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'Super Admin')));
 
-        $this->applyTableQuery($query, $request, ['name', 'email'], ['name', 'email'], 'name');
+        $this->applyTableQuery($query, $request, ['name', 'email', 'created_at'], ['name', 'email'], 'created_at');
 
         return UserResource::collection($query->paginate($request->integer('per_page', 20)));
     }

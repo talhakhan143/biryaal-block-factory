@@ -16,6 +16,7 @@ class StaffResource extends JsonResource
             'phone' => $this->phone,
             'monthly_salary' => (int) $this->monthly_salary,
             'is_active' => (bool) $this->is_active,
+            'created_at' => $this->created_at,
         ];
     }
 }
