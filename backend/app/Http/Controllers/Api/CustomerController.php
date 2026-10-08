@@ -24,7 +24,9 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         $query = Customer::query()
-            ->when($request->boolean('has_dues'), fn ($q) => $q->where('balance', '>', 0));
+            ->when($request->boolean('has_dues'), fn ($q) => $q->where('balance', '>', 0))
+            // Minus balance = in ka paisa hamare paas jama hai.
+            ->when($request->boolean('has_advance'), fn ($q) => $q->where('balance', '<', 0));
 
         $this->applyTableQuery($query, $request, ['name', 'balance', 'phone'], ['name', 'phone'], 'name');
 

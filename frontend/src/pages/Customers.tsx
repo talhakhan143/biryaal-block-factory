@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
@@ -22,6 +22,8 @@ interface Customer {
 export default function Customers() {
   const { can } = useAuth()
   const navigate = useNavigate()
+  const [params, setParams] = useSearchParams()
+  const onlyAdvance = params.get('advance') === '1'
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -30,7 +32,7 @@ export default function Customers() {
   const [creating, setCreating] = useState(false)
   const [ledgerId, setLedgerId] = useState<string | null>(null)
   const [receiveFor, setReceiveFor] = useState<Customer | null>(null)
-  const { data, isLoading } = useList<Customer>('customers', { search, page, sort, dir })
+  const { data, isLoading } = useList<Customer>('customers', { search, page, sort, dir, has_advance: onlyAdvance ? 1 : undefined })
 
   const onSort = (key: string) => {
     if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc')
@@ -81,6 +83,24 @@ export default function Customers() {
 
   return (
     <div>
+      {onlyAdvance && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
+            style={{ background: 'color-mix(in srgb, var(--amber) 14%, transparent)', color: 'var(--amber)' }}
+          >
+            Sirf wo jinhon ne advance diya hai
+          </span>
+          <button
+            onClick={() => { setParams(new URLSearchParams(), { replace: true }); setPage(1) }}
+            className="text-xs font-medium underline"
+            style={{ color: 'var(--primary)' }}
+          >
+            Saare customers
+          </button>
+        </div>
+      )}
+
       <PageHeader
         title="Customers"
         subtitle="Grahak. Kisi bhi naam par click karein, uski poori history khul jayegi"
@@ -91,7 +111,7 @@ export default function Customers() {
         columns={columns}
         rows={data?.data}
         loading={isLoading}
-        emptyText="No customers yet."
+        emptyText={onlyAdvance ? 'Kisi customer ka advance jama nahi.' : 'Abhi koi customer nahi.'}
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1) }}
         searchPlaceholder="Name ya phone se search…"

@@ -15,11 +15,12 @@ interface DashboardData {
   bank_balance: number
   total_cash: number
   receivables: number
+  customer_advances: number
   payables: number
   payable_breakdown: { suppliers: number; drivers: number; labourers: number; staff: number }
   advances: number
   advance_breakdown: { suppliers: number; drivers: number; labourers: number; staff: number }
-  due_counts: { customers: number; suppliers: number; drivers: number; labourers: number }
+  due_counts: { customers: number; customers_with_advance: number; suppliers: number; drivers: number; labourers: number }
   pending_dispatch: number
   stock: { curing: number; ready: number; damaged: number }
   low_stock_alerts: { id: string; name: string; unit: string; current_qty: number; low_stock_threshold: number }[]
@@ -101,6 +102,15 @@ export default function Dashboard() {
             <Stat label="Bank balance" hint="Bank me · click for cash book" value={formatPaisa(data.bank_balance)} tone={data.bank_balance < 0 ? 'red' : 'primary'} to="/cash-book" />
             <Stat label="Receivables" hint={`${d.customers} customers se lene hain · click for list`} value={formatPaisa(data.receivables)} tone="primary" to="/payments" />
             <Stat label="Payables" hint={`${d.suppliers + d.drivers + d.labourers} ko dene hain · click for list`} value={formatPaisa(data.payables)} tone="red" to="/payments" />
+            {data.customer_advances > 0 && (
+              <Stat
+                label="Customer ka advance"
+                hint={`${d.customers_with_advance} ne paisa pehle diya · click for list`}
+                value={formatPaisa(data.customer_advances)}
+                tone="amber"
+                to="/customers?advance=1"
+              />
+            )}
             {data.advances > 0 && (
               <Stat label="Advances diye" hint="Mazdoor/driver ko pehle diya · click for list" value={formatPaisa(data.advances)} tone="primary" to="/payments" />
             )}

@@ -31,7 +31,12 @@ class DriverHistoryService
         $payments = $this->payments($driver);
 
         $docs = $this->docs($trips, $payments);
-        $ledger = $this->statement->rows(Account::PAYABLE, $docs, 'credit');
+        $ledger = $this->statement->rows(
+            Account::PAYABLE,
+            [Payment::class => ['payment', $payments->pluck('reference', 'id')]],
+            'credit',
+            $this->tripRows($trips),
+        );
         $computed = $ledger === [] ? 0 : (int) end($ledger)['running'];
         $stored = (int) $driver->balance;
 
@@ -64,6 +69,34 @@ class DriverHistoryService
             'trips' => $trips,
             'payments' => $payments,
         ];
+    }
+
+    /**
+     * Har trip aik row: poora kiraya, aur jo paisa usi waqt diya gaya. Farq
+     * wahi hai jo driver ke khate par chadha, is liye running total theek
+     * rehta hai aur mauqe par chukaya hua kiraya bhi nazar aata hai.
+     *
+     * @param  Collection<int,TransportTrip>  $trips
+     * @return array<int,array<string,mixed>>
+     */
+    private function tripRows(Collection $trips): array
+    {
+        $cashAtTrip = $this->statement
+            ->lines([Account::CASH, Account::BANK], [TransportTrip::class => ['trip', $trips->pluck('reference', 'id')]], 'entry:id,source_type,source_id')
+            ->groupBy(fn ($line) => $line->entry?->source_id)
+            ->map(fn ($lines) => (int) $lines->sum('credit') - (int) $lines->sum('debit'));
+
+        return $trips->map(fn (TransportTrip $t) => [
+            'date' => $t->trip_date?->toDateString(),
+            'at' => $t->created_at?->format('YmdHisu'),
+            'type' => 'trip',
+            'reference' => $t->reference,
+            'journal_ref' => $t->reference,
+            'description' => ($t->kind === TransportTrip::INBOUND ? 'Maal laaya' : 'Maal bheja').((int) $t->paid >= (int) $t->rate ? ', kiraya usi waqt diya' : ''),
+            'credit' => (int) $t->rate,
+            'debit' => (int) ($cashAtTrip[$t->id] ?? 0),
+            'link_id' => $t->id,
+        ])->values()->all();
     }
 
     /**

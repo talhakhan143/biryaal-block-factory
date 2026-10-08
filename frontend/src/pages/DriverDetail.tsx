@@ -128,7 +128,7 @@ export default function DriverDetail() {
 
       <Tabs tabs={tabs} active={tab} onChange={setTab} />
 
-      {tab === 'statement' && <Statement rows={data.ledger} balance={s.balance} settledAtOnce={data.trips.filter((t) => t.paid >= t.rate).length} />}
+      {tab === 'statement' && <Statement rows={data.ledger} balance={s.balance} />}
       {tab === 'in' && <Trips rows={inbound} empty="Is driver ne abhi koi maal laaya nahi." />}
       {tab === 'out' && <Trips rows={outbound} empty="Is driver ne abhi koi maal bheja nahi." />}
       {tab === 'payments' && <Payments rows={data.payments} />}
@@ -159,12 +159,11 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <Card><p className="text-sm" style={{ color: 'var(--muted)' }}>{children}</p></Card>
 }
 
-function Statement({ rows, balance, settledAtOnce }: { rows: LedgerRow[]; balance: number; settledAtOnce: number }) {
+function Statement({ rows, balance }: { rows: LedgerRow[]; balance: number }) {
   if (rows.length === 0) {
     return (
       <Note>
         Is driver ka koi udhaar nahi chala.
-        {settledAtOnce > 0 && <> {settledAtOnce} trip ka kiraya usi waqt poora de diya gaya tha, is liye khate me nahi aata. "Maal laaya" aur "Maal bheja" me saari trips mojood hain.</>}
       </Note>
     )
   }
@@ -192,11 +191,6 @@ function Statement({ rows, balance, settledAtOnce }: { rows: LedgerRow[]; balanc
         </tr>
       )}
     />
-    {settledAtOnce > 0 && (
-      <p className="mt-2 text-xs" style={{ color: 'var(--muted)' }}>
-        {settledAtOnce} trip khate me nahi aayi kyunki uska kiraya usi waqt poora de diya gaya tha.
-      </p>
-    )}
     </>
   )
 }

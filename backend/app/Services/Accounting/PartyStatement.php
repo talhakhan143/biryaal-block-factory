@@ -29,35 +29,47 @@ class PartyStatement
      * @param  'debit'|'credit'  $increases  which side grows this party's balance
      * @return array<int,array<string,mixed>>
      */
-    public function rows(string $accountCode, array $docs, string $increases): array
+    public function rows(string $accountCode, array $docs, string $increases, array $settledAtOnce = []): array
     {
-        $lines = $this->lines([$accountCode], $docs, 'entry:id,reference,entry_date,description,source_type,source_id,created_at')
+        $rows = $this->lines([$accountCode], $docs, 'entry:id,reference,entry_date,description,source_type,source_id,created_at')
             ->filter(fn (JournalLine $l) => $l->entry !== null)
+            ->map(function (JournalLine $line) use ($docs) {
+                $entry = $line->entry;
+                [$type, $refs] = $docs[$entry->source_type] ?? ['other', collect()];
+
+                return [
+                    'date' => $entry->entry_date?->toDateString(),
+                    'at' => $entry->created_at?->format('YmdHisu'),
+                    'type' => $type,
+                    'reference' => $refs->get($entry->source_id) ?? $entry->reference,
+                    'journal_ref' => $entry->reference,
+                    'description' => $entry->description,
+                    'debit' => (int) $line->debit,
+                    'credit' => (int) $line->credit,
+                    'link_id' => $entry->source_id,
+                ];
+            })
+            // Jo sauda mauqe par hi poora chuk gaya (cash bikri, cash khareed,
+            // wahin ada kiya gaya kiraya) us ka control account par koi line
+            // banti hi nahi. Phir bhi wo is bande ke sath hua kaam hai, is liye
+            // khate me usay dono taraf barabar likh dete hain: baqi par asar
+            // sifar, magar nazar se ghayab bhi nahi.
+            ->concat($settledAtOnce)
             // Date pehle, phir jis tarteeb se post hui. Aik hi din ki rows bhi
             // stable rahen is liye dono ko jorh kar sort karte hain.
-            ->sortBy(fn (JournalLine $l) => $l->entry->entry_date?->toDateString().'|'.$l->entry->created_at?->format('YmdHisu'))
+            ->sortBy(fn (array $r) => $r['date'].'|'.$r['at'])
             ->values();
 
         $running = 0;
 
-        return $lines->map(function (JournalLine $line) use (&$running, $docs, $increases) {
-            $entry = $line->entry;
-            [$type, $refs] = $docs[$entry->source_type] ?? ['other', collect()];
-            $debit = (int) $line->debit;
-            $credit = (int) $line->credit;
-            $running += $increases === 'credit' ? $credit - $debit : $debit - $credit;
+        return $rows->map(function (array $row) use (&$running, $increases) {
+            $running += $increases === 'credit'
+                ? $row['credit'] - $row['debit']
+                : $row['debit'] - $row['credit'];
+            $row['running'] = $running;
+            unset($row['at']);
 
-            return [
-                'date' => $entry->entry_date?->toDateString(),
-                'type' => $type,
-                'reference' => $refs->get($entry->source_id) ?? $entry->reference,
-                'journal_ref' => $entry->reference,
-                'description' => $entry->description,
-                'debit' => $debit,
-                'credit' => $credit,
-                'running' => $running,
-                'link_id' => $entry->source_id,
-            ];
+            return $row;
         })->all();
     }
 

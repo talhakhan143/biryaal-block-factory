@@ -60,16 +60,55 @@ class CustomerHistoryService
      */
     private function ledgerRows(Collection $sales, Collection $receipts, Collection $returns, Collection $adjustments): array
     {
-        return $this->statement->rows(Account::RECEIVABLE, $this->docs($sales, $receipts, $returns, $adjustments), 'debit');
+        // Sale ki rows document se banti hain, journal se nahi. Journal par
+        // sirf udhaar wala hissa hota hai, aur khate me poora bill nazar aana
+        // chahiye: "maal diya 35,500, paisa mila 20,000, baqi 15,500".
+        return $this->statement->rows(
+            Account::RECEIVABLE,
+            $this->moneyDocs($receipts, $returns, $adjustments),
+            'debit',
+            $this->saleRows($sales),
+        );
     }
 
     /**
+     * Har bikri aik row: poora bill charge me, aur jo paisa usi waqt counter
+     * par mila wo credit me. Dono ka farq wahi hai jo receivable par chadha,
+     * is liye running total bilkul theek rehta hai. Cash bikri me dono barabar
+     * hote hain, yani baqi par asar sifar magar khate me mojood.
+     *
+     * @param  Collection<int,Sale>  $sales
+     * @return array<int,array<string,mixed>>
+     */
+    private function saleRows(Collection $sales): array
+    {
+        $cashAtSale = $this->statement
+            ->lines([Account::CASH, Account::BANK], [Sale::class => ['sale', $sales->pluck('invoice_no', 'id')]], 'entry:id,source_type,source_id')
+            ->groupBy(fn ($line) => $line->entry?->source_id)
+            ->map(fn ($lines) => (int) $lines->sum('debit') - (int) $lines->sum('credit'));
+
+        return $sales->map(fn (Sale $s) => [
+            'date' => $s->sale_date?->toDateString(),
+            'at' => $s->created_at?->format('YmdHisu'),
+            'type' => 'sale',
+            'reference' => $s->invoice_no,
+            'journal_ref' => $s->invoice_no,
+            'description' => $s->type === 'cash' ? 'Maal diya, paisa usi waqt mila' : 'Udhaar par maal diya',
+            'debit' => (int) $s->total,
+            'credit' => (int) ($cashAtSale[$s->id] ?? 0),
+            'link_id' => $s->id,
+        ])->values()->all();
+    }
+
+    /**
+     * Journal se banne wali rows: receipt, return aur adjustment. Sale yahan
+     * nahi hai kyunki uski row upar document se banti hai.
+     *
      * @return array<class-string,array{0:string,1:Collection}>
      */
-    private function docs(Collection $sales, Collection $receipts, Collection $returns, Collection $adjustments): array
+    private function moneyDocs(Collection $receipts, Collection $returns, Collection $adjustments): array
     {
         return [
-            Sale::class => ['sale', $sales->pluck('invoice_no', 'id')],
             Payment::class => ['receipt', $receipts->pluck('reference', 'id')],
             SalesReturn::class => ['return', $returns->pluck('reference', 'id')],
             Adjustment::class => ['adjustment', $adjustments->pluck('reference', 'id')],
@@ -85,8 +124,11 @@ class CustomerHistoryService
         $adjustments = $this->adjustments($customer);
         $dispatches = $this->dispatches($customer);
 
-        $docs = $this->docs($sales, $receipts, $returns, $adjustments);
-        $ledger = $this->statement->rows(Account::RECEIVABLE, $docs, 'debit');
+        // `received` ke liye saare documents chahiye, khate ke liye nahi.
+        $docs = [
+            Sale::class => ['sale', $sales->pluck('invoice_no', 'id')],
+        ] + $this->moneyDocs($receipts, $returns, $adjustments);
+        $ledger = $this->ledgerRows($sales, $receipts, $returns, $adjustments);
         $computed = $ledger === [] ? 0 : (int) end($ledger)['running'];
         $stored = (int) $customer->balance;
 

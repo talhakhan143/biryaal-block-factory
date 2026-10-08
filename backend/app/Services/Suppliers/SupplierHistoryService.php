@@ -35,11 +35,7 @@ class SupplierHistoryService
      */
     public function ledger(Supplier $supplier): array
     {
-        return $this->statement->rows(
-            Account::PAYABLE,
-            $this->docs($this->purchases($supplier), $this->payments($supplier), $this->adjustments($supplier)),
-            'credit',
-        );
+        return $this->rows($this->purchases($supplier), $this->payments($supplier), $this->adjustments($supplier));
     }
 
     /** KPIs, the statement, and every document behind it. */
@@ -50,7 +46,7 @@ class SupplierHistoryService
         $adjustments = $this->adjustments($supplier);
 
         $docs = $this->docs($purchases, $payments, $adjustments);
-        $ledger = $this->statement->rows(Account::PAYABLE, $docs, 'credit');
+        $ledger = $this->rows($purchases, $payments, $adjustments);
         $computed = $ledger === [] ? 0 : (int) end($ledger)['running'];
         $stored = (int) $supplier->balance;
 
@@ -85,6 +81,52 @@ class SupplierHistoryService
             'adjustments' => $adjustments,
             'ledger' => $ledger,
         ];
+    }
+
+    /**
+     * @param  Collection<int,MaterialPurchase>  $purchases
+     * @param  Collection<int,Payment>  $payments
+     * @param  Collection<int,Adjustment>  $adjustments
+     * @return array<int,array<string,mixed>>
+     */
+    private function rows(Collection $purchases, Collection $payments, Collection $adjustments): array
+    {
+        // Khareed ki rows document se banti hain, journal se nahi. Journal par
+        // sirf udhaar wala hissa hota hai, aur khate me poora bill nazar aana
+        // chahiye: "maal liya 50,000, paisa diya 20,000, baqi 30,000".
+        return $this->statement->rows(
+            Account::PAYABLE,
+            [
+                Payment::class => ['payment', $payments->pluck('reference', 'id')],
+                Adjustment::class => ['adjustment', $adjustments->pluck('reference', 'id')],
+            ],
+            'credit',
+            $this->purchaseRows($purchases),
+        );
+    }
+
+    /**
+     * @param  Collection<int,MaterialPurchase>  $purchases
+     * @return array<int,array<string,mixed>>
+     */
+    private function purchaseRows(Collection $purchases): array
+    {
+        $cashAtBuy = $this->statement
+            ->lines([Account::CASH, Account::BANK], [MaterialPurchase::class => ['purchase', $purchases->pluck('reference', 'id')]], 'entry:id,source_type,source_id')
+            ->groupBy(fn ($line) => $line->entry?->source_id)
+            ->map(fn ($lines) => (int) $lines->sum('credit') - (int) $lines->sum('debit'));
+
+        return $purchases->map(fn (MaterialPurchase $p) => [
+            'date' => $p->purchase_date?->toDateString(),
+            'at' => $p->created_at?->format('YmdHisu'),
+            'type' => 'purchase',
+            'reference' => $p->reference,
+            'journal_ref' => $p->reference,
+            'description' => $p->supplierBill() <= (int) $p->paid_amount ? 'Maal liya, paisa usi waqt diya' : 'Udhaar par maal liya',
+            'credit' => $p->supplierBill(),
+            'debit' => (int) ($cashAtBuy[$p->id] ?? 0),
+            'link_id' => $p->id,
+        ])->values()->all();
     }
 
     /**

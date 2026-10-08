@@ -276,10 +276,6 @@ function TripForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, unkn
       onSubmit={(e) => { e.preventDefault(); if (over) return; onSubmit({ ...form, rate, paid }) }}
       className="space-y-3"
     >
-      <Note>
-        Ye kiraya factory ka kharcha bane ga aur driver ke khate me dena likha jayega.
-        Purchase form ke <strong>Transport</strong> khane me yehi raqam dobara mat likhein.
-      </Note>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Date"><Input type="date" value={form.trip_date} onChange={(e) => set('trip_date', e.target.value)} required /></Field>
         <Field label="Kiraya (Rs)"><MoneyInput value={form.rate} onChange={(v) => set('rate', v)} required /></Field>

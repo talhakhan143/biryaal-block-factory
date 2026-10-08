@@ -5,7 +5,7 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { Wallet } from 'lucide-react'
-import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, Note, OutstandingNote, PageHeader, RowActions, Select } from '../components/ui'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select } from '../components/ui'
 import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface FreightDriver {
@@ -207,11 +207,6 @@ function PurchaseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, 
         <Field label="Unloading (Rs, total)"><MoneyInput value={form.unloading_cost} onChange={(v) => set('unloading_cost', v)} /></Field>
         <Field label="Paid now (Rs)"><MoneyInput value={form.paid_amount} onChange={(v) => set('paid_amount', v)} /></Field>
       </div>
-
-      <Note>
-        Maal laane ka kiraya yahan nahi likha jata. Wo <strong>Maal ka Kiraya</strong> wale page par
-        driver ke naam se likhein, taake uska hisaab aur payment aik hi jagah rahe.
-      </Note>
 
       {/* Live bill total */}
       <div className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>

@@ -107,21 +107,53 @@ class CustomerHistoryTest extends TestCase
         $this->assertSame((int) $customer->balance, $response->json('summary.factory.balance'));
     }
 
-    public function test_statement_covers_returns_and_adjustments_but_skips_cash_sales(): void
+    public function test_the_statement_shows_every_bill_including_cash_ones(): void
     {
+        // Khata bahi-khata hai, sirf udhaar ka hisaab nahi. Har sauda us me
+        // nazar aana chahiye, warna maalik ko lagta hai kuch gum ho gaya.
         $customer = $this->busyCustomer();
 
         $ledger = $this->getJson("/api/v1/customers/{$customer->id}/history")->assertOk()->json('ledger');
         $types = array_column($ledger, 'type');
 
-        // A return and an adjustment both move the balance, so both must be listed.
         $this->assertContains('return', $types);
         $this->assertContains('adjustment', $types);
         $this->assertContains('receipt', $types);
-
-        // Two sales were made but only the credit one creates a receivable.
-        $this->assertSame(1, count(array_filter($types, fn ($t) => $t === 'sale')));
+        // Dono bikriyan, cash wali bhi.
+        $this->assertSame(2, count(array_filter($types, fn ($t) => $t === 'sale')));
         $this->assertCount(2, $this->getJson("/api/v1/customers/{$customer->id}/history")->json('sales'));
+    }
+
+    public function test_a_bill_shows_its_full_amount_and_what_was_paid_at_the_till(): void
+    {
+        $product = $this->readyProduct();
+        $customer = Customer::create(['name' => 'Haji Ashraf']);
+
+        // Rs 50,000 ka maal, Rs 20,000 mauqe par.
+        app(SaleService::class)->create([
+            'customer_id' => $customer->id, 'sale_date' => '2026-06-01', 'type' => 'credit',
+            'paid' => 2000000,
+            'items' => [['product_id' => $product->id, 'quantity' => 500, 'unit_price' => 10000]],
+        ]);
+        // Cash bikri: poora paisa usi waqt.
+        app(SaleService::class)->create([
+            'customer_id' => $customer->id, 'sale_date' => '2026-06-02', 'type' => 'cash',
+            'items' => [['product_id' => $product->id, 'quantity' => 100, 'unit_price' => 10000]],
+        ]);
+
+        $ledger = $this->getJson("/api/v1/customers/{$customer->id}/history")->assertOk()->json('ledger');
+
+        // Poora bill charge me, counter par mila hua paisa credit me.
+        $this->assertSame(5000000, $ledger[0]['debit']);
+        $this->assertSame(2000000, $ledger[0]['credit']);
+        $this->assertSame(3000000, $ledger[0]['running']);
+
+        // Cash bikri dono taraf barabar: nazar aati hai, baqi nahi hilati.
+        $this->assertSame(1000000, $ledger[1]['debit']);
+        $this->assertSame(1000000, $ledger[1]['credit']);
+        $this->assertSame(3000000, $ledger[1]['running']);
+
+        $this->assertSame((int) $customer->fresh()->balance, (int) end($ledger)['running']);
     }
 
     public function test_a_later_receipt_is_not_counted_twice(): void

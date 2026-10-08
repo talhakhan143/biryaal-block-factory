@@ -163,7 +163,7 @@ export default function CustomerDetail() {
 
       <Tabs tabs={tabs} active={tab} onChange={setTab} />
 
-      {tab === 'statement' && <Statement rows={data.ledger} balance={s.factory.balance} cashSales={data.sales.filter((x) => x.balance === 0 && x.type === 'cash').length} />}
+      {tab === 'statement' && <Statement rows={data.ledger} balance={s.factory.balance} />}
       {tab === 'sales' && <Sales rows={data.sales} />}
       {tab === 'receipts' && <Receipts rows={data.receipts} />}
       {tab === 'returns' && <Returns returns={data.returns} adjustments={data.adjustments} />}
@@ -196,12 +196,11 @@ function Empty({ children }: { children: React.ReactNode }) {
 }
 
 /** Running khata. Every row here moved the customer's balance. */
-function Statement({ rows, balance, cashSales }: { rows: LedgerRow[]; balance: number; cashSales: number }) {
+function Statement({ rows, balance }: { rows: LedgerRow[]; balance: number }) {
   if (rows.length === 0) {
     return (
       <Note>
         Is customer ka koi udhaar nahi chala.
-        {cashSales > 0 && <> {cashSales} dafa cash par maal liya hai jiska paisa usi waqt mil gaya tha, is liye khate me nahi aata. "Sales" me dekh lein.</>}
       </Note>
     )
   }
@@ -233,11 +232,6 @@ function Statement({ rows, balance, cashSales }: { rows: LedgerRow[]; balance: n
           </tr>
         )}
       />
-      {cashSales > 0 && (
-        <p className="text-xs" style={{ color: 'var(--muted)' }}>
-          {cashSales} cash wali bikri khate me nahi aayi kyunki uska paisa usi waqt mil gaya tha. "Sales" me saare bill mojood hain.
-        </p>
-      )}
     </div>
   )
 }
