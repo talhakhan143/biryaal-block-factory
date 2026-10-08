@@ -24,7 +24,7 @@ class SupplierController extends Controller
             ->when($request->boolean('has_dues'), fn ($q) => $q->where('balance', '>', 0))
             ->when($request->boolean('active_only'), fn ($q) => $q->where('is_active', true));
 
-        $this->applyTableQuery($query, $request, ['name', 'balance', 'phone', 'is_active'], ['name', 'phone'], 'name');
+        $this->applyTableQuery($query, $request, ['name', 'balance', 'phone', 'is_active', 'created_at'], ['name', 'phone'], 'created_at');
 
         return SupplierResource::collection($query->paginate($request->integer('per_page', 15)));
     }

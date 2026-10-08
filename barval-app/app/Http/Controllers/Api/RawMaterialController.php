@@ -17,7 +17,7 @@ class RawMaterialController extends Controller
         $query = RawMaterial::query()
             ->when($request->boolean('low_only'), fn ($q) => $q->whereColumn('current_qty', '<=', 'low_stock_threshold'));
 
-        $this->applyTableQuery($query, $request, ['name', 'current_qty', 'unit'], ['name'], 'name');
+        $this->applyTableQuery($query, $request, ['name', 'current_qty', 'unit', 'created_at'], ['name'], 'created_at');
 
         $materials = $query->paginate($request->integer('per_page', 50));
 

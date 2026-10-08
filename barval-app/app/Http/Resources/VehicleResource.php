@@ -16,6 +16,7 @@ class VehicleResource extends JsonResource
             'type' => $this->type,
             'default_trip_rate' => (int) $this->default_trip_rate,
             'is_active' => (bool) $this->is_active,
+            'created_at' => $this->created_at,
         ];
     }
 }

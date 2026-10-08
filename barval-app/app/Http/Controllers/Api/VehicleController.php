@@ -20,9 +20,9 @@ class VehicleController extends Controller
         $this->applyTableQuery(
             $query,
             $request,
-            ['name', 'plate', 'type', 'default_trip_rate', 'is_active'],
+            ['name', 'plate', 'type', 'default_trip_rate', 'is_active', 'created_at'],
             ['name', 'plate', 'type'],
-            'name',
+            'created_at',
         );
 
         return VehicleResource::collection($query->paginate($request->integer('per_page', 50)));

@@ -17,6 +17,7 @@ class ResellerSupplierResource extends JsonResource
             'notes' => $this->notes,
             'balance' => (int) $this->balance,
             'is_active' => (bool) $this->is_active,
+            'created_at' => $this->created_at,
         ];
     }
 }

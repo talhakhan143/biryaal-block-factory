@@ -18,7 +18,7 @@ class ResellerItemController extends Controller
         $query = ResellerItem::query()
             ->when($request->boolean('active_only'), fn ($q) => $q->where('is_active', true));
 
-        $this->applyTableQuery($query, $request, ['name', 'sale_price', 'unit', 'stock_qty'], ['name'], 'name');
+        $this->applyTableQuery($query, $request, ['name', 'sale_price', 'unit', 'stock_qty', 'created_at'], ['name'], 'created_at');
 
         return ResellerItemResource::collection($query->paginate($request->integer('per_page', 100)));
     }

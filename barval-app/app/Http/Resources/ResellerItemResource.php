@@ -21,6 +21,7 @@ class ResellerItemResource extends JsonResource
             'stock_value' => (int) round($qty * (int) $this->avg_cost),
             'low_stock_threshold' => (float) $this->low_stock_threshold,
             'is_active' => (bool) $this->is_active,
+            'created_at' => $this->created_at,
         ];
     }
 }

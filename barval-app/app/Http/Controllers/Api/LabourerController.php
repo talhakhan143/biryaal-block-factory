@@ -23,7 +23,7 @@ class LabourerController extends Controller
     public function index(Request $request)
     {
         $query = Labourer::query();
-        $this->applyTableQuery($query, $request, ['name', 'phone', 'daily_wage', 'balance', 'is_active'], ['name', 'phone'], 'name');
+        $this->applyTableQuery($query, $request, ['name', 'phone', 'daily_wage', 'balance', 'is_active', 'created_at'], ['name', 'phone'], 'created_at');
 
         return LabourerResource::collection($query->paginate($request->integer('per_page', 50)));
     }

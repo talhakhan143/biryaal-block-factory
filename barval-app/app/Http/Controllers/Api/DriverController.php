@@ -25,7 +25,7 @@ class DriverController extends Controller
     public function index(Request $request)
     {
         $query = Driver::query();
-        $this->applyTableQuery($query, $request, ['name', 'phone', 'balance', 'vehicle_name'], ['name', 'phone', 'vehicle_name'], 'name');
+        $this->applyTableQuery($query, $request, ['name', 'phone', 'balance', 'vehicle_name', 'created_at'], ['name', 'phone', 'vehicle_name'], 'created_at');
 
         return DriverResource::collection($query->paginate($request->integer('per_page', 50)));
     }
