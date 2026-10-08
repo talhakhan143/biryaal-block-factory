@@ -8,6 +8,7 @@ use App\Http\Resources\ProductResource;
 use App\Models\FinishedGoodsStock;
 use App\Models\Product;
 use App\Support\Money;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
@@ -58,7 +59,7 @@ class ProductController extends Controller
         try {
             $product->stock()->delete();
             $product->delete();
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             return response()->json(['message' => 'Ye product use me hai (sale/production) — delete nahi ho sakta. "Active" off kar dein.'], 422);
         }
 
