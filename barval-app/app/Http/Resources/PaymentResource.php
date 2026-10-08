@@ -26,6 +26,9 @@ class PaymentResource extends JsonResource
             'amount' => (int) $this->amount,
             'method' => $this->method,
             'bank_ref' => $this->bank_ref,
+            // Jo paisa kisi aik bill ke sath juda hai usay yahan se nahi
+            // chheda ja sakta: UI us row par buttons hi nahi dikhata.
+            'can_rollback' => ! $this->allocatable_id,
             'notes' => $this->notes,
             'created_at' => $this->created_at,
         ];

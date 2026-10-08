@@ -145,6 +145,8 @@ Route::prefix('v1')->group(function () {
         Route::get('payments', [PaymentController::class, 'index'])->middleware('permission:payments.view');
         Route::get('payments/payables', [PaymentController::class, 'payables'])->middleware('permission:payments.view');
         Route::get('payments/advances', [PaymentController::class, 'advances'])->middleware('permission:payments.view');
+        Route::patch('payments/{payment}', [PaymentController::class, 'update'])->middleware('permission:payments.manage');
+        Route::delete('payments/{payment}', [PaymentController::class, 'destroy'])->middleware('permission:payments.manage');
         // Customer money IN, receipts (allowed for sales staff).
         Route::post('payments/receipt', [PaymentController::class, 'receipt'])->middleware('permission:payments.receive');
         // Advance: paisa pehle, maal baad me.
