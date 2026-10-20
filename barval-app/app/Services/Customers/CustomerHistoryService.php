@@ -156,6 +156,12 @@ class CustomerHistoryService
                     'returned' => (int) $returns->sum('refund_amount'),
                     'adjustments' => (int) $adjustments->sum(fn (Adjustment $a) => $a->mode === 'customer_charge' ? (int) $a->amount : -(int) $a->amount),
                     'dispatch_count' => $dispatches->count(),
+                    // Jo bill bik chuka hai magar uska maal abhi gaya nahi. Yehi
+                    // wo cheez hai jo bande ko sab se pehle yaad rehni chahiye.
+                    'pending_bills' => $sales->filter(fn (Sale $s) => $s->dispatches->isEmpty())->count(),
+                    'pending_blocks' => (int) $sales
+                        ->filter(fn (Sale $s) => $s->dispatches->isEmpty())
+                        ->sum(fn (Sale $s) => (int) $s->items->sum('quantity')),
                     // Lena wahi hai jo musbat ho. Minus wala hissa advance hai,
                     // wo upar alag se jata hai, warna "lena hai" minus me dikhta.
                     'outstanding' => max($stored, 0),
@@ -181,7 +187,13 @@ class CustomerHistoryService
     /** @return Collection<int,Sale> */
     private function sales(Customer $customer): Collection
     {
-        return Sale::with('items.product:id,name,unit')
+        // Delivery bhi sath: bande ko ye dikhna chahiye ke kaunse bill ka maal
+        // ja chuka hai aur kaunse ka abhi khada hai.
+        return Sale::with([
+            'items.product:id,name,unit',
+            'dispatches:id,sale_id,reference,dispatch_date,status,driver_id',
+            'dispatches.driver:id,name',
+        ])
             ->where('customer_id', $customer->id)
             ->orderByDesc('sale_date')->orderByDesc('created_at')
             ->get();
@@ -223,7 +235,15 @@ class CustomerHistoryService
     /** @return Collection<int,Dispatch> */
     private function dispatches(Customer $customer): Collection
     {
-        return Dispatch::with(['items.product:id,name', 'driver:id,name', 'vehicle:id,name,plate'])
+        // trip bhi sath: challan par kiraya kitna bana aur kitna baqi hai, wo
+        // bande ko usi jagah nazar aana chahiye jahan delivery dikh rahi hai.
+        return Dispatch::with([
+            'items.product:id,name',
+            'driver:id,name,phone,vehicle_name,vehicle_plate',
+            'vehicle:id,name,plate',
+            'sale:id,invoice_no',
+            'trip:id,reference,dispatch_id,rate,paid,balance,status',
+        ])
             // Apna customer_id ho to wahi chalta hai. Jo row bina customer ke
             // bani ho (dono services usay allow karti hain) sirf wo invoice ke
             // zariye yahan aati hai, warna doosre customer ki row ghus jayegi.

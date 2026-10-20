@@ -46,4 +46,10 @@ class TransportTrip extends Model implements AuditableContract
     {
         return $this->belongsTo(MaterialPurchase::class);
     }
+
+    /** Maal bhejne wali trip jis delivery ke sath judi hai. */
+    public function dispatch(): BelongsTo
+    {
+        return $this->belongsTo(Dispatch::class);
+    }
 }

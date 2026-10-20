@@ -27,6 +27,16 @@ class SaleResource extends JsonResource
             'bank_ref' => $this->bank_ref,
             'notes' => $this->notes,
             'items' => SaleItemResource::collection($this->whenLoaded('items')),
+            // Maal gaya ya abhi khada hai, aur kis ke hath gaya. Sales ki list
+            // par yehi sab se pehle poocha jata hai.
+            'delivery' => $this->whenLoaded('dispatches', fn () => $this->dispatches->map(fn ($d) => [
+                'id' => $d->id,
+                'reference' => $d->reference,
+                'dispatch_date' => $d->dispatch_date?->toDateString(),
+                'status' => $d->status,
+                'driver_id' => $d->driver_id,
+                'driver_name' => $d->driver?->name,
+            ])->values()),
             'created_at' => $this->created_at,
         ];
     }

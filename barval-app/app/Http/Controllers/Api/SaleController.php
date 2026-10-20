@@ -22,7 +22,7 @@ class SaleController extends Controller
     public function index(Request $request)
     {
         $query = Sale::query()
-            ->with('customer')
+            ->with(['customer', 'dispatches:id,sale_id,reference,dispatch_date,status,driver_id', 'dispatches.driver:id,name'])
             ->when($request->customer_id, fn ($q, $id) => $q->where('customer_id', $id))
             ->when($request->type, fn ($q, $t) => $q->where('type', $t))
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))

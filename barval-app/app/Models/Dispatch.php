@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
@@ -38,5 +39,17 @@ class Dispatch extends Model implements AuditableContract
     public function items(): HasMany
     {
         return $this->hasMany(DispatchItem::class);
+    }
+
+    /** Jis bill ki ye delivery hai. */
+    public function sale(): BelongsTo
+    {
+        return $this->belongsTo(Sale::class);
+    }
+
+    /** Is delivery ka kiraya. Challan ke sath yehi driver ko dena banta hai. */
+    public function trip(): HasOne
+    {
+        return $this->hasOne(TransportTrip::class);
     }
 }
