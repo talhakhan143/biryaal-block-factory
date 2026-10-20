@@ -6,7 +6,7 @@ import { api, apiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
 import {
-  Badge, Button, Card, Field, IconButton, Input, MethodField, Modal, MoneyInput, Note,
+  Badge, Button, Card, EntityLink, Field, IconButton, Input, MethodField, Modal, MoneyInput, Note,
   OutstandingNote, PagedTable, Spinner, StatTile, Tabs,
 } from '../components/ui'
 import { PaymentReceipt, PurchaseBill, type PaymentDoc, type PurchaseDoc } from '../components/receipts'
@@ -27,7 +27,17 @@ interface Purchase extends PurchaseDoc {
   raw_material?: { name: string; unit?: string } | null
   unit_cost: number; loading_cost: number; unloading_cost: number
   supplier_bill: number; payment_status: string
-  freight_driver?: { driver_name?: string; rate: number; balance: number } | null
+  /** Maal laane wala driver. `driver_id` se us ka apna khata khulta hai. */
+  freight_driver?: {
+    trip_reference?: string
+    driver_id?: string | null
+    driver_name?: string
+    vehicle?: string | null
+    rate: number
+    paid?: number
+    balance: number
+    status?: string
+  } | null
 }
 interface PaymentRow extends PaymentDoc { id: string; method: string; bank_ref?: string }
 interface AdjRow { id: string; reference: string; mode: string; adjustment_date: string; amount: number; reason: string }
@@ -207,10 +217,10 @@ function Purchases({ rows, onPrint }: { rows: Purchase[]; onPrint: (p: Purchase)
   if (rows.length === 0) return <Empty>Is supplier se abhi kuch nahi khareeda.</Empty>
   return (
     <PagedTable
-      head={['Ref', 'Date', 'Maal', { label: 'Kitna', align: 'right' }, { label: 'Bill', align: 'right' }, { label: 'Diya', align: 'right' }, 'Laaya', 'Haal', { label: 'Parchi', align: 'right' }]}
+      head={['Ref', 'Date', 'Maal', { label: 'Kitna', align: 'right' }, { label: 'Bill', align: 'right' }, { label: 'Diya', align: 'right' }, 'Laane wala', 'Haal', { label: 'Parchi', align: 'right' }]}
       rows={rows}
-      searchText={(p) => `${p.reference} ${p.purchase_date} ${p.raw_material?.name ?? ''} ${p.freight_driver?.driver_name ?? ''} ${p.payment_status}`}
-      searchPlaceholder="Ref, date ya maal se dhoondein…"
+      searchText={(p) => `${p.reference} ${p.purchase_date} ${p.raw_material?.name ?? ''} ${p.freight_driver?.driver_name ?? ''} ${p.freight_driver?.trip_reference ?? ''} ${p.freight_driver?.vehicle ?? ''} ${p.payment_status}`}
+      searchPlaceholder="Ref, date, maal ya driver se dhoondein…"
       row={(p) => (
         <tr key={p.id} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{p.reference}</td>
@@ -219,8 +229,25 @@ function Purchases({ rows, onPrint }: { rows: Purchase[]; onPrint: (p: Purchase)
           <td className="px-4 py-2 text-right">{p.quantity} {p.raw_material?.unit ?? ''}</td>
           <td className="px-4 py-2 text-right">{formatPaisa(p.supplier_bill)}</td>
           <td className="px-4 py-2 text-right" style={{ color: 'var(--green)' }}>{formatPaisa(p.paid_amount)}</td>
-          <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>
-            {p.freight_driver ? `${p.freight_driver.driver_name} (${formatPaisa(p.freight_driver.rate)})` : '·'}
+          <td className="px-4 py-2">
+            {p.freight_driver ? (
+              <>
+                {p.freight_driver.driver_id
+                  ? <EntityLink
+                      to={`/drivers/${p.freight_driver.driver_id}`}
+                      title={`${p.freight_driver.trip_reference ? `Trip ${p.freight_driver.trip_reference}` : 'Maal laane wala'}${p.freight_driver.vehicle ? `, ${p.freight_driver.vehicle}` : ''}. Driver ka khata kholein`}
+                    >
+                      {p.freight_driver.driver_name ?? 'Driver'}
+                    </EntityLink>
+                  : <span>{p.freight_driver.driver_name ?? 'Driver'}</span>}
+                <div className="text-xs" style={{ color: 'var(--muted)' }}>
+                  Kiraya {formatPaisa(p.freight_driver.rate)}
+                  {p.freight_driver.balance > 0 && (
+                    <span style={{ color: 'var(--amber)' }}>, baqi {formatPaisa(p.freight_driver.balance)}</span>
+                  )}
+                </div>
+              </>
+            ) : <span style={{ color: 'var(--muted)' }}>·</span>}
           </td>
           <td className="px-4 py-2"><Badge color={statusColor[p.payment_status]}>{p.payment_status}</Badge></td>
           <td className="px-4 py-2 text-right">

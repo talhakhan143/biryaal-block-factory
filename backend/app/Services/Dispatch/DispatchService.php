@@ -3,6 +3,7 @@
 namespace App\Services\Dispatch;
 
 use App\Models\Dispatch;
+use App\Models\Sale;
 use App\Models\Driver;
 use App\Services\Transport\TransportService;
 use App\Support\Sequence;
@@ -24,9 +25,18 @@ class DispatchService
     public function create(array $data): Dispatch
     {
         return DB::transaction(function () use ($data) {
+            // Bill se banne wale challan par customer ka naam nahi likha jata
+            // tha, sirf bill ka hawala rehta tha. Us se challan kisi bande se
+            // juda hi nahi rehta aur uski page tak raasta nahi banta. Bill ko
+            // pata hai customer kaun hai, to wahin se le lete hain.
+            $customerId = $data['customer_id'] ?? null;
+            if (! $customerId && ! empty($data['sale_id'])) {
+                $customerId = Sale::whereKey($data['sale_id'])->value('customer_id');
+            }
+
             $dispatch = Dispatch::create([
                 'reference' => Sequence::next('DSP'),
-                'customer_id' => $data['customer_id'] ?? null,
+                'customer_id' => $customerId,
                 'sale_id' => $data['sale_id'] ?? null,
                 'vehicle_id' => $data['vehicle_id'] ?? null,
                 'driver_id' => $data['driver_id'] ?? null,

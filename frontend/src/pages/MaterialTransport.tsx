@@ -7,8 +7,8 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import {
-  Badge, Button, Card, type Column, DataTable, Field, IconButton, Input, MethodField,
-  Modal, MoneyInput, Note, OutstandingNote, PageHeader, RowActions, Select, StatTile,
+  Badge, Button, Card, type Column, DataTable, EntityLink, Field, IconButton, Input,
+  MethodField, Modal, MoneyInput, Note, OutstandingNote, PageHeader, RowActions, Select, StatTile,
 } from '../components/ui'
 import { MONEY_KEYS } from '../lib/queryKeys'
 import { KirayaVoucher, PaymentReceipt, type PaymentDoc } from '../components/receipts'
@@ -20,6 +20,17 @@ interface Driver {
   vehicle_name?: string
   vehicle_plate?: string
   balance: number
+}
+/**
+ * Ye trip kis ke kaam ki thi. Yahan sab maal laane wali trips hain, to side
+ * 'supplier' hi aata hai, magar shape dono taraf ke liye aik hi hai.
+ */
+interface TripFor {
+  side: 'customer' | 'supplier'
+  name?: string | null
+  customer_id?: string | null
+  supplier_id?: string | null
+  reference?: string | null
 }
 interface Trip {
   id: string
@@ -33,6 +44,7 @@ interface Trip {
   balance: number
   status: string
   notes?: string
+  for?: TripFor | null
 }
 
 const statusColor: Record<string, string> = { paid: 'green', partial: 'amber', unpaid: 'red' }
@@ -93,7 +105,8 @@ export default function MaterialTransport() {
   const columns: Column<Trip>[] = [
     { key: 'reference', label: 'Ref', render: (t) => <span className="font-mono text-xs">{t.reference}</span> },
     { key: 'trip_date', label: 'Date', render: (t) => t.trip_date },
-    { key: 'driver', label: 'Driver', render: (t) => t.driver?.name ?? '·' },
+    { key: 'driver', label: 'Driver', render: (t) => (t.driver ? <EntityLink to={`/drivers/${t.driver.id}`}>{t.driver.name}</EntityLink> : '·') },
+    { key: 'for', label: 'Kiska kaam', render: (t) => <ForWhom trip={t} /> },
     { key: 'vehicle', label: 'Gaari', render: (t) => t.vehicle_label ?? '·' },
     { key: 'notes', label: 'Kya laaya', render: (t) => <span style={{ color: 'var(--muted)' }}>{t.notes || '·'}</span> },
     { key: 'rate', label: 'Kiraya', align: 'right', render: (t) => formatPaisa(t.rate) },
@@ -248,6 +261,24 @@ export default function MaterialTransport() {
           />
         </Modal>
       )}
+    </div>
+  )
+}
+
+/**
+ * Maal kis ke paas se aaya: supplier ka naam link hai, neeche us khareed ka
+ * reference. Purchase bill ki apni page nahi hoti, is liye wo sirf likha
+ * jata hai, link nahi banta.
+ */
+function ForWhom({ trip }: { trip: Trip }) {
+  const f = trip.for
+  if (!f) return <span style={{ color: 'var(--muted)' }}>·</span>
+  const id = f.side === 'customer' ? f.customer_id : f.supplier_id
+  const to = !id ? null : f.side === 'customer' ? `/customers/${id}` : `/suppliers/${id}`
+  return (
+    <div className="leading-tight">
+      {f.name && to ? <EntityLink to={to}>{f.name}</EntityLink> : <span>{f.name ?? '·'}</span>}
+      {f.reference && <div className="font-mono text-xs" style={{ color: 'var(--muted)' }}>{f.reference}</div>}
     </div>
   )
 }

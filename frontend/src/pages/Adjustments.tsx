@@ -5,7 +5,7 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, PageHeader, RowActions, Select } from '../components/ui'
+import { Button, type Column, DataTable, EntityLink, Field, IconButton, Input, MethodField, Modal, MoneyInput, PageHeader, RowActions, Select } from '../components/ui'
 import { AdjustmentVoucher, type AdjustmentDoc } from '../components/receipts'
 
 interface Adjustment {
@@ -13,6 +13,9 @@ interface Adjustment {
   reference: string
   mode: string
   party_name?: string
+  /** Kis ke khate ka adjustment hai: Customer ya Supplier (poora class path bhi aa sakta hai). */
+  party_type?: string | null
+  party_id?: string | null
   adjustment_date: string
   amount: number
   reason: string
@@ -28,6 +31,28 @@ const MODES = [
 ]
 
 const modeLabel = (m: string) => MODES.find((x) => x.key === m)?.label ?? m
+
+/**
+ * Party ke naam par click karke us ka poora khata kholne ka raasta.
+ *
+ * Adjustment ki party sirf customer ya supplier hoti hai (cash wale modes me
+ * koi party hi nahi hoti), aur ye baat mode se bhi pata chal jati hai. Link
+ * sirf us waqt banta hai jab party ki id bhi aa jaye: bina id ke click par
+ * kuch nahi khulta, is liye phir sirf naam likha rehta hai.
+ *
+ * Abhi adjustments ki list party_id nahi bhejti (sirf naam), to naam khali
+ * likha aata hai. Jis din API id bhejne lage, link apne aap chal parega.
+ */
+const partyPath = (a: Adjustment) => {
+  if (!a.party_id) return null
+  // Kabhi poora class path aata hai (App\Models\Customer), is liye aakhri hissa.
+  const kind = (a.party_type ?? '').split('\\').pop()
+  const isCustomer = kind === 'Customer' || (!kind && a.mode.startsWith('customer_'))
+  const isSupplier = kind === 'Supplier' || (!kind && a.mode.startsWith('supplier_'))
+  return isCustomer ? `/customers/${a.party_id}`
+    : isSupplier ? `/suppliers/${a.party_id}`
+      : null
+}
 
 /**
  * Parchi ke liye row ko theek karna.
@@ -85,7 +110,14 @@ export default function Adjustments() {
     { key: 'reference', label: 'Ref', sortable: true, render: (a) => <span className="font-mono text-xs">{a.reference}</span> },
     { key: 'adjustment_date', label: 'Date', sortable: true, render: (a) => a.adjustment_date },
     { key: 'mode', label: 'Type', sortable: true, render: (a) => <span className="text-xs">{modeLabel(a.mode)}</span> },
-    { key: 'party_name', label: 'Party', render: (a) => a.party_name ?? '·' },
+    {
+      key: 'party_name', label: 'Party',
+      render: (a) => {
+        const to = partyPath(a)
+        const name = a.party_name || '\u00b7'
+        return to ? <EntityLink to={to} title="Is ka poora khata kholein">{name}</EntityLink> : <span>{name}</span>
+      },
+    },
     { key: 'amount', label: 'Amount', sortable: true, align: 'right', render: (a) => formatPaisa(a.amount) },
     { key: 'reason', label: 'Reason', render: (a) => <span className="text-xs" style={{ color: 'var(--muted)' }}>{a.reason}</span> },
     {

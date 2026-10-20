@@ -6,8 +6,8 @@ import { api, apiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
 import {
-  Badge, Button, Card, Field, IconButton, Input, MethodField, Modal, MoneyInput, Note,
-  OutstandingNote, PagedTable, Spinner, StatTile, Tabs,
+  Badge, Button, Card, EntityLink, Field, IconButton, Input, MethodField, Modal, MoneyInput,
+  Note, OutstandingNote, PagedTable, Spinner, StatTile, Tabs,
 } from '../components/ui'
 import { KirayaVoucher, PaymentReceipt, type PaymentDoc, type TripDoc } from '../components/receipts'
 import { MONEY_KEYS } from '../lib/queryKeys'
@@ -21,11 +21,29 @@ interface LedgerRow {
   credit: number
   running: number
 }
+/**
+ * Ye trip kis ke kaam ki thi.
+ *
+ * Maal bhejne wali trip kisi customer ki delivery se judi hoti hai aur
+ * reference us ka bill ban jata hai; maal laane wali kisi supplier ki khareed
+ * se, aur reference us purchase ka. Jo trip hath se likhi gayi ho us ka kisi
+ * saude se taluq nahi hota, to ye null aata hai.
+ */
+interface TripFor {
+  side: 'customer' | 'supplier'
+  name?: string | null
+  customer_id?: string | null
+  supplier_id?: string | null
+  reference?: string | null
+}
 interface Trip {
   id: string; reference: string; kind: string; trip_date: string
   vehicle_label?: string; notes?: string
   from_location?: string; to_location?: string
   rate: number; paid: number; balance: number; status: string
+  // Dono taraf ka naam aur id sath aate hain taake yahan se seedha us bande
+  // ki page khul jaye.
+  for?: TripFor | null
 }
 interface PaymentRow {
   id: string; reference: string; payment_date: string; amount: number
@@ -167,7 +185,7 @@ export default function DriverDetail() {
 
       <Tabs tabs={tabs} active={tab} onChange={setTab} />
 
-      {tab === 'statement' && <Statement rows={data.ledger} balance={s.balance} onPrint={printLedger} canPrint={canPrintLedger} />}
+      {tab === 'statement' && <Statement rows={data.ledger} balance={s.balance} onPrint={printLedger} canPrint={canPrintLedger} tripOf={ledgerTrip} />}
       {tab === 'in' && <Trips rows={inbound} label="Maal laane ka kiraya (purchases)" empty="Is driver ne abhi koi maal laaya nahi." onPrint={printTrip} />}
       {tab === 'out' && <Trips rows={outbound} label="Maal bhejne ka kiraya (block sell)" empty="Is driver ne abhi koi maal bheja nahi." onPrint={printTrip} />}
       {tab === 'payments' && <Payments rows={data.payments} onPrint={printPayment} />}
@@ -196,11 +214,39 @@ function Back({ onClick }: { onClick: () => void }) {
   )
 }
 
+/**
+ * Trip ka maalik: maal bheja to customer, maal laaya to supplier. Naam par
+ * click karke us bande ki apni page khulti hai. Bill aur challan ki apni page
+ * nahi hoti, is liye wo sirf reference ban kar neeche likha rehta hai.
+ */
+function TripParty({ trip }: { trip?: Trip }) {
+  const f = trip?.for
+  if (!f) return <span style={{ color: 'var(--muted)' }}>·</span>
+  const id = f.side === 'customer' ? f.customer_id : f.supplier_id
+  const to = !id ? null : f.side === 'customer' ? `/customers/${id}` : `/suppliers/${id}`
+  return (
+    <div className="leading-tight">
+      {f.name && to ? <EntityLink to={to}>{f.name}</EntityLink> : <span>{f.name ?? '·'}</span>}
+      {f.reference && <div className="font-mono text-xs" style={{ color: 'var(--muted)' }}>{f.reference}</div>}
+    </div>
+  )
+}
+
+/** Wahi naam search box ke liye, taake customer ya supplier likh kar bhi mil jaye. */
+function partyText(trip?: Trip) {
+  return [trip?.for?.name, trip?.for?.reference].filter(Boolean).join(' ')
+}
+
 function Empty({ children }: { children: React.ReactNode }) {
   return <Card><p className="text-sm" style={{ color: 'var(--muted)' }}>{children}</p></Card>
 }
 
-function Statement({ rows, balance, onPrint, canPrint }: { rows: LedgerRow[]; balance: number; onPrint: (r: LedgerRow) => void; canPrint: (r: LedgerRow) => boolean }) {
+function Statement({ rows, balance, onPrint, canPrint, tripOf }: {
+  rows: LedgerRow[]; balance: number
+  onPrint: (r: LedgerRow) => void
+  canPrint: (r: LedgerRow) => boolean
+  tripOf: (r: LedgerRow) => Trip | undefined
+}) {
   if (rows.length === 0) {
     return (
       <Note>
@@ -211,13 +257,13 @@ function Statement({ rows, balance, onPrint, canPrint }: { rows: LedgerRow[]; ba
   return (
     <>
     <PagedTable
-      head={['Date', 'Kya hua', 'Ref', { label: 'Kiraya bana', align: 'right' }, { label: 'Paisa diya', align: 'right' }, { label: 'Baqi raha', align: 'right' }, { label: 'Parchi', align: 'right' }]}
+      head={['Date', 'Kya hua', 'Ref', 'Kiska kaam', { label: 'Kiraya bana', align: 'right' }, { label: 'Paisa diya', align: 'right' }, { label: 'Baqi raha', align: 'right' }, { label: 'Parchi', align: 'right' }]}
       rows={rows}
-      searchText={(r) => `${r.date} ${r.reference} ${r.type === 'trip' ? 'Trip ka kiraya' : 'Paisa diya'}`}
+      searchText={(r) => `${r.date} ${r.reference} ${r.type === 'trip' ? 'Trip ka kiraya' : 'Paisa diya'} ${partyText(tripOf(r))}`}
       searchPlaceholder="Date ya ref se dhoondein…"
       footer={(
         <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
-          <td className="px-4 py-2.5 font-bold" colSpan={5}>{balance < 0 ? 'Advance diya hua' : 'Ab kitna dena hai'}</td>
+          <td className="px-4 py-2.5 font-bold" colSpan={6}>{balance < 0 ? 'Advance diya hua' : 'Ab kitna dena hai'}</td>
           <td className="px-4 py-2.5 text-right font-bold" style={{ color: balance > 0 ? 'var(--amber)' : 'var(--green)' }}>{formatPaisa(Math.abs(balance))}</td>
           <td />
         </tr>
@@ -227,6 +273,7 @@ function Statement({ rows, balance, onPrint, canPrint }: { rows: LedgerRow[]; ba
           <td className="whitespace-nowrap px-4 py-2">{r.date}</td>
           <td className="px-4 py-2"><Badge color={r.type === 'trip' ? 'blue' : 'green'}>{r.type === 'trip' ? 'Trip ka kiraya' : 'Paisa diya'}</Badge></td>
           <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{r.reference}</td>
+          <td className="px-4 py-2"><TripParty trip={tripOf(r)} /></td>
           <td className="px-4 py-2 text-right">{r.credit ? formatPaisa(r.credit) : '·'}</td>
           <td className="px-4 py-2 text-right" style={{ color: r.debit ? 'var(--green)' : undefined }}>{r.debit ? formatPaisa(r.debit) : '·'}</td>
           <td className="px-4 py-2 text-right font-semibold">{formatPaisa(r.running)}</td>
@@ -247,13 +294,13 @@ function Trips({ rows, label, empty, onPrint }: { rows: Trip[]; label: string; e
   const due = rows.reduce((a, t) => a + t.balance, 0)
   return (
     <PagedTable
-      head={['Ref', 'Date', 'Gaari', 'Tafseel', { label: 'Kiraya', align: 'right' }, { label: 'Diya', align: 'right' }, { label: 'Baqi', align: 'right' }, 'Haal', { label: 'Parchi', align: 'right' }]}
+      head={['Ref', 'Date', 'Kiska kaam', 'Gaari', 'Tafseel', { label: 'Kiraya', align: 'right' }, { label: 'Diya', align: 'right' }, { label: 'Baqi', align: 'right' }, 'Haal', { label: 'Parchi', align: 'right' }]}
       rows={rows}
-      searchText={(t) => `${t.reference} ${t.trip_date} ${t.vehicle_label ?? ''} ${t.notes ?? ''} ${t.status}`}
-      searchPlaceholder="Ref, date ya gaari se dhoondein…"
+      searchText={(t) => `${t.reference} ${t.trip_date} ${t.vehicle_label ?? ''} ${t.notes ?? ''} ${t.status} ${partyText(t)}`}
+      searchPlaceholder="Ref, date, gaari ya naam se dhoondein…"
       footer={(
         <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--surface-2)' }}>
-          <td className="px-4 py-2.5 font-bold" colSpan={4}>{label}</td>
+          <td className="px-4 py-2.5 font-bold" colSpan={5}>{label}</td>
           <td className="px-4 py-2.5 text-right font-bold">{formatPaisa(kiraya)}</td>
           <td className="px-4 py-2.5 text-right font-bold" style={{ color: 'var(--green)' }}>{formatPaisa(paid)}</td>
           <td className="px-4 py-2.5 text-right font-bold" style={{ color: due > 0 ? 'var(--amber)' : undefined }}>{formatPaisa(due)}</td>
@@ -265,6 +312,7 @@ function Trips({ rows, label, empty, onPrint }: { rows: Trip[]; label: string; e
         <tr key={t.id} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{t.reference}</td>
           <td className="whitespace-nowrap px-4 py-2">{t.trip_date}</td>
+          <td className="px-4 py-2"><TripParty trip={t} /></td>
           <td className="px-4 py-2">{t.vehicle_label ?? '·'}</td>
           <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>{t.notes || '·'}</td>
           <td className="px-4 py-2 text-right">{formatPaisa(t.rate)}</td>

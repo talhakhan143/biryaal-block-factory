@@ -6,12 +6,18 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { ArrowRight, Coins, HandCoins, Printer, SquarePen, Undo2, Wallet } from 'lucide-react'
-import { AdvanceForm, Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Select, Spinner, Table, useConfirm } from '../components/ui'
+import { AdvanceForm, Badge, Button, type Column, DataTable, EntityLink, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Select, Spinner, Table, useConfirm } from '../components/ui'
 import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
 import PaymentEditForm from '../components/PaymentEditForm'
 
 interface Payment extends PaymentDoc {
   id: string
+  /**
+   * Kis ke sath len den hua. API class ka chhota naam bhejti hai:
+   * Customer, Supplier, Driver, Labourer ya Staff.
+   */
+  party_type?: string | null
+  party_id?: string | null
   /** Jo paisa kisi aik bill se juda ho usay yahan se nahi chheda ja sakta. */
   can_rollback?: boolean
 }
@@ -36,6 +42,39 @@ const payUrl = (row: Payable) =>
     : '/payments/supplier'
 
 const typeLabel: Record<PayableType, string> = { supplier: 'Supplier', driver: 'Driver', labourer: 'Mazdoor', salary: 'Staff' }
+
+/**
+ * Party ke naam par click karke us ka poora khata kholne ka raasta.
+ *
+ * Payment ki party paanch tarah ki hoti hai (Customer, Supplier, Driver,
+ * Labourer, Staff) magar app me apni page sirf pehle teen ki hai. Jis ki page
+ * nahi, us ka naam khali likha rehta hai: link banate to click par kuch bhi
+ * na khulta. Raasta aik jagah se nikalta hai taake har row par if-else na
+ * likhna pare.
+ */
+const partyPath = (type?: string | null, id?: string | null) => {
+  if (!id || !type) return null
+  // Kabhi poora class path bhi aa sakta hai (App\Models\Customer), is liye
+  // aakhri hissa utha lete hain.
+  const kind = type.split('\\').pop()
+  return kind === 'Customer' ? `/customers/${id}`
+    : kind === 'Supplier' ? `/suppliers/${id}`
+      : kind === 'Driver' ? `/drivers/${id}`
+        : null
+}
+
+/** Payable/advance wali row ki apni page. Mazdoor aur salary ki page nahi hai. */
+const partyRowPath = (row: { type: PayableType; id: string }) =>
+  row.type === 'supplier' ? `/suppliers/${row.id}`
+    : row.type === 'driver' ? `/drivers/${row.id}`
+      : null
+
+/** Naam, aur agar us bande ki apni page mojood ho to us par jane wala link. */
+function PartyName({ to, name }: { to: string | null; name?: string | null }) {
+  const label = name || '\u00b7'
+  if (!to) return <span className="font-medium">{label}</span>
+  return <EntityLink to={to} title="Is ka poora khata kholein">{label}</EntityLink>
+}
 
 export default function Payments() {
   const navigate = useNavigate()
@@ -67,7 +106,18 @@ export default function Payments() {
     { key: 'reference', label: 'Ref', sortable: true, render: (p) => <span className="font-mono text-xs">{p.reference}</span> },
     { key: 'payment_date', label: 'Date', sortable: true, render: (p) => p.payment_date },
     { key: 'direction', label: 'Direction', sortable: true, render: (p) => <Badge color={p.direction === 'receipt' ? 'green' : 'red'}>{p.direction === 'receipt' ? 'IN' : 'OUT'}</Badge> },
-    { key: 'party', label: 'Party', render: (p) => p.party_name },
+    { key: 'party', label: 'Party', render: (p) => <PartyName to={partyPath(p.party_type, p.party_id)} name={p.party_name} /> },
+    {
+      // Bande ko pata hona chahiye ke ye rasid kis bill ki hai. Bill ki apni
+      // koi page nahi hai, is liye sirf us ka number likha jata hai.
+      key: 'against', label: 'Kis bill ka',
+      render: (p) => {
+        const ref = p.against?.reference
+        return ref
+          ? <span className="font-mono text-xs">{ref}</span>
+          : <span className="text-xs" style={{ color: 'var(--muted)' }}>Khate me</span>
+      },
+    },
     { key: 'amount', label: 'Amount', sortable: true, align: 'right', render: (p) => formatPaisa(p.amount) },
     { key: 'method', label: 'Method', sortable: true, render: (p) => <Badge color={p.method === 'bank' ? 'blue' : 'slate'}>{p.method}</Badge> },
     { key: 'bank_ref', label: 'Bank / ref', render: (p) => <span className="text-xs" style={{ color: 'var(--muted)' }}>{p.bank_ref ?? '·'}</span> },
@@ -175,7 +225,7 @@ export default function Payments() {
         <Table head={['Customer', 'Baqi (dene hain)', '']}>
           {recv.data?.data.map((c) => (
             <tr key={c.id}>
-              <td className="px-4 py-3 font-medium">{c.name}</td>
+              <td className="px-4 py-3"><PartyName to={`/customers/${c.id}`} name={c.name} /></td>
               <td className="px-4 py-3"><Badge color="amber">{formatPaisa(c.balance)}</Badge></td>
               <td className="px-4 py-3">
                 {can('payments.receive') && (
@@ -199,7 +249,7 @@ export default function Payments() {
             <Table head={['Kis ko', 'Type', 'Baqi (dene hain)', '']}>
               {payRows.map((p) => (
                 <tr key={`${p.type}-${p.id}`}>
-                  <td className="px-4 py-3 font-medium">{p.name}</td>
+                  <td className="px-4 py-3"><PartyName to={partyRowPath(p)} name={p.name} /></td>
                   <td className="px-4 py-3"><Badge color="slate">{typeLabel[p.type]}</Badge></td>
                   <td className="px-4 py-3"><Badge color="red">{formatPaisa(p.balance)}</Badge></td>
                   <td className="px-4 py-3">
@@ -226,7 +276,7 @@ export default function Payments() {
         <Table head={['Kis se', 'Phone', 'Advance jama', '']}>
           {heldRows.map((h) => (
             <tr key={h.id}>
-              <td className="px-4 py-3 font-medium">{h.name}</td>
+              <td className="px-4 py-3"><PartyName to={`/customers/${h.id}`} name={h.name} /></td>
               <td className="px-4 py-3" style={{ color: 'var(--muted)' }}>{h.phone || '\u00b7'}</td>
               <td className="px-4 py-3"><Badge color="green">{formatPaisa(h.advance)}</Badge></td>
               <td className="px-4 py-3">
@@ -250,7 +300,7 @@ export default function Payments() {
           <Table head={['Kis ko', 'Type', 'Advance jama', '']}>
             {advRows.map((a) => (
               <tr key={`${a.type}-${a.id}`}>
-                <td className="px-4 py-3 font-medium">{a.name}</td>
+                <td className="px-4 py-3"><PartyName to={partyRowPath(a)} name={a.name} /></td>
                 <td className="px-4 py-3"><Badge color="slate">{typeLabel[a.type]}</Badge></td>
                 <td className="px-4 py-3"><Badge color="blue">{formatPaisa(a.advance)}</Badge></td>
                 <td className="px-4 py-3">

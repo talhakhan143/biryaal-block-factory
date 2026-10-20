@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, ArrowDown, ArrowUp, ChevronsUpDown, Eye, EyeOff, Search, X, type LucideIcon } from 'lucide-react'
 
 export function Button({
@@ -719,5 +720,31 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         </div>
       )}
     </ConfirmContext.Provider>
+  )
+}
+
+/**
+ * Kisi doosre bande ya sauday tak jane wala link.
+ *
+ * Usool: app me jahan bhi kisi customer, supplier, driver, bill ya challan ka
+ * naam likha ho, wo khali likha hua nahi hona chahiye, us par click karke us
+ * cheez ki apni page khulni chahiye. Har jagah aik hi shakal rakhne ke liye
+ * link yahin se banta hai.
+ *
+ * Table ki row khud bhi click par khulti hai, is liye click yahan rok diya
+ * jata hai warna do jagah ek sath chal parti hain.
+ */
+export function EntityLink({ to, children, title }: { to: string; children: ReactNode; title?: string }) {
+  const navigate = useNavigate()
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={(e) => { e.stopPropagation(); navigate(to) }}
+      className="text-left font-medium underline-offset-2 transition hover:underline"
+      style={{ color: 'var(--primary)' }}
+    >
+      {children}
+    </button>
   )
 }

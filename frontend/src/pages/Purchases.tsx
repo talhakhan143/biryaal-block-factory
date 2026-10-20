@@ -5,12 +5,14 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { Printer, Wallet } from 'lucide-react'
-import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select } from '../components/ui'
+import { Badge, Button, type Column, DataTable, EntityLink, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Select } from '../components/ui'
 import { PaymentReceipt, PurchaseBill, type PaymentDoc, type PurchaseDoc } from '../components/receipts'
 import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface FreightDriver {
   trip_reference: string
+  /** Driver ka khata kholne ke liye. Purani rows me na bhi ho to page chalta rahe. */
+  driver_id?: string | null
   driver_name?: string
   vehicle?: string | null
   rate: number
@@ -21,6 +23,8 @@ interface FreightDriver {
 /** List se jo row aati hai wo poora bill chhapne ke liye kaafi hai. */
 interface Purchase extends PurchaseDoc {
   id: string
+  /** Supplier ka khata kholne ke liye, naam par click karne par. */
+  supplier_id?: string | null
   /** Supplier ko kitna dena. Kiraya driver ko gaya ho to wo is me nahi. */
   supplier_bill: number
   payment_status: string
@@ -52,7 +56,14 @@ export default function Purchases() {
   const columns: Column<Purchase>[] = [
     { key: 'reference', label: 'Ref', sortable: true, render: (p) => <span className="font-mono text-xs">{p.reference}</span> },
     { key: 'purchase_date', label: 'Date', sortable: true, render: (p) => p.purchase_date },
-    { key: 'supplier', label: 'Supplier', render: (p) => p.supplier?.name ?? '·' },
+    {
+      key: 'supplier', label: 'Supplier',
+      render: (p) => {
+        if (!p.supplier?.name) return <span style={{ color: 'var(--muted)' }}>·</span>
+        if (!p.supplier_id) return p.supplier.name
+        return <EntityLink to={`/suppliers/${p.supplier_id}`} title="Is supplier ka poora khata kholein">{p.supplier.name}</EntityLink>
+      },
+    },
     { key: 'material', label: 'Material', render: (p) => p.raw_material?.name ?? '·' },
     { key: 'quantity', label: 'Qty', sortable: true, align: 'right', render: (p) => p.quantity },
     { key: 'total_cost', label: 'Maal ki lagat', sortable: true, align: 'right', render: (p) => formatPaisa(p.total_cost) },
@@ -60,7 +71,14 @@ export default function Purchases() {
       key: 'freight', label: 'Laane wala driver',
       render: (p) => (p.freight_driver
         ? <span className="text-xs">
-            {p.freight_driver.driver_name}
+            {p.freight_driver.driver_id
+              ? <EntityLink
+                  to={`/drivers/${p.freight_driver.driver_id}`}
+                  title={`Trip ${p.freight_driver.trip_reference}${p.freight_driver.vehicle ? `, ${p.freight_driver.vehicle}` : ''}. Driver ka khata kholein`}
+                >
+                  {p.freight_driver.driver_name}
+                </EntityLink>
+              : p.freight_driver.driver_name}
             <span style={{ color: 'var(--muted)' }}> · kiraya {formatPaisa(p.freight_driver.rate)}</span>
             {p.freight_driver.balance > 0 && <Badge color="amber">baqi {formatPaisa(p.freight_driver.balance)}</Badge>}
           </span>

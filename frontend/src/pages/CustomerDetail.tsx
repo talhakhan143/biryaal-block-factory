@@ -6,7 +6,7 @@ import { api, apiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
 import {
-  Badge, Button, Card, Field, IconButton, Input, MethodField, Modal, MoneyInput, Note,
+  Badge, Button, Card, EntityLink, Field, IconButton, Input, MethodField, Modal, MoneyInput, Note,
   OutstandingNote, PagedTable, RowActions, Spinner, StatTile, Tabs, useConfirm,
 } from '../components/ui'
 import SaleInvoiceModal from '../components/SaleInvoiceModal'
@@ -25,10 +25,19 @@ interface LedgerRow {
   running: number
 }
 interface SaleItem { product_name?: string; quantity: number; unit_price: number; line_total: number }
+/**
+ * Is bill ka maal kab aur kis ke hath gaya. Khali array ka matlab: maal abhi
+ * gaya hi nahi. Shakal SaleResource ke `delivery` se aati hai.
+ */
+interface SaleDelivery {
+  id: string; reference: string; dispatch_date?: string | null; status?: string
+  driver_id?: string | null; driver_name?: string | null
+}
 interface Sale {
   id: string; invoice_no: string; sale_date: string; type: string; status: string
   subtotal: number; discount: number; transport_fare: number; total: number; paid: number; balance: number
   payment_method?: string; items?: SaleItem[]
+  delivery?: SaleDelivery[]
 }
 interface Receipt {
   id: string; reference: string; payment_date: string; amount: number; method: string; bank_ref?: string
@@ -44,7 +53,13 @@ interface Return {
 interface Adjustment { id: string; reference: string; mode: string; adjustment_date: string; amount: number; reason: string; notes?: string | null }
 interface Dispatch {
   id: string; reference: string; dispatch_date: string; status: string
-  driver?: { name: string } | null; vehicle?: { name?: string; plate?: string } | null
+  sale_id?: string | null
+  driver?: { id: string; name: string; phone?: string | null; vehicle_name?: string | null; vehicle_plate?: string | null } | null
+  vehicle?: { id?: string; name?: string | null; plate?: string | null } | null
+  /** Kis bill ki delivery hai. */
+  sale?: { id: string; invoice_no: string } | null
+  /** Is delivery ka kiraya: driver ko kitna banta hai aur kitna baqi hai. */
+  trip?: { id: string; reference: string; rate: number; paid: number; balance: number; status: string } | null
   items?: { product_name?: string; quantity: number }[]
 }
 interface History {
@@ -54,6 +69,8 @@ interface History {
       sales_count: number; sales_total: number; advance: number; blocks: number
       blocks_on_credit: number; credit_sales_count: number; credit_total: number
       received: number; returned: number; adjustments: number; dispatch_count: number
+      /** Jo bill ban chuke hain magar un ka maal abhi gaya hi nahi. */
+      pending_bills: number; pending_blocks: number
       outstanding: number; balance: number
     }
     first_activity?: string
@@ -143,7 +160,7 @@ export default function CustomerDetail() {
         )}
       </div>
 
-      <div className="bf-stagger mb-5 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="bf-stagger mb-5 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-7">
         <StatTile label="Kitna lena hai" value={formatPaisa(s.factory.outstanding)} hint="Abhi tak ka baqi paisa" tone={s.factory.outstanding > 0 ? 'red' : 'green'} />
         <StatTile
           label="Advance jama"
@@ -156,6 +173,16 @@ export default function CustomerDetail() {
           value={`${s.factory.blocks_on_credit.toLocaleString('en-PK')} pcs`}
           hint={`${s.factory.credit_sales_count} udhaar bill, ${formatPaisa(s.factory.credit_total)}`}
           tone={s.factory.blocks_on_credit > 0 ? 'amber' : 'text'}
+        />
+        {/* Jo bill ban chuka hai magar maal khara hai. Delivery tab me isi ka
+            poora kachcha chittha hai: kis ke hath gaya aur kiraya kitna bana. */}
+        <StatTile
+          label="Delivery baqi"
+          value={`${s.factory.pending_blocks.toLocaleString('en-PK')} pcs`}
+          hint={s.factory.pending_blocks > 0
+            ? `${s.factory.pending_bills} bill ka maal abhi gaya hi nahi`
+            : 'Sab maal ja chuka'}
+          tone={s.factory.pending_blocks > 0 ? 'amber' : 'green'}
         />
         <StatTile label="Ab tak ka kaam" value={formatPaisa(s.factory.sales_total)} hint={`${s.factory.sales_count} bill, ${s.factory.blocks.toLocaleString('en-PK')} pcs`} tone="primary" />
         <StatTile label="Paisa mila" value={formatPaisa(s.factory.received)} hint="Cash aur bank, dono" tone="green" />
@@ -255,10 +282,10 @@ function Sales({ rows }: { rows: Sale[] }) {
   return (
     <>
     <PagedTable
-      head={['Bill no', 'Date', 'Kaise', { label: 'Bill ka total', align: 'right' }, { label: 'Paisa mila', align: 'right' }, { label: 'Baqi', align: 'right' }, 'Haal', '']}
+      head={['Bill no', 'Date', 'Kaise', { label: 'Bill ka total', align: 'right' }, { label: 'Paisa mila', align: 'right' }, { label: 'Baqi', align: 'right' }, 'Delivery', 'Haal', '']}
       rows={rows}
-      searchText={(s) => `${s.invoice_no} ${s.sale_date} ${s.type} ${s.status} ${(s.items ?? []).map((i) => i.product_name ?? '').join(' ')}`}
-      searchPlaceholder="Bill no, date ya maal se dhoondein…"
+      searchText={(s) => `${s.invoice_no} ${s.sale_date} ${s.type} ${s.status} ${(s.items ?? []).map((i) => i.product_name ?? '').join(' ')} ${(s.delivery ?? []).map((d) => `${d.reference} ${d.driver_name ?? ''}`).join(' ')}`}
+      searchPlaceholder="Bill no, date, maal ya driver se dhoondein…"
       row={(s) => (
         <Fragment key={s.id}>
           <tr style={{ borderTop: '1px solid var(--border)' }}>
@@ -268,6 +295,30 @@ function Sales({ rows }: { rows: Sale[] }) {
             <td className="px-4 py-2 text-right">{formatPaisa(s.total)}</td>
             <td className="px-4 py-2 text-right" style={{ color: 'var(--green)' }}>{formatPaisa(s.paid)}</td>
             <td className="px-4 py-2 text-right" style={{ color: s.balance > 0 ? 'var(--amber)' : undefined }}>{s.balance ? formatPaisa(s.balance) : '·'}</td>
+            {/* Maal gaya ya abhi khara hai, aur kis ke hath gaya. Driver ke
+                naam par click se usi driver ka poora hisaab khul jata hai. */}
+            <td className="px-4 py-2">
+              {(s.delivery ?? []).length === 0 ? (
+                <Badge color="amber">Baqi hai</Badge>
+              ) : (
+                <div className="space-y-1">
+                  {(s.delivery ?? []).map((d) => (
+                    <div key={d.id} className="leading-tight">
+                      <div className="font-mono text-xs">{d.reference}</div>
+                      {d.driver_name && (
+                        <div className="text-xs">
+                          {d.driver_id ? (
+                            <EntityLink to={`/drivers/${d.driver_id}`} title="Is driver ka poora hisaab">{d.driver_name}</EntityLink>
+                          ) : (
+                            <span style={{ color: 'var(--muted)' }}>{d.driver_name}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </td>
             <td className="px-4 py-2"><Badge color={s.status === 'paid' ? 'green' : s.status === 'partial' ? 'amber' : 'red'}>{s.status}</Badge></td>
             <td className="px-4 py-2 text-right">
               <RowActions>
@@ -280,7 +331,7 @@ function Sales({ rows }: { rows: Sale[] }) {
           </tr>
           {open === s.id && (
             <tr>
-              <td colSpan={8} className="px-4 py-3" style={{ background: 'var(--surface-2)' }}>
+              <td colSpan={9} className="px-4 py-3" style={{ background: 'var(--surface-2)' }}>
                 <div className="space-y-1 text-xs">
                   {(s.items ?? []).map((it, i) => (
                     <div key={i} className="flex justify-between gap-4">
@@ -480,25 +531,73 @@ function Returns({ returns, adjustments, party }: { returns: Return[]; adjustmen
   )
 }
 
+/** Gaari ka naam: challan par jo lagi thi, warna jo driver ke sath rehti hai. */
+function vehicleLabel(d: Dispatch): string {
+  return [d.vehicle?.name ?? d.driver?.vehicle_name, d.vehicle?.plate ?? d.driver?.vehicle_plate]
+    .filter(Boolean).join(' ')
+}
+
+/**
+ * Delivery tab: har challan, kis ke hath gaya, kis bill ka tha aur us par
+ * kiraya kitna bana. Driver ka naam us ki apni page tak le jata hai, aur bill
+ * ka number usi jagah invoice khol deta hai (bill ki apni koi page nahi hai).
+ */
 function Dispatches({ rows }: { rows: Dispatch[] }) {
+  const [invoiceId, setInvoiceId] = useState<string | null>(null)
   if (rows.length === 0) return <Empty>Abhi koi delivery nahi hui.</Empty>
   return (
+    <>
     <PagedTable
-      head={['Ref', 'Date', 'Driver', 'Gaari', 'Kya gaya', 'Haal']}
+      head={['Ref', 'Date', 'Kis ke hath gaya', 'Bill', 'Kya gaya', { label: 'Kiraya', align: 'right' }, 'Haal']}
       rows={rows}
-      searchText={(d) => `${d.reference} ${d.dispatch_date} ${d.driver?.name ?? ''} ${d.vehicle?.name ?? ''} ${d.vehicle?.plate ?? ''} ${(d.items ?? []).map((i) => i.product_name ?? '').join(' ')} ${d.status}`}
-      searchPlaceholder="Ref, driver ya gaari se dhoondein…"
-      row={(d) => (
+      searchText={(d) => `${d.reference} ${d.dispatch_date} ${d.driver?.name ?? ''} ${vehicleLabel(d)} ${d.sale?.invoice_no ?? ''} ${d.trip?.reference ?? ''} ${(d.items ?? []).map((i) => i.product_name ?? '').join(' ')} ${d.status}`}
+      searchPlaceholder="Ref, driver, gaari ya bill se dhoondein…"
+      row={(d) => {
+        const gaari = vehicleLabel(d)
+        const saleId = d.sale?.id ?? d.sale_id
+        return (
         <tr key={d.id} style={{ borderTop: '1px solid var(--border)' }}>
           <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">{d.reference}</td>
           <td className="whitespace-nowrap px-4 py-2">{d.dispatch_date}</td>
-          <td className="px-4 py-2">{d.driver?.name ?? '·'}</td>
-          <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>{[d.vehicle?.name, d.vehicle?.plate].filter(Boolean).join(' ') || '·'}</td>
+          <td className="px-4 py-2">
+            {d.driver?.id ? (
+              <EntityLink to={`/drivers/${d.driver.id}`} title="Is driver ka poora hisaab">{d.driver.name}</EntityLink>
+            ) : (
+              <span>{d.driver?.name ?? '·'}</span>
+            )}
+            {gaari && <div className="text-xs" style={{ color: 'var(--muted)' }}>{gaari}</div>}
+          </td>
+          <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">
+            {!d.sale?.invoice_no ? '·' : saleId ? (
+              <button
+                type="button"
+                title="Is bill ka invoice dekhein"
+                onClick={(e) => { e.stopPropagation(); setInvoiceId(saleId) }}
+                className="font-mono text-xs font-medium underline-offset-2 transition hover:underline"
+                style={{ color: 'var(--primary)' }}
+              >
+                {d.sale.invoice_no}
+              </button>
+            ) : d.sale.invoice_no}
+          </td>
           <td className="px-4 py-2">{(d.items ?? []).map((i) => `${i.product_name ?? 'Item'} × ${i.quantity}`).join(', ') || '·'}</td>
+          <td className="px-4 py-2 text-right">
+            {d.trip ? (
+              <>
+                <div>{formatPaisa(d.trip.rate)}</div>
+                {d.trip.balance > 0 && (
+                  <div className="mt-0.5"><Badge color="amber">baqi {formatPaisa(d.trip.balance)}</Badge></div>
+                )}
+              </>
+            ) : '·'}
+          </td>
           <td className="px-4 py-2"><Badge color={d.status === 'delivered' ? 'green' : 'amber'}>{d.status}</Badge></td>
         </tr>
-      )}
+        )
+      }}
     />
+    {invoiceId && <SaleInvoiceModal id={invoiceId} onClose={() => setInvoiceId(null)} />}
+    </>
   )
 }
 

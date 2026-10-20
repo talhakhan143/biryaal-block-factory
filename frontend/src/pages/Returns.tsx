@@ -5,13 +5,14 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, PageHeader, RowActions, Select, Spinner } from '../components/ui'
+import { Badge, Button, type Column, DataTable, EntityLink, Field, IconButton, Input, MethodField, Modal, MoneyInput, PageHeader, RowActions, Select, Spinner } from '../components/ui'
 import { ReturnNote, type ReturnDoc } from '../components/receipts'
 
 interface SalesReturn {
   id: string
   reference: string
-  customer?: { name: string }
+  customer?: { id: string; name: string }
+  customer_id?: string | null
   return_date: string
   return_value: number
   deduction: number
@@ -52,7 +53,15 @@ export default function Returns() {
   const columns: Column<SalesReturn>[] = [
     { key: 'reference', label: 'Ref', sortable: true, render: (r) => <span className="font-mono text-xs">{r.reference}</span> },
     { key: 'return_date', label: 'Date', sortable: true, render: (r) => r.return_date },
-    { key: 'customer', label: 'Customer', render: (r) => r.customer?.name ?? 'Walk-in' },
+    {
+      key: 'customer', label: 'Customer', render: (r) => {
+        const cid = r.customer_id ?? r.customer?.id
+        if (!r.customer?.name) return 'Walk-in'
+        return cid
+          ? <EntityLink to={`/customers/${cid}`} title="Is grahak ka poora khata kholein">{r.customer.name}</EntityLink>
+          : r.customer.name
+      },
+    },
     { key: 'return_value', label: 'Return Value', sortable: true, align: 'right', render: (r) => formatPaisa(r.return_value) },
     { key: 'deduction', label: 'Deduction', sortable: true, align: 'right', render: (r) => formatPaisa(r.deduction) },
     { key: 'refund_amount', label: 'Refund', sortable: true, align: 'right', render: (r) => <span className="font-semibold">{formatPaisa(r.refund_amount)}</span> },

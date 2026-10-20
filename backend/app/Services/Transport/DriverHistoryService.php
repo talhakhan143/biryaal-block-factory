@@ -120,7 +120,18 @@ class DriverHistoryService
     /** @return Collection<int,TransportTrip> */
     private function trips(Driver $driver): Collection
     {
-        return TransportTrip::with(['vehicle:id,name,plate', 'materialPurchase:id,reference', 'materialPurchase.rawMaterial:id,name'])
+        // Har trip kisi na kisi ka kaam hoti hai: maal bhejne wali kisi customer
+        // ki, maal laane wali kisi supplier ki. Dono taraf ka naam aur id sath
+        // bhejte hain taake khate se seedha us bande ki page tak jaya ja sake.
+        return TransportTrip::with([
+            'vehicle:id,name,plate',
+            'materialPurchase:id,reference,supplier_id,raw_material_id',
+            'materialPurchase.supplier:id,name',
+            'materialPurchase.rawMaterial:id,name',
+            'dispatch:id,reference,customer_id,sale_id',
+            'dispatch.customer:id,name',
+            'dispatch.sale:id,invoice_no,customer_id', 'dispatch.sale.customer:id,name',
+        ])
             ->where('driver_id', $driver->id)
             ->orderByDesc('trip_date')->orderByDesc('created_at')
             ->get();

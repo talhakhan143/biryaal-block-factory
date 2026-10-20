@@ -5,21 +5,34 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { Eye, HandCoins, Undo2 } from 'lucide-react'
-import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, useConfirm } from '../components/ui'
+import { Badge, Button, type Column, DataTable, EntityLink, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, useConfirm } from '../components/ui'
 import SaleInvoiceModal from '../components/SaleInvoiceModal'
 import { MONEY_KEYS } from '../lib/queryKeys'
 import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
 
+/** Is bill ka maal kis challan par, kis driver ke hath gaya. */
+interface Delivery {
+  id: string
+  reference: string
+  dispatch_date: string | null
+  status: string
+  driver_id: string | null
+  driver_name: string | null
+}
+
 interface Sale {
   id: string
   invoice_no: string
-  customer?: { name: string }
+  customer?: { id: string; name: string }
+  customer_id?: string | null
   sale_date: string
   type: string
   total: number
   paid: number
   balance: number
   status: string
+  /** Khali list ka matlab: bill ban gaya hai par maal abhi gaya hi nahi. */
+  delivery?: Delivery[]
 }
 
 const statusColor: Record<string, string> = { paid: 'green', partial: 'amber', unpaid: 'red' }
@@ -65,12 +78,40 @@ export default function Sales() {
   const columns: Column<Sale>[] = [
     { key: 'invoice_no', label: 'Invoice', sortable: true, render: (s) => <span className="font-mono text-xs">{s.invoice_no}</span> },
     { key: 'sale_date', label: 'Date', sortable: true, render: (s) => s.sale_date },
-    { key: 'customer', label: 'Customer', render: (s) => s.customer?.name ?? 'Walk-in' },
+    {
+      key: 'customer', label: 'Customer', render: (s) => {
+        const cid = s.customer_id ?? s.customer?.id
+        if (!s.customer?.name) return 'Walk-in'
+        return cid
+          ? <EntityLink to={`/customers/${cid}`} title="Is grahak ka poora khata kholein">{s.customer.name}</EntityLink>
+          : s.customer.name
+      },
+    },
     { key: 'type', label: 'Type', sortable: true, render: (s) => <span className="capitalize">{s.type}</span> },
     { key: 'total', label: 'Total', sortable: true, align: 'right', render: (s) => formatPaisa(s.total) },
     { key: 'paid', label: 'Paid', sortable: true, align: 'right', render: (s) => formatPaisa(s.paid) },
     { key: 'balance', label: 'Balance', sortable: true, align: 'right', render: (s) => formatPaisa(s.balance) },
     { key: 'status', label: 'Status', sortable: true, render: (s) => <Badge color={statusColor[s.status]}>{s.status}</Badge> },
+    {
+      key: 'delivery', label: 'Delivery', render: (s) => {
+        const trips = s.delivery ?? []
+        if (trips.length === 0) return <Badge color="amber">Baqi hai</Badge>
+        return (
+          <div className="space-y-1">
+            {trips.map((d) => (
+              <div key={d.id}>
+                <div className="font-mono text-xs" title={`${d.dispatch_date ?? ''} ${d.status}`.trim()}>{d.reference}</div>
+                <div className="text-xs">
+                  {d.driver_id && d.driver_name
+                    ? <EntityLink to={`/drivers/${d.driver_id}`} title="Kis ke hath gaya, us driver ka khata">{d.driver_name}</EntityLink>
+                    : <span style={{ color: 'var(--muted)' }}>{d.driver_name ?? '·'}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      },
+    },
     {
       key: 'actions', label: '', align: 'right', render: (s) => (
         <RowActions>

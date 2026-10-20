@@ -6,9 +6,24 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions } from '../components/ui'
+import {
+  Badge, Button, type Column, DataTable, EntityLink, Field, IconButton, Input, MethodField,
+  Modal, MoneyInput, OutstandingNote, PageHeader, RowActions,
+} from '../components/ui'
 import { KirayaVoucher, PaymentReceipt, type PaymentDoc, type TripDoc } from '../components/receipts'
 
+/**
+ * Ye trip kis ke kaam ki thi. Maal bhejne wali kisi customer ki delivery, maal
+ * laane wali kisi supplier ki khareed. Backend dono taraf ka naam, id aur us
+ * saude ka reference sath bhejta hai.
+ */
+interface TripFor {
+  side: 'customer' | 'supplier'
+  name?: string | null
+  customer_id?: string | null
+  supplier_id?: string | null
+  reference?: string | null
+}
 interface Trip {
   id: string
   reference: string
@@ -23,6 +38,7 @@ interface Trip {
   paid: number
   balance: number
   status: string
+  for?: TripFor | null
 }
 
 const statusColor: Record<string, string> = { paid: 'green', partial: 'amber', unpaid: 'red' }
@@ -60,7 +76,8 @@ export default function Transport() {
     { key: 'reference', label: 'Ref', sortable: true, render: (t) => <span className="font-mono text-xs">{t.reference}</span> },
     { key: 'trip_date', label: 'Date', sortable: true, render: (t) => t.trip_date },
     { key: 'vehicle', label: 'Vehicle', render: (t) => t.vehicle_label ?? '·' },
-    { key: 'driver', label: 'Driver', render: (t) => t.driver?.name ?? '·' },
+    { key: 'driver', label: 'Driver', render: (t) => (t.driver ? <EntityLink to={`/drivers/${t.driver.id}`}>{t.driver.name}</EntityLink> : '·') },
+    { key: 'for', label: 'Kiska kaam', render: (t) => <ForWhom trip={t} /> },
     { key: 'kind', label: 'Simt', render: (t) => <Badge color={t.kind === 'in' ? 'amber' : 'blue'}>{t.kind === 'in' ? 'Maal laaya' : 'Maal bheja'}</Badge> },
     { key: 'rate', label: 'Rate', sortable: true, align: 'right', render: (t) => formatPaisa(t.rate) },
     { key: 'paid', label: 'Paid', sortable: true, align: 'right', render: (t) => formatPaisa(t.paid) },
@@ -114,6 +131,24 @@ export default function Transport() {
       )}
       {receipt && <PaymentReceipt payment={receipt} onClose={() => setReceipt(null)} />}
       {voucher && <KirayaVoucher trip={voucher} onClose={() => setVoucher(null)} />}
+    </div>
+  )
+}
+
+/**
+ * Trip ka maalik: naam par click karke us customer ya supplier ki page khulti
+ * hai. Bill aur challan ki apni koi page nahi hoti, is liye wo sirf reference
+ * ban kar neeche likha rehta hai.
+ */
+function ForWhom({ trip }: { trip: Trip }) {
+  const f = trip.for
+  if (!f) return <span style={{ color: 'var(--muted)' }}>·</span>
+  const id = f.side === 'customer' ? f.customer_id : f.supplier_id
+  const to = !id ? null : f.side === 'customer' ? `/customers/${id}` : `/suppliers/${id}`
+  return (
+    <div className="leading-tight">
+      {f.name && to ? <EntityLink to={to}>{f.name}</EntityLink> : <span>{f.name ?? '·'}</span>}
+      {f.reference && <div className="font-mono text-xs" style={{ color: 'var(--muted)' }}>{f.reference}</div>}
     </div>
   )
 }

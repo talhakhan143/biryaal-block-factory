@@ -21,7 +21,7 @@ class TransportController extends Controller
     public function index(Request $request)
     {
         $query = TransportTrip::query()
-            ->with(['vehicle', 'driver'])
+            ->with(['vehicle', 'driver', 'dispatch:id,reference,customer_id,sale_id', 'dispatch.customer:id,name', 'dispatch.sale:id,invoice_no,customer_id', 'dispatch.sale.customer:id,name', 'materialPurchase:id,reference,supplier_id', 'materialPurchase.supplier:id,name'])
             ->when($request->driver_id, fn ($q, $id) => $q->where('driver_id', $id))
             ->when($request->kind, fn ($q, $k) => $q->where('kind', $k))
             ->when($request->status, fn ($q, $s) => $q->where('status', $s));

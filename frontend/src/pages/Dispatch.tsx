@@ -5,15 +5,17 @@ import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
 import { FileText } from 'lucide-react'
-import { Badge, Button, Card, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, PageHeader, RowActions, Select, Spinner, PagedTable } from '../components/ui'
+import { Badge, Button, Card, type Column, DataTable, EntityLink, Field, IconButton, Input, MethodField, Modal, MoneyInput, PageHeader, RowActions, Select, Spinner, PagedTable } from '../components/ui'
 import InvoiceSheet from '../components/InvoiceSheet'
 
 interface Dispatch {
   id: string
   reference: string
-  customer?: { name: string }
-  vehicle?: { name: string }
-  driver?: { name: string }
+  customer?: { id: string; name: string }
+  customer_id?: string | null
+  sale_id?: string | null
+  vehicle?: { id: string; name: string; plate?: string | null }
+  driver?: { id: string; name: string }
   dispatch_date: string
   status: string
 }
@@ -99,7 +101,11 @@ export default function DispatchPage() {
                 <tr key={o.sale_id}>
                   <td className="px-4 py-3 font-mono text-xs">{o.invoice_no}</td>
                   <td className="px-4 py-3">{o.sale_date}</td>
-                  <td className="px-4 py-3">{o.customer_name}</td>
+                  <td className="px-4 py-3">
+                    {o.customer_id
+                      ? <EntityLink to={`/customers/${o.customer_id}`} title="Is grahak ka poora khata kholein">{o.customer_name}</EntityLink>
+                      : o.customer_name}
+                  </td>
                   <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)' }}>
                     {o.items.map((i) => `${i.product_name} ×${i.quantity}`).join(', ')}
                   </td>
@@ -125,9 +131,23 @@ export default function DispatchPage() {
           columns={[
             { key: 'reference', label: 'Challan', sortable: true, render: (d) => <span className="font-mono text-xs">{d.reference}</span> },
             { key: 'dispatch_date', label: 'Date', sortable: true, render: (d) => d.dispatch_date },
-            { key: 'customer', label: 'Customer', render: (d) => d.customer?.name ?? '·' },
+            {
+              key: 'customer', label: 'Customer', render: (d) => {
+                const cid = d.customer_id ?? d.customer?.id
+                if (!d.customer?.name) return '·'
+                return cid
+                  ? <EntityLink to={`/customers/${cid}`} title="Is grahak ka poora khata kholein">{d.customer.name}</EntityLink>
+                  : d.customer.name
+              },
+            },
             { key: 'vehicle', label: 'Vehicle', render: (d) => d.vehicle?.name ?? '·' },
-            { key: 'driver', label: 'Driver', render: (d) => d.driver?.name ?? '·' },
+            {
+              key: 'driver', label: 'Driver', render: (d) => (
+                d.driver?.id
+                  ? <EntityLink to={`/drivers/${d.driver.id}`} title="Kis ke hath gaya, us driver ka khata">{d.driver.name}</EntityLink>
+                  : d.driver?.name ?? '·'
+              ),
+            },
             { key: 'status', label: 'Status', sortable: true, render: (d) => <Badge color={d.status === 'delivered' ? 'green' : 'amber'}>{d.status}</Badge> },
             { key: 'actions', label: '', align: 'right', render: (d) => <RowActions><IconButton icon={FileText} label="Challan" tone="primary" onClick={() => setChallanId(d.id)} /></RowActions> },
           ] as Column<Dispatch>[]}
