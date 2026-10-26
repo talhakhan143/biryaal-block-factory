@@ -1,1 +1,0 @@
-import{N as e}from"./ui-DpwYXzs6.js";import{c as t}from"./index-Be3JqdXp.js";function n(n,r={}){return t({queryKey:[n,r],queryFn:async()=>(await e.get(`/${n}`,{params:r})).data})}export{n as t};

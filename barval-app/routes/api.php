@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\SalaryController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SalesReturnController;
 use App\Http\Controllers\Api\SearchController;
+use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\SystemController;
@@ -52,6 +53,10 @@ Route::prefix('v1')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
         // Self password change, verifies current password; blocked for Sales Users.
         Route::post('change-password', [AuthController::class, 'changePassword']);
+
+        // Apna hi dashboard chhupana/kholna, isliye koi permission nahi. Ginti
+        // controller mein hoti hai, sirf ghalat password wali koshishon ki.
+        Route::patch('settings/dashboard-privacy', [SettingsController::class, 'dashboardPrivacy']);
 
         Route::get('dashboard', [DashboardController::class, 'index'])
             ->middleware('permission:dashboard.view');

@@ -16,13 +16,25 @@ use App\Models\Salary;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Supplier;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        // Owner ki marzi: jo raqam usne Settings se chhupa di, wo yahin se nikal
+        // jati hai. Screen ke paas khara banda devtools kholay to bhi kuch nahi.
+        $chosen = $request->user()?->hiddenDashboardGroups() ?? [];
+
+        // Jis ko accounting dekhne ki ijazat hi nahi, us ke browser tak raqam
+        // pohanchni hi nahi chahiye. UI pehle se chhupa deta tha, magar JSON mein
+        // khuli pari thi, aur counter wali machine isi account par chalti hai.
+        $strip = $request->user()?->can('accounting.view') ? $chosen : User::DASHBOARD_GROUPS;
+
         $today = Carbon::today()->toDateString();
         $monthStart = Carbon::now()->startOfMonth()->toDateString();
         $monthEnd = Carbon::now()->endOfMonth()->toDateString();
@@ -112,7 +124,7 @@ class DashboardController extends Controller
         $cash = $this->accountBalance(Account::CASH);
         $bank = $this->accountBalance(Account::BANK);
 
-        return response()->json([
+        $payload = [
             'today' => [
                 'production_qty' => $todayProduction,
                 'blocks_sold' => $todayBlocksSold,
@@ -153,7 +165,40 @@ class DashboardController extends Controller
             ],
             'low_stock_alerts' => $lowMaterials,
             'low_ready_alerts' => $lowReady,
-        ]);
+        ];
+
+        $payload = $this->applyPrivacy($payload, $strip);
+        // Frontend ko batana zaroori hai kya chhupa hai, warna wo khaali tile dikhata rahega.
+        // Sirf bande ki apni marzi, $strip nahi: jis ke paas accounting.view hi nahi wo
+        // taala khol bhi nahi sakta, use chaar band taale dikhana bend gali hai.
+        $payload['hidden'] = $chosen;
+
+        return response()->json($payload);
+    }
+
+    /** Jo group chhupa hua hai uski raqam response se hi nikal deti hai, UI tak pohanchti bhi nahi. */
+    private function applyPrivacy(array $payload, array $hidden): array
+    {
+        $map = [
+            'sales' => ['today.sales_total', 'today.money_in', 'today.money_out', 'month.sales_total'],
+            // Kharch (expenses) jaan bujh kar is list mein NAHI hai: owner ko wo
+            // hamesha nazar aana chahiye, usne saaf kaha "expenses q hide kr rhe".
+            // Aamdani aur munafa chhupe hue hain, is liye kharch dekh kar bhi
+            // koi aamdani ka andaza nahi laga sakta.
+            'income' => ['month.income', 'month.net_profit', 'totals.income', 'totals.cost', 'totals.net_profit'],
+            'cash' => ['cash_in_hand', 'bank_balance', 'total_cash'],
+            'dues' => [
+                'receivables', 'customer_advances', 'payables', 'payable_breakdown',
+                'advances', 'advance_breakdown',
+            ],
+        ];
+
+        foreach ($hidden as $group) {
+            // Anjaan slug aaye to chup chaap chhor do, dashboard girna nahi chahiye.
+            Arr::forget($payload, $map[$group] ?? []);
+        }
+
+        return $payload;
     }
 
     /**
