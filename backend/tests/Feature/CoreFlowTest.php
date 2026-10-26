@@ -13,9 +13,8 @@ use Database\Seeders\CatalogSeeder;
 use Database\Seeders\ChartOfAccountsSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Sanctum\Sanctum;
-use RuntimeException;
 use InvalidArgumentException;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class CoreFlowTest extends TestCase

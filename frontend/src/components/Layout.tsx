@@ -5,7 +5,7 @@ import {
   Package, Truck, ClipboardList, Car, UserRound, HardHat, Wallet, BookText,
   FileBarChart, Tag, UsersRound, History,
   Undo2, LogOut, Languages, Menu, X, KeyRound, Store, Factory as FactoryIcon,
-  CalendarClock, type LucideIcon,
+  CalendarClock, EyeOff, type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { useWorkspace, type Workspace } from '../lib/workspace'
@@ -89,6 +89,7 @@ const FACTORY_GROUPS: NavGroup[] = [
   {
     en: 'Settings', ur: 'سیٹنگز',
     items: [
+      { to: '/settings', en: 'Privacy (Chhupana)', ur: 'پردہ / چھپانا', permission: 'dashboard.view', icon: EyeOff },
       { to: '/users', en: 'Users', ur: 'یوزرز اور رولز', permission: 'users.manage', icon: UsersRound },
       { to: '/audit-logs', en: 'Audit Logs', ur: 'ریکارڈ تبدیلیاں', permission: 'audit.view', icon: History },
     ],
@@ -135,6 +136,16 @@ const RESELLER_GROUPS: NavGroup[] = [
       { to: '/reseller/customers', en: 'Customers', ur: 'کسٹمر', permission: 'customers.view', icon: Users },
       { to: '/drivers', en: 'Drivers', ur: 'ڈرائیور', permission: 'transport.view', icon: UserRound },
       // Vehicles hata diya, driver add karte waqt gaadi wahin add hoti hai
+    ],
+  },
+  {
+    // Parda har bande ki apni nazar par lagta hai aur dono dashboard par aik
+    // saath, is liye yahan se bhi khulna chahiye. Users aur Audit Logs yahan
+    // nahi: wo factory wale panel ki admin screens hain, reseller panel me sirf
+    // reseller ka kaam rehta hai.
+    en: 'Settings', ur: 'سیٹنگز',
+    items: [
+      { to: '/settings', en: 'Privacy (Chhupana)', ur: 'پردہ / چھپانا', permission: 'dashboard.view', icon: EyeOff },
     ],
   },
 ]

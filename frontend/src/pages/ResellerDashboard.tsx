@@ -5,22 +5,43 @@ import { SquarePen } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
-import { Button, Card, Field, Input, Modal, PageHeader, Spinner } from '../components/ui'
+import { Button, Card, Field, Input, LockedStat, Modal, PageHeader, Spinner } from '../components/ui'
 
 interface LowItem { id: string; name: string; unit: string; sale_price: number; stock_qty: number; low_stock_threshold: number }
+/**
+ * Jo raqam Settings se chhupai ja chuki ho, server use payload me bhejta hi
+ * nahi. Is liye paisa wale sab khane optional hain, aur jo ginti hai (items,
+ * low stock, active kiraya) wo hamesha aati hai.
+ *
+ * Aur jis dabbe ka har khana chhup jaye wo poora dabba hi gayab ho jata hai:
+ * 'today' (teeno khane 'sales' group ke hain), 'sales' (jab sales + income +
+ * dues teeno chhupe hon), aur 'all' (poora 'cash' group me hai). Is liye in
+ * teeno ko ? laga ke parhna hai. 'kiraya' kabhi gayab nahi hota kyunki uska
+ * 'active' kisi group me nahi hai, hamesha aata hai.
+ */
 interface ResellerDash {
-  today: { in: number; out: number; net: number }
-  all: { in: number; out: number; net: number }
-  payable: number
-  receivable: number
-  stock_value: number
+  today?: { in?: number; out?: number; net?: number }
+  all?: { in: number; out: number; net: number }
+  payable?: number
+  receivable?: number
+  stock_value?: number
   low_stock_count: number
   low_items: LowItem[]
   items_count: number
-  purchase_total: number
-  sales: { today: number; revenue: number; profit: number; receivable: number }
-  kiraya: { active: number; earned: number; this_month: number; collected: number; outstanding: number }
-  profit: number
+  purchase_total?: number
+  sales?: { today?: number; revenue?: number; profit?: number; receivable?: number }
+  kiraya: { active: number; earned?: number; this_month?: number; collected?: number; outstanding?: number }
+  profit?: number
+  /** Kaun kaun se group chhupe hue hain, server batata hai. */
+  hidden?: string[]
+}
+
+/** Lock tile ka naam, Settings wale contract se bilkul same rakhna hai. */
+const GROUP_LABEL: Record<string, string> = {
+  income: 'Profit aur loss',
+  sales: 'Total sales aur payments',
+  cash: 'Cash aur bank',
+  dues: 'Lena dena (udhaar aur advance)',
 }
 
 type Tone = 'text' | 'green' | 'red' | 'primary' | 'amber'
@@ -67,6 +88,10 @@ export default function ResellerDashboard() {
 
   if (isLoading || !data) return <Spinner />
 
+  // Permission alag cheez hai, ye parda alag. Banda khud Settings se khole.
+  const hidden = new Set(data.hidden ?? [])
+  const shown = (g: string) => !hidden.has(g)
+
   return (
     <div>
       <PageHeader title="Resellers Point, Dashboard" subtitle="Alag hisab, aaj ka lain den, payable/receivable, stock, kiraya" />
@@ -76,48 +101,77 @@ export default function ResellerDashboard() {
         <>
           <SectionTitle title="Aaj (Today)" note="kitna aya / gaya" />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Stat label="Aaj Aya" hint="Kiraya receipts" value={formatPaisa(data.today.in)} tone="green" to="/reseller/payments" />
-            <Stat label="Aaj Gaya" hint="Supplier payments" value={formatPaisa(data.today.out)} tone="red" to="/reseller/payments" />
-            <Stat label="Aaj Net" hint="Aya − Gaya" value={formatPaisa(data.today.net)} tone={data.today.net >= 0 ? 'green' : 'red'} to="/reseller/payments" />
+            {shown('sales') ? (
+              <>
+                <Stat label="Aaj Aya" hint="Kiraya receipts" value={formatPaisa(data.today?.in ?? 0)} tone="green" to="/reseller/payments" />
+                <Stat label="Aaj Gaya" hint="Supplier payments" value={formatPaisa(data.today?.out ?? 0)} tone="red" to="/reseller/payments" />
+                <Stat label="Aaj Net" hint="Aya − Gaya" value={formatPaisa(data.today?.net ?? 0)} tone={(data.today?.net ?? 0) >= 0 ? 'green' : 'red'} to="/reseller/payments" />
+              </>
+            ) : <LockedStat label={GROUP_LABEL.sales} />}
           </div>
 
           <SectionTitle title="Farokht (Sales)" note="revenue aur munafa" />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label="Aaj Farokht" hint="Aaj ka total sale" value={formatPaisa(data.sales.today)} tone="primary" to="/reseller/pos" />
-            <Stat label="Total Revenue" hint="Ab tak" value={formatPaisa(data.sales.revenue)} tone="text" to="/reseller/sales" />
-            <Stat label="Sale Profit" hint="Revenue − cost (margin)" value={formatPaisa(data.sales.profit)} tone="green" to="/reseller/sales" />
-            <Stat label="Udhaar (sale)" hint="Customers se lena" value={formatPaisa(data.sales.receivable)} tone="amber" to="/reseller/sales" />
+            {shown('sales') ? (
+              <>
+                <Stat label="Aaj Farokht" hint="Aaj ka total sale" value={formatPaisa(data.sales?.today ?? 0)} tone="primary" to="/reseller/pos" />
+                <Stat label="Total Revenue" hint="Ab tak" value={formatPaisa(data.sales?.revenue ?? 0)} tone="text" to="/reseller/sales" />
+              </>
+            ) : <LockedStat label={GROUP_LABEL.sales} />}
+            {shown('income')
+              ? <Stat label="Sale Profit" hint="Revenue − cost (margin)" value={formatPaisa(data.sales?.profit ?? 0)} tone="green" to="/reseller/sales" />
+              : <LockedStat label={GROUP_LABEL.income} />}
+            {shown('dues')
+              ? <Stat label="Udhaar (sale)" hint="Customers se lena" value={formatPaisa(data.sales?.receivable ?? 0)} tone="amber" to="/reseller/sales" />
+              : <LockedStat label={GROUP_LABEL.dues} />}
           </div>
 
           <SectionTitle title="Baqi Jaat (Outstanding)" note="lena / dena" />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Stat label="Receivable" hint="Customers se lena (sale+kiraya)" value={formatPaisa(data.receivable)} tone="amber" to="/reseller/payments" />
-            <Stat label="Payable" hint="Suppliers+drivers ko dena" value={formatPaisa(data.payable)} tone="red" to="/reseller/payments" />
-            <Stat label="Net Cash" hint="Ab tak: aya − gaya" value={formatPaisa(data.all.net)} tone={data.all.net >= 0 ? 'green' : 'red'} to="/reseller/payments" />
+            {shown('dues') ? (
+              <>
+                <Stat label="Receivable" hint="Customers se lena (sale+kiraya)" value={formatPaisa(data.receivable ?? 0)} tone="amber" to="/reseller/payments" />
+                <Stat label="Payable" hint="Suppliers+drivers ko dena" value={formatPaisa(data.payable ?? 0)} tone="red" to="/reseller/payments" />
+              </>
+            ) : <LockedStat label={GROUP_LABEL.dues} />}
+            {shown('cash')
+              ? <Stat label="Net Cash" hint="Ab tak: aya − gaya" value={formatPaisa(data.all?.net ?? 0)} tone={(data.all?.net ?? 0) >= 0 ? 'green' : 'red'} to="/reseller/payments" />
+              : <LockedStat label={GROUP_LABEL.cash} />}
           </div>
 
           <SectionTitle title="Kiraya (Rental)" />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <Stat label="Active" hint="Abhi kiraye par" value={String(data.kiraya.active)} tone="primary" to="/reseller/kiraya" />
-            <Stat label="This Month" hint="Is mahine ki income" value={formatPaisa(data.kiraya.this_month)} tone="green" to="/reseller/kiraya" />
-            <Stat label="Kiraya Income" hint="Total banna (earned)" value={formatPaisa(data.kiraya.earned)} tone="green" to="/reseller/kiraya" />
-            <Stat label="Collected" hint="Wasool ho chuka" value={formatPaisa(data.kiraya.collected)} tone="text" to="/reseller/kiraya" />
-            <Stat label="Outstanding" hint="Kiraya lena baqi" value={formatPaisa(data.kiraya.outstanding)} tone="amber" to="/reseller/kiraya" />
+            {shown('income') ? (
+              <>
+                <Stat label="This Month" hint="Is mahine ki income" value={formatPaisa(data.kiraya.this_month ?? 0)} tone="green" to="/reseller/kiraya" />
+                <Stat label="Kiraya Income" hint="Total banna (earned)" value={formatPaisa(data.kiraya.earned ?? 0)} tone="green" to="/reseller/kiraya" />
+                <Stat label="Collected" hint="Wasool ho chuka" value={formatPaisa(data.kiraya.collected ?? 0)} tone="text" to="/reseller/kiraya" />
+              </>
+            ) : <LockedStat label={GROUP_LABEL.income} />}
+            {shown('dues')
+              ? <Stat label="Outstanding" hint="Kiraya lena baqi" value={formatPaisa(data.kiraya.outstanding ?? 0)} tone="amber" to="/reseller/kiraya" />
+              : <LockedStat label={GROUP_LABEL.dues} />}
           </div>
         </>
       )}
 
       <SectionTitle title="Stock" />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {money && <Stat label="Stock Value" hint="Avg cost par" value={formatPaisa(data.stock_value)} tone="primary" to="/reseller/items" />}
+        {money && (shown('cash')
+          ? <Stat label="Stock Value" hint="Avg cost par" value={formatPaisa(data.stock_value ?? 0)} tone="primary" to="/reseller/items" />
+          : <LockedStat label={GROUP_LABEL.cash} />)}
         <Stat label="Items" hint="Total items" value={String(data.items_count)} tone="text" to="/reseller/items" />
         <Stat label="Low Stock" hint="Kam maal wale items" value={String(data.low_stock_count)} tone={data.low_stock_count > 0 ? 'amber' : 'text'} to="/reseller/items" />
       </div>
 
       {money && (
         <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Stat label="Total Profit" hint="Sale margin + kiraya income" value={formatPaisa(data.profit)} tone="green" to="/reseller/payments" />
-          <Stat label="Total Khareed" hint="Ab tak maal khareeda (stock)" value={formatPaisa(data.purchase_total)} tone="text" to="/reseller/purchases" />
+          {shown('income')
+            ? <Stat label="Total Profit" hint="Sale margin + kiraya income" value={formatPaisa(data.profit ?? 0)} tone="green" to="/reseller/payments" />
+            : <LockedStat label={GROUP_LABEL.income} />}
+          {/* Khareed kharch hai, aur kharch kabhi nahi chhupta */}
+          <Stat label="Total Khareed" hint="Ab tak maal khareeda (stock)" value={formatPaisa(data.purchase_total ?? 0)} tone="text" to="/reseller/purchases" />
         </div>
       )}
 

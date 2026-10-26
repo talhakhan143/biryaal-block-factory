@@ -8,6 +8,8 @@ export interface AuthUser {
   phone?: string
   roles: string[]
   permissions: string[]
+  /** Dashboard par jo raqam is bande ne chhupa rakhi hai. Settings se badalti hai. */
+  dashboard_hidden?: string[]
 }
 
 interface AuthContextValue {
@@ -16,6 +18,8 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   can: (permission: string) => boolean
+  /** Taza user wapas deta hai, taake call karne wala usi par faisla kar sake. */
+  refreshUser: () => Promise<AuthUser | null>
 }
 
 const AuthContext = createContext<AuthContextValue>(null!)
@@ -55,8 +59,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const can = (permission: string) => user?.permissions.includes(permission) ?? false
 
+  // Settings me parda badalne ke baad naya haal yahin se aata hai, poora page reload kiye bina.
+  const refreshUser = async () => {
+    const res = await api.get('/me')
+    const fresh = res.data.data as AuthUser
+    setUser(fresh)
+    return fresh
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, can }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, can, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )

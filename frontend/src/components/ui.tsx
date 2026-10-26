@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
+import { createContext, useCallback, useContext, useState, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowDown, ArrowUp, ChevronsUpDown, Eye, EyeOff, Search, X, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, ChevronsUpDown, Eye, EyeOff, Lock, Search, X, type LucideIcon } from 'lucide-react'
 
 export function Button({
   variant = 'primary',
@@ -137,6 +137,29 @@ export function Select({ className = '', children, ...props }: SelectHTMLAttribu
     <select className={`${inputCls} ${className}`} style={inputStyle} {...props}>
       {children}
     </select>
+  )
+}
+
+/**
+ * On/off switch. Checkbox ki jagah ye lagta hai jahan setting foran samajh aani
+ * chahiye. Asli button hai, is liye keyboard aur screen reader dono chalte hain.
+ */
+export function Switch({ on, label, onToggle }: { on: boolean; label: string; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={onToggle}
+      className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 outline-none focus-visible:ring-2"
+      style={{ background: on ? 'var(--primary)' : 'var(--border)', '--tw-ring-color': 'var(--ring)' } as CSSProperties}
+    >
+      <span
+        className="inline-block h-5 w-5 rounded-full shadow transition-transform duration-200"
+        style={{ background: 'var(--surface)', transform: on ? 'translateX(22px)' : 'translateX(2px)' }}
+      />
+    </button>
   )
 }
 
@@ -566,6 +589,30 @@ export function StatTile({ label, value, hint, tone = 'text' }: { label: string;
       <div className="mt-1 text-xl font-bold tracking-tight" style={{ color }}>{value}</div>
       {hint && <div className="mt-0.5 text-[10px]" style={{ color: 'var(--muted)' }}>{hint}</div>}
     </div>
+  )
+}
+
+/**
+ * Dashboard par chhupayi hui raqam ki jagah ye tile lagti hai.
+ *
+ * khali tile dekh kar banda samajhta hai kuch toot gaya, is liye saaf likha hai
+ * ke chhupayi gayi hai aur kahan se khulegi. Click karne par Settings khul jati hai.
+ */
+export function LockedStat({ label, hint = 'Chhupa hua hai, Settings se khul jayega' }: { label: string; hint?: string }) {
+  const navigate = useNavigate()
+  return (
+    <Card hover onClick={() => navigate('/settings')} className="pl-6">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{label}</div>
+        <span className="text-lg leading-none" style={{ color: 'var(--muted)' }}>›</span>
+      </div>
+      <div className="text-[10px]" style={{ color: 'var(--muted)' }}>{hint}</div>
+      <div className="mt-2 flex items-center gap-2 text-2xl font-bold tracking-tight" style={{ color: 'var(--muted)' }}>
+        <Lock size={18} aria-hidden />
+        <span aria-hidden>••••••</span>
+        <span className="sr-only">Chhupa hua hai</span>
+      </div>
+    </Card>
   )
 }
 

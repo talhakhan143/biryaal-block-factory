@@ -30,8 +30,14 @@ export default function ResellerPOS() {
   const subtotal = useMemo(() => cart.reduce((s, l) => s + l.item.sale_price * l.qty, 0), [cart])
   const goodsNet = Math.max(0, subtotal - Number(discount) * 100)
   const total = goodsNet + Number(transport) * 100
-  // Paid: khali chhoro to poora paisa; kam likho to baqi udhaar (customer zaroori).
-  const paidVal = paid.trim() === '' ? total : Math.min(Math.round(Number(paid) * 100), total)
+  // Khali ya 0, dono ka matlab aik hi hai: poora udhaar (customer zaroori).
+  // Jitna likho utna cash mila, baqi udhaar. Factory POS par bilkul yehi rule hai.
+  // Number('.') NaN deta hai aur MoneyInput akela "." rehne deta hai, is liye guard,
+  // warna paidVal NaN ban kar poora bill kharab kar deta tha.
+  const paidRs = paid.trim() === '' ? 0 : Number(paid)
+  const paidVal = Number.isFinite(paidRs) && paidRs >= 0
+    ? Math.min(Math.round(paidRs * 100), total)
+    : 0
   const balance = Math.max(0, total - paidVal)
   const isCredit = balance > 0
 
@@ -118,9 +124,9 @@ export default function ResellerPOS() {
           </Field>
           <Field label="Discount (Rs)"><MoneyInput value={discount} onChange={setDiscount} /></Field>
           <Field label="Transport / kiraya (Rs)"><MoneyInput value={transport} onChange={setTransport} /></Field>
-          {/* Paid now hamesha, khali = poora paisa; kam likho to baqi udhaar */}
-          <Field label="Paid now (Rs), khali = poora">
-            <MoneyInput value={paid} onChange={setPaid} placeholder={String(total / 100)} />
+          {/* Khali ya 0 = poora udhaar; jitna likho utna cash, baqi udhaar */}
+          <Field label="Paid now (Rs), khali ya 0 = udhaar">
+            <MoneyInput value={paid} onChange={setPaid} placeholder="0 (udhaar)" />
           </Field>
           {paidVal > 0 && (
             <MethodField method={method} bankRef={bankRef} onChange={(m, b) => { setMethod(m); setBankRef(b) }} />

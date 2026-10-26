@@ -39,6 +39,7 @@ const Accounts = lazy(() => import('./pages/Accounts'))
 const Adjustments = lazy(() => import('./pages/Adjustments'))
 const Users = lazy(() => import('./pages/Users'))
 const AuditLogs = lazy(() => import('./pages/AuditLogs'))
+const Settings = lazy(() => import('./pages/Settings'))
 const ResellerDashboard = lazy(() => import('./pages/ResellerDashboard'))
 const ResellerItems = lazy(() => import('./pages/ResellerItems'))
 const ResellerSuppliers = lazy(() => import('./pages/ResellerSuppliers'))
@@ -107,6 +108,7 @@ export default function App() {
           <Route path="/adjustments" element={<Adjustments />} />
           <Route path="/users" element={<Users />} />
           <Route path="/audit-logs" element={<AuditLogs />} />
+          <Route path="/settings" element={<Settings />} />
           {/* Resellers Point */}
           <Route path="/reseller" element={<ResellerDashboard />} />
           <Route path="/reseller/pos" element={<ResellerPOS />} />

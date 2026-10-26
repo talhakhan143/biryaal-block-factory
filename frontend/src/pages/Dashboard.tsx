@@ -5,21 +5,24 @@ import { SquarePen } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { formatPaisa } from '../lib/money'
-import { Button, Card, Field, Input, Modal, PageHeader, Spinner } from '../components/ui'
+import { Button, Card, Field, Input, LockedStat, Modal, PageHeader, Spinner } from '../components/ui'
 
+// Paise wali har key optional hai kyunke API chhupi hui raqam bhejti hi nahi,
+// server pe se nikal deti hai. Isliye yahan sab ko `?` lagana zaroori hai.
 interface DashboardData {
-  today: { production_qty: number; blocks_sold: number; sales_total: number; expenses_total: number; money_in: number; money_out: number }
-  month: { label: string; sales_total: number; income: number; expenses_total: number; net_profit: number }
-  totals: { production: number; sold: number; income: number; cost: number; net_profit: number }
-  cash_in_hand: number
-  bank_balance: number
-  total_cash: number
-  receivables: number
-  customer_advances: number
-  payables: number
-  payable_breakdown: { suppliers: number; drivers: number; labourers: number; staff: number }
-  advances: number
-  advance_breakdown: { suppliers: number; drivers: number; labourers: number; staff: number }
+  today: { production_qty: number; blocks_sold: number; sales_total?: number; expenses_total?: number; money_in?: number; money_out?: number }
+  month: { label: string; sales_total?: number; income?: number; expenses_total?: number; net_profit?: number }
+  totals: { production: number; sold: number; income?: number; cost?: number; net_profit?: number }
+  cash_in_hand?: number
+  bank_balance?: number
+  total_cash?: number
+  receivables?: number
+  customer_advances?: number
+  payables?: number
+  payable_breakdown?: { suppliers: number; drivers: number; labourers: number; staff: number }
+  advances?: number
+  advance_breakdown?: { suppliers: number; drivers: number; labourers: number; staff: number }
+  hidden?: string[]
   due_counts: { customers: number; customers_with_advance: number; suppliers: number; drivers: number; labourers: number }
   pending_dispatch: number
   stock: { curing: number; ready: number; damaged: number }
@@ -59,6 +62,15 @@ function SectionTitle({ title, note }: { title: string; note?: string }) {
   )
 }
 
+// Ek group ke saare tile ke badle ek hi taala lagta hai, warna grid taalon se bhar jata hai
+// aur malik ko samajh nahi aata kahan se kholna hai.
+const GROUP_LABEL: Record<string, string> = {
+  income: 'Profit aur loss',
+  sales: 'Total sales aur payments',
+  cash: 'Cash aur bank',
+  dues: 'Lena dena (udhaar aur advance)',
+}
+
 type LowMat = DashboardData['low_stock_alerts'][number]
 
 export default function Dashboard() {
@@ -78,6 +90,9 @@ export default function Dashboard() {
   if (isLoading || !data) return <Spinner />
 
   const d = data.due_counts
+  // Settings se jo group chhupaya gaya hai wo API khud bata deti hai.
+  const hidden = new Set(data.hidden ?? [])
+  const shown = (g: string) => !hidden.has(g)
   // Kharch wale cards apna scope sath le kar jaate hain, warna list page
   // card ka number kabhi explain nahi kar paata.
   const now = new Date()
@@ -97,22 +112,34 @@ export default function Dashboard() {
         <>
           <SectionTitle title="Paisa" note="cash position" />
           <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Stat label="Total Cash" hint="Bank + haath ka cash (total liquid)" value={formatPaisa(data.total_cash)} tone={data.total_cash < 0 ? 'red' : 'green'} to="/cash-book" />
-            <Stat label="Cash in hand" hint="Cash mojood · click for cash book" value={formatPaisa(data.cash_in_hand)} tone={data.cash_in_hand < 0 ? 'red' : 'green'} to="/cash-book" />
-            <Stat label="Bank balance" hint="Bank me · click for cash book" value={formatPaisa(data.bank_balance)} tone={data.bank_balance < 0 ? 'red' : 'primary'} to="/cash-book" />
-            <Stat label="Receivables" hint={`${d.customers} customers se lene hain · click for list`} value={formatPaisa(data.receivables)} tone="primary" to="/payments" />
-            <Stat label="Payables" hint={`${d.suppliers + d.drivers + d.labourers} ko dene hain · click for list`} value={formatPaisa(data.payables)} tone="red" to="/payments" />
-            {data.customer_advances > 0 && (
-              <Stat
-                label="Customer ka advance"
-                hint={`${d.customers_with_advance} ne paisa pehle diya · click for list`}
-                value={formatPaisa(data.customer_advances)}
-                tone="amber"
-                to="/customers?advance=1"
-              />
+            {shown('cash') ? (
+              <>
+                <Stat label="Total Cash" hint="Bank + haath ka cash (total liquid)" value={formatPaisa(data.total_cash ?? 0)} tone={(data.total_cash ?? 0) < 0 ? 'red' : 'green'} to="/cash-book" />
+                <Stat label="Cash in hand" hint="Cash mojood · click for cash book" value={formatPaisa(data.cash_in_hand ?? 0)} tone={(data.cash_in_hand ?? 0) < 0 ? 'red' : 'green'} to="/cash-book" />
+                <Stat label="Bank balance" hint="Bank me · click for cash book" value={formatPaisa(data.bank_balance ?? 0)} tone={(data.bank_balance ?? 0) < 0 ? 'red' : 'primary'} to="/cash-book" />
+              </>
+            ) : (
+              <LockedStat label={GROUP_LABEL.cash} />
             )}
-            {data.advances > 0 && (
-              <Stat label="Advances diye" hint="Mazdoor/driver ko pehle diya · click for list" value={formatPaisa(data.advances)} tone="primary" to="/payments" />
+            {shown('dues') ? (
+              <>
+                <Stat label="Receivables" hint={`${d.customers} customers se lene hain · click for list`} value={formatPaisa(data.receivables ?? 0)} tone="primary" to="/payments" />
+                <Stat label="Payables" hint={`${d.suppliers + d.drivers + d.labourers} ko dene hain · click for list`} value={formatPaisa(data.payables ?? 0)} tone="red" to="/payments" />
+                {(data.customer_advances ?? 0) > 0 && (
+                  <Stat
+                    label="Customer ka advance"
+                    hint={`${d.customers_with_advance} ne paisa pehle diya · click for list`}
+                    value={formatPaisa(data.customer_advances ?? 0)}
+                    tone="amber"
+                    to="/customers?advance=1"
+                  />
+                )}
+                {(data.advances ?? 0) > 0 && (
+                  <Stat label="Advances diye" hint="Mazdoor/driver ko pehle diya · click for list" value={formatPaisa(data.advances ?? 0)} tone="primary" to="/payments" />
+                )}
+              </>
+            ) : (
+              <LockedStat label={GROUP_LABEL.dues} />
             )}
           </div>
         </>
@@ -121,10 +148,14 @@ export default function Dashboard() {
       {/* Today */}
       <SectionTitle title="Aaj" note="today" />
       <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {money && <Stat label="Today Sales" hint="Aaj ki farokht (Rs)" value={formatPaisa(data.today.sales_total)} tone="green" to="/sales" />}
-        {money && <Stat label="Today Expenses" hint="Aaj ke kharchay · click for details" value={formatPaisa(data.today.expenses_total)} tone="red" to={expensesToday} />}
-        {money && <Stat label="Money In" hint="Aaj paisa aaya" value={formatPaisa(data.today.money_in)} tone="green" to="/payments" />}
-        {money && <Stat label="Money Out" hint="Aaj paisa gaya" value={formatPaisa(data.today.money_out)} tone="red" to="/payments" />}
+        {/* Taala pehle chhupe tile ki jagah pe aata hai, taake neeche wale blocks ke card apni jagah pe hi rahein */}
+        {money && (shown('sales')
+          ? <Stat label="Today Sales" hint="Aaj ki farokht (Rs)" value={formatPaisa(data.today.sales_total ?? 0)} tone="green" to="/sales" />
+          : <LockedStat label={GROUP_LABEL.sales} />)}
+        {/* Kharch kabhi nahi chhupta, owner ko hamesha dikhna chahiye */}
+        {money && <Stat label="Today Expenses" hint="Aaj ke kharchay · click for details" value={formatPaisa(data.today.expenses_total ?? 0)} tone="red" to={expensesToday} />}
+        {money && shown('sales') && <Stat label="Money In" hint="Aaj paisa aaya" value={formatPaisa(data.today.money_in ?? 0)} tone="green" to="/payments" />}
+        {money && shown('sales') && <Stat label="Money Out" hint="Aaj paisa gaya" value={formatPaisa(data.today.money_out ?? 0)} tone="red" to="/payments" />}
         <Stat label="Today Production" hint="Aaj banaye blocks" value={`${data.today.production_qty} pcs`} tone="primary" to="/production" />
         <Stat label="Today Blocks Sold" hint="Aaj bik'e blocks" value={`${data.today.blocks_sold} pcs`} tone="green" to="/sales" />
         <Stat label="Pending Dispatch" hint="Order jo deliver hone baqi" value={`${data.pending_dispatch}`} tone={data.pending_dispatch > 0 ? 'amber' : 'green'} to="/dispatch" />
@@ -134,12 +165,20 @@ export default function Dashboard() {
       {/* Profit & Loss, sirf accounts-access wale */}
       {money && (
         <>
+          {/* Section chhupne par bhi heading rehti hai, warna malik ko pata hi nahi chalega ke yahan kuch tha */}
           <SectionTitle title={`Munafa / Nuksan (${data.month.label})`} note="profit & loss, kharch me expenses + salaries + labour sab" />
           <div className="bf-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Stat label="Is mahine Aamdani" hint="Farokht + other income" value={formatPaisa(data.month.income)} tone="green" to="/reports" />
-            <Stat label="Is mahine Kharch" hint="Expenses + salary + labour · click for breakdown" value={formatPaisa(data.month.expenses_total)} tone="red" to={expensesMonth} />
-            <Stat label="Net Profit (mahina)" hint={data.month.net_profit < 0 ? 'NUKSAN' : 'Munafa is mahine'} value={formatPaisa(data.month.net_profit)} tone={data.month.net_profit < 0 ? 'red' : 'green'} />
-            <Stat label="Net Profit (ab tak)" hint={data.totals.net_profit < 0 ? 'NUKSAN, lifetime' : 'Lifetime munafa'} value={formatPaisa(data.totals.net_profit)} tone={data.totals.net_profit < 0 ? 'red' : 'green'} />
+            {shown('income')
+              ? <Stat label="Is mahine Aamdani" hint="Farokht + other income" value={formatPaisa(data.month.income ?? 0)} tone="green" to="/reports" />
+              : <LockedStat label={GROUP_LABEL.income} />}
+            {/* Kharch is parde se bahar hai, is liye taala lagne par bhi apni jagah rehta hai */}
+            <Stat label="Is mahine Kharch" hint="Expenses + salary + labour · click for breakdown" value={formatPaisa(data.month.expenses_total ?? 0)} tone="red" to={expensesMonth} />
+            {shown('income') && (
+              <>
+                <Stat label="Net Profit (mahina)" hint={(data.month.net_profit ?? 0) < 0 ? 'NUKSAN' : 'Munafa is mahine'} value={formatPaisa(data.month.net_profit ?? 0)} tone={(data.month.net_profit ?? 0) < 0 ? 'red' : 'green'} />
+                <Stat label="Net Profit (ab tak)" hint={(data.totals.net_profit ?? 0) < 0 ? 'NUKSAN, lifetime' : 'Lifetime munafa'} value={formatPaisa(data.totals.net_profit ?? 0)} tone={(data.totals.net_profit ?? 0) < 0 ? 'red' : 'green'} />
+              </>
+            )}
           </div>
         </>
       )}

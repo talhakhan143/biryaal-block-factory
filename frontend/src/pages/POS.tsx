@@ -65,15 +65,14 @@ export default function POS() {
   // Jo advance pehle se jama hai.
   const advanceHeld = selected?.advance ?? 0
 
-  // Paid now khali chhodne ka matlab:
-  //   advance pada hai  -> kuch cash nahi liya, bill advance me se katega
-  //   advance nahi hai  -> poora paisa mauqe par mil gaya (cash sale)
-  // Warna jo likha hai wahi cash hai.
+  // Khali chhorna aur 0 likhna, dono ka matlab aik hi hai: kuch paisa nahi mila,
+  // poora bill udhaar. Jitna likho utna cash mila aur baqi udhaar.
+  // Pehle khali ka matlab "poora paisa mil gaya" tha, aur jaldi me banda khali
+  // chhor deta tha, jis se wo cash kitab me chadh jata tha jo aaya hi nahi tha.
+  // Advance pada ho to backend baqi khud usi me se kaat leta hai.
   const paidEntered = paid.trim() === '' ? null : rsToPaisa(paid)
   const badPaid = paid.trim() !== '' && paidEntered === null
-  const paidVal = paidEntered === null
-    ? (advanceHeld > 0 ? 0 : total)
-    : Math.min(paidEntered, total)
+  const paidVal = paidEntered === null ? 0 : Math.min(paidEntered, total)
   const balance = Math.max(0, total - paidVal)
   const isCredit = balance > 0
   // Backend bhi yehi karta hai: pehle cash, phir advance, phir udhaar.
@@ -246,9 +245,9 @@ export default function POS() {
           <Field label="Transport / kiraya (Rs), customer deta hai">
             <MoneyInput value={transport} onChange={setTransport} />
           </Field>
-          {/* Paid now hamesha, khali = poora paisa; kam likho to baqi udhaar */}
-          <Field label={advanceHeld > 0 ? 'Paid now (Rs), khali = advance se' : 'Paid now (Rs), khali = poora'}>
-            <MoneyInput value={paid} onChange={setPaid} placeholder={advanceHeld > 0 ? '0 (advance se)' : String(total / 100)} />
+          {/* Khali ya 0 = poora udhaar; jitna likho utna cash, baqi udhaar */}
+          <Field label={advanceHeld > 0 ? 'Paid now (Rs), khali = advance se' : 'Paid now (Rs), khali ya 0 = udhaar'}>
+            <MoneyInput value={paid} onChange={setPaid} placeholder={advanceHeld > 0 ? '0 (advance se)' : '0 (udhaar)'} />
           </Field>
 
           {paidVal > 0 && (
