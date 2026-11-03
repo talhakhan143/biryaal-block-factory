@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Printer, Truck, UserPlus, Wallet } from 'lucide-react'
+import { ArrowRight, Printer, SquarePen, Truck, UserPlus, Wallet } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
@@ -12,6 +12,16 @@ import {
 } from '../components/ui'
 import { MONEY_KEYS } from '../lib/queryKeys'
 import { KirayaVoucher, PaymentReceipt, type PaymentDoc } from '../components/receipts'
+import { TripEditModal } from '../components/TripEditForm'
+
+/** Kiraya likhte waqt ye batane ke liye ke maal kis khareed ka tha. */
+interface PurchaseOption {
+  id: string
+  reference: string
+  purchase_date: string
+  supplier?: { name: string } | null
+  raw_material?: { name: string } | null
+}
 
 interface Driver {
   id: string
@@ -66,6 +76,7 @@ export default function MaterialTransport() {
   const [addingTrip, setAddingTrip] = useState(false)
   const [payingDriver, setPayingDriver] = useState(false)
   const [payTrip, setPayTrip] = useState<Trip | null>(null)
+  const [editTrip, setEditTrip] = useState<Trip | null>(null)
   // Kiraya likha ya paisa diya, dono par parchi.
   const [voucher, setVoucher] = useState<Trip | null>(null)
   const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
@@ -97,6 +108,13 @@ export default function MaterialTransport() {
     onSuccess: (res) => { refresh(); drivers.refetch(); setPayingDriver(false); setReceipt(res.data.data) },
   })
 
+  // Galat likha hua kiraya theek karna. Backend purana asar hata kar naya
+  // lagata hai, is liye yahan har paise wali screen refresh karna kaafi hai.
+  const editOne = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.patch(`/transport-trips/${id}`, payload),
+    onSuccess: () => { refresh(); drivers.refetch(); setEditTrip(null) },
+  })
+
   const payOne = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/transport-trips/${id}/pay`, payload),
     onSuccess: (res) => { refresh(); drivers.refetch(); setPayTrip(null); setReceipt(res.data.data) },
@@ -118,11 +136,14 @@ export default function MaterialTransport() {
       render: (t) => (
         <div onClick={(e) => e.stopPropagation()}>
           <RowActions>
-            <IconButton icon={Printer} label="Kiraye ki parchi" tone="primary" onClick={() => setVoucher(t)} />
+            <IconButton icon={Printer} label="Print" tone="primary" onClick={() => setVoucher(t)} />
+            {can('transport.manage') && (
+              <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditTrip(t)} />
+            )}
             {can('payments.manage') && t.balance > 0 && (
               <IconButton icon={Wallet} label="Is trip ka paisa" tone="primary" onClick={() => setPayTrip(t)} />
             )}
-            {t.driver && <IconButton icon={ArrowRight} label="Driver ki poori history" tone="primary" onClick={() => navigate(`/drivers/${t.driver!.id}`)} />}
+            {t.driver && <IconButton icon={ArrowRight} label="History" tone="primary" onClick={() => navigate(`/drivers/${t.driver!.id}`)} />}
           </RowActions>
         </div>
       ),
@@ -250,6 +271,16 @@ export default function MaterialTransport() {
         </Modal>
       )}
 
+      {editTrip && (
+        <TripEditModal
+          trip={editTrip}
+          onClose={() => setEditTrip(null)}
+          onSubmit={(payload) => editOne.mutate({ id: editTrip.id, payload })}
+          busy={editOne.isPending}
+          error={editOne.error ? apiError(editOne.error) : ''}
+        />
+      )}
+
       {payTrip && (
         <Modal title={`Paisa dein: ${payTrip.reference}`} onClose={() => setPayTrip(null)}>
           <PayForm
@@ -304,21 +335,41 @@ function DriverForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, un
 function TripForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
   const [form, setForm] = useState({
     trip_date: new Date().toISOString().slice(0, 10),
-    rate: '', paid: '0', notes: '', method: 'cash', bank_ref: '',
+    rate: '', paid: '0', notes: '', method: 'cash', bank_ref: '', material_purchase_id: '',
   })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
+  // Kiraya ab bhi sirf yahin likha jata hai, purchase par nahi. Ye khana sirf
+  // batata hai ke maal kis khareed ka tha, taake Purchases ki row par "Laane
+  // wala driver" nazar aaye. Paisa dobara kahin nahi ginna jata.
+  const purchases = useList<PurchaseOption>('purchases', { per_page: 50 })
   const rate = Number(form.rate) || 0
   const paid = Number(form.paid) || 0
   const over = paid > rate && rate > 0
   return (
     <form
-      onSubmit={(e) => { e.preventDefault(); if (over) return; onSubmit({ ...form, rate, paid }) }}
+      onSubmit={(e) => {
+        // Khali chhoda ho to key bheji hi nahi jaati, warna '' uuid validation par girti hai.
+        e.preventDefault()
+        if (over) return
+        const { material_purchase_id: pid, ...rest } = form
+        onSubmit({ ...rest, rate, paid, ...(pid ? { material_purchase_id: pid } : {}) })
+      }}
       className="space-y-3"
     >
       <div className="grid grid-cols-2 gap-3">
         <Field label="Date"><Input type="date" value={form.trip_date} onChange={(e) => set('trip_date', e.target.value)} required /></Field>
         <Field label="Kiraya (Rs)"><MoneyInput value={form.rate} onChange={(v) => set('rate', v)} required /></Field>
       </div>
+      <Field label="Kis khareed ka maal hai (marzi se)">
+        <Select value={form.material_purchase_id} onChange={(e) => set('material_purchase_id', e.target.value)}>
+          <option value="">Kisi khareed se nahi joda</option>
+          {purchases.data?.data.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.reference} · {p.supplier?.name ?? 'bina naam'} · {p.raw_material?.name ?? ''} ({p.purchase_date})
+            </option>
+          ))}
+        </Select>
+      </Field>
       <Field label="Kya laaya (marzi se)"><Input value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Raiti 10 trolley, Chenab se" /></Field>
       <Field label="Abhi diya (Rs)"><MoneyInput value={form.paid} onChange={(v) => set('paid', v)} /></Field>
       {paid > 0 && <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />}

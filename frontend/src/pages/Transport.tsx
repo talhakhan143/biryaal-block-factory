@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Printer, Wallet } from 'lucide-react'
+import { ArrowRight, Printer, SquarePen, Wallet } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
@@ -11,6 +11,8 @@ import {
   Modal, MoneyInput, OutstandingNote, PageHeader, RowActions,
 } from '../components/ui'
 import { KirayaVoucher, PaymentReceipt, type PaymentDoc, type TripDoc } from '../components/receipts'
+import { TripEditModal } from '../components/TripEditForm'
+import { MONEY_KEYS } from '../lib/queryKeys'
 
 /**
  * Ye trip kis ke kaam ki thi. Maal bhejne wali kisi customer ki delivery, maal
@@ -52,6 +54,7 @@ export default function Transport() {
   const [sort, setSort] = useState('trip_date')
   const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [payFor, setPayFor] = useState<Trip | null>(null)
+  const [editTrip, setEditTrip] = useState<Trip | null>(null)
   // Paisa dene ki parchi, aur kisi bhi trip ki kiraya parchi.
   const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
   const [voucher, setVoucher] = useState<TripDoc | null>(null)
@@ -63,13 +66,23 @@ export default function Transport() {
     setPage(1)
   }
 
+  // Paisa hila to har paise wali screen purani ho gayi, is liye poori list se
+  // refresh. Maal ke Kiraye wala page bhi yehi karta hai.
+  const refresh = () => MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+
   const pay = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.post(`/transport-trips/${id}/pay`, payload),
     onSuccess: (res) => {
-      ['transport-trips', 'drivers', 'dashboard', 'payables'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+      refresh()
       setPayFor(null)
       setReceipt(res.data.data)
     },
+  })
+
+  // Galat likha hua kiraya theek karna. Row wahi rehti hai, reference wahi.
+  const editMut = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.patch(`/transport-trips/${id}`, payload),
+    onSuccess: () => { refresh(); setEditTrip(null) },
   })
 
   const columns: Column<Trip>[] = [
@@ -87,12 +100,15 @@ export default function Transport() {
       key: 'actions', label: '', align: 'right', render: (t) => (
         <div onClick={(e) => e.stopPropagation()}>
           <RowActions>
-            <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setVoucher(t)} />
+            <IconButton icon={Printer} label="Print" tone="primary" onClick={() => setVoucher(t)} />
+            {can('transport.manage') && (
+              <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditTrip(t)} />
+            )}
             {can('payments.manage') && t.status !== 'paid' && t.driver && (
               <IconButton icon={Wallet} label="Pay" tone="primary" onClick={() => setPayFor(t)} />
             )}
             {t.driver && (
-              <IconButton icon={ArrowRight} label="Driver ki poori history" tone="primary" onClick={() => navigate(`/drivers/${t.driver!.id}`)} />
+              <IconButton icon={ArrowRight} label="History" tone="primary" onClick={() => navigate(`/drivers/${t.driver!.id}`)} />
             )}
           </RowActions>
         </div>
@@ -128,6 +144,15 @@ export default function Transport() {
             error={pay.error ? apiError(pay.error) : ''}
           />
         </Modal>
+      )}
+      {editTrip && (
+        <TripEditModal
+          trip={editTrip}
+          onClose={() => setEditTrip(null)}
+          onSubmit={(payload) => editMut.mutate({ id: editTrip.id, payload })}
+          busy={editMut.isPending}
+          error={editMut.error ? apiError(editMut.error) : ''}
+        />
       )}
       {receipt && <PaymentReceipt payment={receipt} onClose={() => setReceipt(null)} />}
       {voucher && <KirayaVoucher trip={voucher} onClose={() => setVoucher(null)} />}

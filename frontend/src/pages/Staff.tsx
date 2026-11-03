@@ -66,7 +66,7 @@ export default function StaffPage() {
       key: 'actions', label: '', align: 'right', render: (s) => (
         can('hr.manage') || can('hr.delete') ? (
           <RowActions>
-            {can('hr.manage') && <IconButton icon={SquarePen} label="Theek karein" tone="primary" onClick={() => setEditing(s)} />}
+            {can('hr.manage') && <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(s)} />}
             {can('hr.delete') && <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
               if (await confirm({ title: 'Staff delete karein?', message: `"${s.name}" delete ho jayega.`, confirmText: 'Delete' })) delStaff.mutate(s.id)
             }} />}
@@ -96,7 +96,7 @@ export default function StaffPage() {
       key: 'actions', label: '', align: 'right',
       render: (s) => (
         <RowActions>
-          <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setSlip(s)} />
+          <IconButton icon={Printer} label="Print" tone="primary" onClick={() => setSlip(s)} />
           {can('hr.manage') && s.status !== 'paid' && <IconButton icon={Wallet} label="Tankha dein" tone="primary" onClick={() => setPayId(s.id)} />}
         </RowActions>
       ),

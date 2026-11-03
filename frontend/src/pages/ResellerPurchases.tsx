@@ -62,7 +62,7 @@ export default function ResellerPurchases() {
     {
       key: 'actions', label: '', align: 'right', render: (p) => (
         <RowActions>
-          <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setBill(p)} />
+          <IconButton icon={Printer} label="Print" tone="primary" onClick={() => setBill(p)} />
           {manage && p.payment_status !== 'paid' && <IconButton icon={Wallet} label="Pay" tone="primary" onClick={() => setPayFor(p)} />}
         </RowActions>
       ),

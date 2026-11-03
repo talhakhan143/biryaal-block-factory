@@ -51,7 +51,7 @@ export default function Vehicles() {
     {
       key: 'actions', label: '', align: 'right',
       render: (v) => (can('transport.manage')
-        ? <RowActions><IconButton icon={SquarePen} label="Theek karein" tone="primary" onClick={() => setEditing(v)} /></RowActions>
+        ? <RowActions><IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(v)} /></RowActions>
         : null),
     },
   ]

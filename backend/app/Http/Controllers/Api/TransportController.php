@@ -65,6 +65,42 @@ class TransportController extends Controller
         return new TransportTripResource($this->service->recordTrip($data)->load(['vehicle', 'driver']));
     }
 
+    /**
+     * Galat likha hua kiraya theek karna. Reference wahi rehta hai, andar se
+     * purana asar hat kar naya lag jata hai.
+     *
+     * Simt (`kind`) yahan li jati hai magar badalti nahi: service saaf mana
+     * kar deti hai, kyunki simt badalne se clearing ka khana adhoora reh jata
+     * hai. Chup chaap nazarandaz karne se behtar hai ke banda ko bata diya jaye.
+     */
+    public function update(Request $request, TransportTrip $transportTrip)
+    {
+        $data = $request->validate([
+            'driver_id' => ['required', 'uuid', 'exists:drivers,id'],
+            'vehicle_id' => ['nullable', 'uuid', 'exists:vehicles,id'],
+            'vehicle_label' => ['nullable', 'string', 'max:255'],
+            'material_purchase_id' => ['nullable', 'uuid', 'exists:material_purchases,id'],
+            'kind' => ['sometimes', 'in:in,out'],
+            'trip_date' => ['required', 'date'],
+            'rate' => ['required', 'numeric', 'gt:0'],
+            'paid' => ['required', 'numeric', 'min:0', 'lte:rate'],
+            // Tareeqa sirf tab bheja jata hai jab paisa badla ho, warna purana
+            // hi rehta hai aur bank ka likha paisa cash me nahi chala jata.
+            'method' => ['sometimes', 'in:cash,bank'],
+            'bank_ref' => ['nullable', 'string', 'max:255', 'required_if:method,bank'],
+            'notes' => ['nullable', 'string'],
+        ], [
+            'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
+        ]);
+        $data['rate'] = Money::toPaisa($data['rate']);
+        $data['paid'] = Money::toPaisa($data['paid']);
+
+        return new TransportTripResource(
+            $this->service->updateTrip($transportTrip, $data)
+                ->load(['vehicle', 'driver', 'dispatch.customer', 'dispatch.sale.customer', 'materialPurchase.supplier'])
+        );
+    }
+
     /** Pay (part of) a trip's fare to its driver. */
     public function pay(Request $request, TransportTrip $transportTrip)
     {

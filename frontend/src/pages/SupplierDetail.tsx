@@ -251,7 +251,7 @@ function Purchases({ rows, onPrint }: { rows: Purchase[]; onPrint: (p: Purchase)
           </td>
           <td className="px-4 py-2"><Badge color={statusColor[p.payment_status]}>{p.payment_status}</Badge></td>
           <td className="px-4 py-2 text-right">
-            <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => onPrint(p)} />
+            <IconButton icon={Printer} label="Print" tone="primary" onClick={() => onPrint(p)} />
           </td>
         </tr>
       )}
@@ -283,7 +283,7 @@ function Payments({ rows, onPrint }: { rows: PaymentRow[]; onPrint: (r: PaymentR
           <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>{r.bank_ref || '·'}</td>
           <td className="px-4 py-2 text-right font-medium" style={{ color: 'var(--green)' }}>{formatPaisa(r.amount)}</td>
           <td className="px-4 py-2 text-right">
-            <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => onPrint(r)} />
+            <IconButton icon={Printer} label="Print" tone="primary" onClick={() => onPrint(r)} />
           </td>
         </tr>
       )}

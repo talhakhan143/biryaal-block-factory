@@ -72,7 +72,7 @@ export default function ResellerKiraya() {
     {
       key: 'actions', label: '', align: 'right', render: (r) => (
         <RowActions>
-          <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setBills([r])} />
+          <IconButton icon={Printer} label="Print" tone="primary" onClick={() => setBills([r])} />
           {manage && r.status === 'active' && <IconButton icon={Undo2} label="Return" tone="primary" onClick={() => setReturning(r)} />}
           {manage && r.outstanding > 0 && <IconButton icon={HandCoins} label="Collect" tone="green" onClick={() => setCollecting(r)} />}
         </RowActions>

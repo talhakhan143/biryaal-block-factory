@@ -5,10 +5,11 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { ArrowRight, Coins, HandCoins, Printer, SquarePen, Undo2, Wallet } from 'lucide-react'
+import { ArrowRight, Coins, HandCoins, Info, Printer, SquarePen, Undo2, Wallet } from 'lucide-react'
 import { AdvanceForm, Badge, Button, type Column, DataTable, EntityLink, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, Pagination, RowActions, Select, Spinner, Table, useConfirm } from '../components/ui'
 import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
 import PaymentEditForm from '../components/PaymentEditForm'
+import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface Payment extends PaymentDoc {
   id: string
@@ -18,8 +19,10 @@ interface Payment extends PaymentDoc {
    */
   party_type?: string | null
   party_id?: string | null
-  /** Jo paisa kisi aik bill se juda ho usay yahan se nahi chheda ja sakta. */
+  /** Backend batata hai ke is row par Edit aur Rollback chalega ya nahi. */
   can_rollback?: boolean
+  /** Agar na chale to wajah, wahi jo backend ne bheji. */
+  rollback_block?: string | null
 }
 
 interface Party { id: string; name: string; balance: number }
@@ -125,18 +128,21 @@ export default function Payments() {
       key: 'actions', label: '', align: 'right',
       render: (p) => (
         <RowActions>
-          <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setReceipt(p)} />
+          <IconButton icon={Printer} label="Print" tone="primary" onClick={() => setReceipt(p)} />
           {can('payments.manage') && p.can_rollback && (
-            <IconButton icon={SquarePen} label="Rakam ya tareekh theek karein" tone="primary" onClick={() => setEditing(p)} />
+            <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(p)} />
           )}
           {can('payments.manage') && p.can_rollback && (
-            <IconButton icon={Undo2} label="Rollback (ye entry wapas lein)" tone="red" onClick={async () => {
+            <IconButton icon={Undo2} label="Rollback" tone="red" onClick={async () => {
               const ok = await confirm({
                 title: `Rollback: ${p.reference}`,
                 message: (
                   <>
                     Ye entry poori wapas le li jayegi aur sab kuch pehle wali haalat par aa jayega:
-                    cash, bande ka khata aur jo bill is paise se chuke the wo dobara khul jayenge.
+                    cash, bande ka khata, aur{' '}
+                    {p.against?.reference
+                      ? <>bill <span className="font-mono">{p.against.reference}</span> par ye paisa dobara baqi likha jayega.</>
+                      : <>jo bill is paise se chuke the wo dobara khul jayenge.</>}
                   </>
                 ),
                 confirmText: 'Rollback karein',
@@ -144,6 +150,11 @@ export default function Payments() {
               })
               if (ok) rollback.mutate(p.id)
             }} />
+          )}
+          {/* Button ghayab ho to bande ko wajah dikhni chahiye, warna wo samajhta
+              hai app kharab hai. */}
+          {can('payments.manage') && !p.can_rollback && p.rollback_block && (
+            <IconButton icon={Info} label={p.rollback_block} onClick={() => alert(p.rollback_block)} />
           )}
         </RowActions>
       ),
@@ -159,8 +170,10 @@ export default function Payments() {
     queryFn: async () => (await api.get<{ data: Advance[]; received: HeldAdvance[] }>('/payments/advances')).data,
   })
 
+  // Paisa hilane wali har mutation ke baad. MONEY_KEYS aik hi jagah rehti hai,
+  // yahan sirf wo do screenein zyada hain jo sirf isi page se chalti hain.
   const invalidateAll = () => {
-    ['payments', 'payables', 'advances', 'customers', 'suppliers', 'drivers', 'labourers', 'salaries', 'dashboard', 'sales', 'purchases', 'transport-trips'].forEach((k) =>
+    [...MONEY_KEYS, 'labourers', 'salaries'].forEach((k) =>
       qc.invalidateQueries({ queryKey: [k] }))
   }
 
@@ -281,7 +294,7 @@ export default function Payments() {
               <td className="px-4 py-3"><Badge color="green">{formatPaisa(h.advance)}</Badge></td>
               <td className="px-4 py-3">
                 <RowActions>
-                  <IconButton icon={ArrowRight} label="Poori history (yahin se theek bhi hota hai)" tone="primary" onClick={() => navigate(`/customers/${h.id}`)} />
+                  <IconButton icon={ArrowRight} label="History" tone="primary" onClick={() => navigate(`/customers/${h.id}`)} />
                 </RowActions>
               </td>
             </tr>

@@ -91,19 +91,69 @@ class InboundFreightTest extends TestCase
         return TransportTrip::findOrFail($id);
     }
 
-    public function test_a_purchase_never_carries_kiraya(): void
+    public function test_a_purchase_never_carries_kiraya_in_its_own_bill(): void
     {
-        // Purani aadat: kiraya purchase par likh dena. Ab wo field hai hi nahi,
-        // aur bhej bhi do to bill me nahi chadhta.
-        $purchase = $this->buy(['transport_cost' => 8000, 'driver_id' => $this->driver->id]);
+        // Owner ab purchase ke form par hi driver chun sakta hai, magar asli
+        // pabandi wahi hai: kiraya supplier ke bill me kabhi nahi chadhta,
+        // warna wahi aik kiraya do jagah gin liya jata.
+        $purchase = $this->buy([
+            'transport_cost' => 8000,   // seedha bhej do to bhi gir jata hai
+            'driver_id' => $this->driver->id,
+            'freight_rate' => 8000,
+        ]);
 
         $this->assertSame(0, (int) $purchase->transport_cost);
         $this->assertSame(5100000, (int) $purchase->total_cost, 'Sirf maal aur loading.');
         $this->assertSame(5100000, $purchase->supplierBill());
-        $this->assertSame(5100000, (int) $this->supplier->fresh()->balance);
+        $this->assertSame(5100000, (int) $this->supplier->fresh()->balance, 'Supplier ka bill kiraye se nahi badhta.');
 
-        $this->assertSame(0, TransportTrip::count(), 'Purchase se koi trip nahi banti.');
-        $this->assertSame(0, (int) $this->driver->fresh()->balance);
+        // Khareed ki apni entry me kiraya ka naam o nishan nahi.
+        $lines = JournalLine::query()
+            ->with('account')
+            ->whereHas('entry', fn ($q) => $q
+                ->where('source_type', $purchase->getMorphClass())
+                ->where('source_id', $purchase->id))
+            ->get();
+        $this->assertSame(5100000, (int) $lines->sum('debit'), 'Inventory me sirf maal aur loading jata hai.');
+        $this->assertTrue(
+            $lines->every(fn (JournalLine $l) => $l->account?->code !== '5000'),
+            'Khareed ki entry me kiraya ka kharcha nahi hona chahiye.'
+        );
+    }
+
+    public function test_the_driver_picked_on_a_purchase_gets_his_own_kiraya_trip(): void
+    {
+        $purchase = $this->buy(['driver_id' => $this->driver->id, 'freight_rate' => 8000, 'freight_paid' => 3000]);
+
+        // Aik hi trip banti hai, usi khareed se juri hui, isi liye Purchases ki
+        // row par "Laane wala driver" nazar aata hai.
+        $this->assertSame(1, TransportTrip::count());
+        $trip = TransportTrip::firstOrFail();
+        $this->assertSame($purchase->id, $trip->material_purchase_id);
+        $this->assertSame(TransportTrip::INBOUND, $trip->kind);
+        $this->assertSame(800000, (int) $trip->rate);
+        $this->assertSame(300000, (int) $trip->paid);
+
+        // Kiraya aik hi dafa ginna gaya: driver ka baqi aur factory ka kharcha.
+        $this->assertSame(500000, (int) $this->driver->fresh()->balance);
+        $this->assertSame(800000, $this->net('5000'));
+        $this->assertSame(0, $this->net('2100'), 'Clearing ko haath nahi lagta.');
+    }
+
+    public function test_a_driver_without_kiraya_is_refused(): void
+    {
+        // Driver chun liya magar rakam nahi likhi: chup chaap Rs 0 ki trip
+        // banane se behtar hai saaf poochh lena.
+        $this->postJson('/api/v1/purchases', [
+            'supplier_id' => $this->supplier->id,
+            'raw_material_id' => $this->material->id,
+            'purchase_date' => '2026-06-10',
+            'quantity' => 10,
+            'unit_cost' => 5000,
+            'driver_id' => $this->driver->id,
+        ])->assertStatus(422)->assertJsonValidationErrors('freight_rate');
+
+        $this->assertSame(0, TransportTrip::count());
     }
 
     public function test_material_kiraya_sits_on_the_driver_as_a_factory_kharcha(): void

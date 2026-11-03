@@ -4,9 +4,10 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { Eye, HandCoins, Undo2 } from 'lucide-react'
+import { Eye, HandCoins, SquarePen, Undo2 } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, EntityLink, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, useConfirm } from '../components/ui'
 import SaleInvoiceModal from '../components/SaleInvoiceModal'
+import SaleEditForm from '../components/SaleEditForm'
 import { MONEY_KEYS } from '../lib/queryKeys'
 import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
 
@@ -47,6 +48,7 @@ export default function Sales() {
   const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [viewId, setViewId] = useState<string | null>(null)
   const [receiveFor, setReceiveFor] = useState<Sale | null>(null)
+  const [editing, setEditing] = useState<Sale | null>(null)
   // Paisa lene ki apni parchi, bill ki parchi se alag.
   const [receipt, setReceipt] = useState<PaymentDoc | null>(null)
   const { data, isLoading } = useList<Sale>('sales', { search, page, sort, dir })
@@ -63,6 +65,16 @@ export default function Sales() {
       ['sales', 'customers', 'payments', 'payables', 'dashboard'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
       setReceiveFor(null)
       setReceipt(res.data.data)
+    },
+  })
+
+  const edit = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.patch(`/sales/${id}`, payload),
+    onSuccess: () => {
+      // Bill badla to stock, customer ka khata aur dashboard sab hilte hain.
+      MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+      qc.invalidateQueries({ queryKey: ['sales'] })
+      setEditing(null)
     },
   })
 
@@ -119,8 +131,11 @@ export default function Sales() {
             <IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => setReceiveFor(s)} />
           )}
           <IconButton icon={Eye} label="View" tone="primary" onClick={() => setViewId(s.id)} />
+          {can('sales.manage') && (
+            <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => { edit.reset(); setEditing(s) }} />
+          )}
           {can('sales.delete') && (
-            <IconButton icon={Undo2} label="Rollback (ye bill wapas lein)" tone="red" onClick={async () => {
+            <IconButton icon={Undo2} label="Rollback" tone="red" onClick={async () => {
               const ok = await confirm({
                 title: `Rollback: ${s.invoice_no}`,
                 message: (
@@ -164,6 +179,16 @@ export default function Sales() {
       />
       {receipt && <PaymentReceipt payment={receipt} onClose={() => setReceipt(null)} />}
       {viewId && <SaleInvoiceModal id={viewId} onClose={() => setViewId(null)} />}
+      {editing && (
+        <Modal title={`Theek karein: ${editing.invoice_no}`} onClose={() => setEditing(null)} wide>
+          <SaleEditForm
+            saleId={editing.id}
+            onSubmit={(payload) => edit.mutate({ id: editing.id, payload })}
+            busy={edit.isPending}
+            error={edit.error ? apiError(edit.error) : ''}
+          />
+        </Modal>
+      )}
       {receiveFor && (
         <Modal title={`Receive, ${receiveFor.invoice_no}`} onClose={() => setReceiveFor(null)}>
           <ReceiveForm

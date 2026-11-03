@@ -83,9 +83,9 @@ export default function Drivers() {
       key: 'actions', label: '', align: 'right', render: (d) => (
         <div onClick={(e) => e.stopPropagation()}>
         <RowActions>
-          <IconButton icon={BookText} label="Khata (quick)" onClick={() => setLedgerId(d.id)} />
-          {can('transport.manage') && <IconButton icon={SquarePen} label="Naam, phone ya gaari theek karein" tone="primary" onClick={() => setEditing(d)} />}
-          <IconButton icon={ArrowRight} label="Poori history" tone="primary" onClick={() => navigate(`/drivers/${d.id}`)} />
+          <IconButton icon={BookText} label="Khata" onClick={() => setLedgerId(d.id)} />
+          {can('transport.manage') && <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(d)} />}
+          <IconButton icon={ArrowRight} label="History" tone="primary" onClick={() => navigate(`/drivers/${d.id}`)} />
           {can('payments.manage') && <IconButton icon={Wallet} label="Pay driver" tone="primary" onClick={() => setPayId(d.id)} />}
           {can('payments.manage') && <IconButton icon={Coins} label="Advance dein" tone="amber" onClick={() => setAdvanceId(d.id)} />}
           {can('transport.delete') && (

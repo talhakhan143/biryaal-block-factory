@@ -84,9 +84,9 @@ export default function Customers() {
         <div onClick={(e) => e.stopPropagation()}>
           <RowActions>
             {can('payments.receive') && c.balance > 0 && <IconButton icon={HandCoins} label="Receive" tone="green" onClick={() => setReceiveFor(c)} />}
-            <IconButton icon={BookText} label="Khata (quick)" onClick={() => setLedgerId(c.id)} />
-            {can('customers.manage') && <IconButton icon={SquarePen} label="Naam, phone ya address theek karein" tone="primary" onClick={() => setEditing(c)} />}
-            <IconButton icon={ArrowRight} label="Poori history" tone="primary" onClick={() => navigate(`/customers/${c.id}`)} />
+            <IconButton icon={BookText} label="Khata" onClick={() => setLedgerId(c.id)} />
+            {can('customers.manage') && <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(c)} />}
+            <IconButton icon={ArrowRight} label="History" tone="primary" onClick={() => navigate(`/customers/${c.id}`)} />
           </RowActions>
         </div>
       ),

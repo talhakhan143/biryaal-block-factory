@@ -9,6 +9,7 @@ use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\MaterialPurchase;
 use App\Models\Payment;
+use App\Models\Salary;
 use App\Models\Sale;
 use App\Models\Supplier;
 use App\Models\TransportTrip;
@@ -17,6 +18,7 @@ use App\Services\Accounting\LedgerService;
 use App\Services\Sales\InvoiceAllocator;
 use App\Support\Money;
 use App\Support\Sequence;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +27,14 @@ use InvalidArgumentException;
 
 class PaymentService
 {
+    private const NO_PARTY = 'Is payment ka banda hi nahi mila, is liye yahan se kuch badla nahi ja sakta.';
+
+    private const NO_BILL = 'Jis bill ka ye paisa tha wo bill hi nahi mila, is liye yahan se kuch badla nahi ja sakta. Pehle wo bill theek karein.';
+
+    private const UNKNOWN_BILL = 'Is kism ke bill ka paisa yahan se nahi badla ja sakta.';
+
+    private const MISMATCH = 'Is payment ka khata aur bill aik doosre se mail nahi khate, is liye yahan se kuch badla nahi ja sakta. Accountant ko dikhayein.';
+
     public function __construct(private LedgerService $ledger, private InvoiceAllocator $allocator) {}
 
     /**
@@ -529,6 +539,29 @@ class PaymentService
     }
 
     /**
+     * Is row par Edit aur Rollback ke button lagenge ya nahi, aur nahi to kyun.
+     *
+     * Aik hi jagah se jawab aata hai taake UI aur API kabhi alag baat na karein.
+     * Yahan sirf wo jaanch hai jo har row par sasti parti hai: banda mojood hai,
+     * bill mojood hai, aur is kism ka bill hum wapas kholna jante hain. Gehri
+     * jaanch (khata aur bill ka milan) edit ke waqt andar hoti hai, kyunki wo
+     * har row par journal parhwati hai aur list dheemi kar deti hai.
+     */
+    public function reverseBlockReason(Payment $payment): ?string
+    {
+        if (! $payment->allocatable_id) {
+            return $payment->party ? null : self::NO_PARTY;
+        }
+
+        $bill = $payment->allocatable;
+        if (! $bill) {
+            return self::NO_BILL;
+        }
+
+        return $this->knownBill($bill) ? null : self::UNKNOWN_BILL;
+    }
+
+    /**
      * Galat likhi hui payment ko wapas lena (rollback).
      *
      * Usool wahi hai jo baqi jagah hai: andaza mat lagao, khate se parho. Is
@@ -537,56 +570,46 @@ class PaymentService
      * ka hisaab allocator khud dobara bana leta hai, is liye jo bills is paise
      * se chuk gaye the wo wapas khul jate hain.
      *
+     * Jo paisa kisi aik bill ke sath juda hai (sale ki rasid, khareed ki
+     * adaigi, trip ka kiraya, tankhwa) us me aik kaam zyada hai: us bill ka
+     * apna paid/balance/status bhi wahin wapas jana chahiye jahan payment se
+     * pehle tha. Warna khata saaf ho jata hai magar bill par paisa para hua
+     * dikhta rehta hai, aur ye farq kisi ko nazar hi nahi aata.
+     *
      * Payment ka apna record Auditable hai, is liye kis ne kab rollback kiya
      * wo audit log me mehfooz reh jata hai.
      */
     public function reverse(Payment $payment): void
     {
         DB::transaction(function () use ($payment) {
-            if ($payment->allocatable_id) {
-                throw new InvalidArgumentException(
-                    'Ye paisa kisi aik bill ke sath juda hua hai, is liye yahan se wapas nahi hota. Usi bill par ja kar handle karein.'
-                );
+            if ($reason = $this->reverseBlockReason($payment)) {
+                throw new InvalidArgumentException($reason);
             }
 
             $party = $payment->party;
-            if (! $party) {
-                throw new InvalidArgumentException('Is payment ka banda hi nahi mila, rollback nahi ho sakta.');
+            $bill = $payment->allocatable_id ? $payment->allocatable : null;
+            $moved = $this->postedEffect($payment);
+
+            // Bill ka hisaab pehle. Agar yahan paisa likha hua hi nahi to kuch
+            // aur pehle se kharab hai, aur aage barhne se bill minus me chala
+            // jata, is liye wahin ruk jate hain.
+            if ($bill) {
+                $this->assertLedgerMatchesBill($payment, $moved);
+                $this->unwindFromBill($bill, $payment);
             }
 
-            $lines = JournalLine::query()
-                ->with('account')
-                ->whereHas('entry', fn ($q) => $q
-                    ->where('source_type', $payment->getMorphClass())
-                    ->where('source_id', $payment->id))
-                ->get();
-
-            // Customer ka hisaab 1100 par chalta hai, baqi sab ka 2000 par.
-            // Dono soorat me party ka balance utna hi NEECHE gaya tha jitna
-            // control account par hila, is liye wapas utna hi upar chadhega.
-            $isCustomer = $party instanceof Customer;
-            $code = $isCustomer ? Account::RECEIVABLE : Account::PAYABLE;
-            $moved = (int) $lines
-                ->filter(fn (JournalLine $l) => $l->account?->code === $code)
-                ->sum(fn (JournalLine $l) => $isCustomer
-                    ? (int) $l->credit - (int) $l->debit
-                    : (int) $l->debit - (int) $l->credit);
-
-            if ($moved !== 0) {
+            if ($moved !== 0 && $party && $this->partyBalanceMoves($bill)) {
                 $party->increment('balance', $moved);
             }
 
-            JournalEntry::where('source_type', $payment->getMorphClass())
-                ->where('source_id', $payment->id)
-                ->get()
-                ->each(function (JournalEntry $entry) {
-                    $entry->lines()->delete();
-                    $entry->delete();
-                });
+            $this->postedEntries($payment)->each(function (JournalEntry $entry) {
+                $entry->lines()->delete();
+                $entry->delete();
+            });
 
             $payment->delete();
 
-            if ($isCustomer) {
+            if ($party instanceof Customer) {
                 $this->allocator->rebuild($party->refresh());
             }
         });
@@ -597,58 +620,61 @@ class PaymentService
      *
      * Rollback karke dobara likhne ke bajae wahi record badalte hain, taake
      * parchi ka reference wahi rahe jo bande ko pehle de diya gaya tha. Andar
-     * se kaam wahi hota hai: purana asar hata kar naya lagana.
+     * se kaam wahi hota hai: purana asar hata kar naya lagana, aur jahan paisa
+     * kisi bill ka hai wahan bill ka apna hisaab bhi sath hi hilta hai.
      *
      * @param  array{payment_date?:string,amount?:int,method?:string,bank_ref?:string,notes?:string}  $data
      */
     public function update(Payment $payment, array $data): Payment
     {
         return DB::transaction(function () use ($payment, $data) {
-            if ($payment->allocatable_id) {
-                throw new InvalidArgumentException(
-                    'Ye paisa kisi aik bill ke sath juda hua hai, is liye yahan se badla nahi ja sakta. Usi bill par ja kar handle karein.'
-                );
+            if ($reason = $this->reverseBlockReason($payment)) {
+                throw new InvalidArgumentException($reason);
             }
 
             $party = $payment->party;
-            if (! $party) {
-                throw new InvalidArgumentException('Is payment ka banda hi nahi mila, tabdeeli nahi ho sakti.');
-            }
+            $bill = $payment->allocatable_id ? $payment->allocatable : null;
 
             $amount = (int) ($data['amount'] ?? $payment->amount);
             $this->assertPositive($amount);
 
             $date = $data['payment_date'] ?? $payment->payment_date->toDateString();
             $method = $data['method'] ?? $payment->method;
-            $isCustomer = $party instanceof Customer;
+            $isReceipt = $payment->direction === Payment::RECEIPT;
 
-            $lines = JournalLine::query()
-                ->with('account')
-                ->whereHas('entry', fn ($q) => $q
-                    ->where('source_type', $payment->getMorphClass())
-                    ->where('source_id', $payment->id))
-                ->get();
-            $code = $isCustomer ? Account::RECEIVABLE : Account::PAYABLE;
-            $moved = (int) $lines
-                ->filter(fn (JournalLine $l) => $l->account?->code === $code)
-                ->sum(fn (JournalLine $l) => $isCustomer
-                    ? (int) $l->credit - (int) $l->debit
-                    : (int) $l->debit - (int) $l->credit);
+            $moved = $this->postedEffect($payment);
 
-            $entries = JournalEntry::where('source_type', $payment->getMorphClass())
-                ->where('source_id', $payment->id)
-                ->get();
+            $entries = $this->postedEntries($payment);
             $description = $entries->first()?->description ?? "Payment {$payment->reference}";
             $entries->each(function (JournalEntry $entry) {
                 $entry->lines()->delete();
                 $entry->delete();
             });
 
-            // Purana asar hata kar nayi rakam ka asar lagao.
-            if ($moved !== 0) {
+            // Purana asar hatao.
+            if ($bill) {
+                $this->assertLedgerMatchesBill($payment, $moved);
+                $this->unwindFromBill($bill, $payment);
+            }
+            if ($moved !== 0 && $party && $this->partyBalanceMoves($bill)) {
                 $party->increment('balance', $moved);
             }
-            $party->decrement('balance', $amount);
+
+            // Phir nayi rakam ka asar lagao, usi shart ke sath jo payment pehli
+            // dafa likhte waqt lagti hai.
+            if ($bill) {
+                $this->assertFitsBill($bill, $amount);
+                if ($bill instanceof MaterialPurchase && $party) {
+                    // Doosri layer, bilkul payForPurchase wali: bill par jagah
+                    // ho magar supplier ka khata saaf ho to paisa bahar nahi
+                    // jana chahiye.
+                    $this->assertWithinOutstanding($amount, (int) $party->balance);
+                }
+                $this->shiftBill($bill, $amount);
+            }
+            if ($party && $this->partyBalanceMoves($bill)) {
+                $party->decrement('balance', $amount);
+            }
 
             $payment->update([
                 'payment_date' => $date,
@@ -662,24 +688,231 @@ class PaymentService
             $this->ledger->post(
                 $date,
                 $description,
-                $isCustomer
+                $isReceipt
                     ? [
                         ['account' => $cashAccount, 'debit' => $amount],
-                        ['account' => Account::RECEIVABLE, 'credit' => $amount, 'memo' => $party->name],
+                        ['account' => Account::RECEIVABLE, 'credit' => $amount, 'memo' => $party?->name],
                     ]
                     : [
-                        ['account' => Account::PAYABLE, 'debit' => $amount, 'memo' => $party->name],
+                        ['account' => Account::PAYABLE, 'debit' => $amount, 'memo' => $party?->name],
                         ['account' => $cashAccount, 'credit' => $amount],
                     ],
                 $payment,
             );
 
-            if ($isCustomer) {
+            if ($party instanceof Customer) {
                 $this->allocator->rebuild($party->refresh());
             }
 
             return $payment->refresh();
         });
+    }
+
+    /**
+     * Is payment ki journal lines, khate se seedhi.
+     *
+     * @return Collection<int,JournalLine>
+     */
+    private function postedLines(Payment $payment): Collection
+    {
+        return JournalLine::query()
+            ->with('account')
+            ->whereHas('entry', fn ($q) => $q
+                ->where('source_type', $payment->getMorphClass())
+                ->where('source_id', $payment->id))
+            ->get();
+    }
+
+    /**
+     * Is payment ki journal entries.
+     *
+     * @return Collection<int,JournalEntry>
+     */
+    private function postedEntries(Payment $payment): Collection
+    {
+        return JournalEntry::where('source_type', $payment->getMorphClass())
+            ->where('source_id', $payment->id)
+            ->get();
+    }
+
+    /**
+     * Is payment ne party ke control account par jitna paisa hilaya tha.
+     *
+     * Paisa aaya to hisaab 1100 par chalta hai, paisa gaya to 2000 par; har
+     * payment likhne wali jagah isi tarteeb par chalti hai. Dono soorat me
+     * party ka balance utna hi NEECHE gaya tha jitna control account par hila,
+     * is liye yahan se wapas utna hi upar chadhta hai.
+     *
+     * Rakam payment ke apne column se nahi, khate se parhi jati hai: paid aur
+     * balance wale column baad me allocation se badal jate hain, journal line
+     * aik dafa likhi jati hai aur phir kabhi hilti nahi.
+     */
+    private function postedEffect(Payment $payment): int
+    {
+        $isReceipt = $payment->direction === Payment::RECEIPT;
+        $code = $isReceipt ? Account::RECEIVABLE : Account::PAYABLE;
+
+        return (int) $this->postedLines($payment)
+            ->filter(fn (JournalLine $l) => $l->account?->code === $code)
+            ->sum(fn (JournalLine $l) => $isReceipt
+                ? (int) $l->credit - (int) $l->debit
+                : (int) $l->debit - (int) $l->credit);
+    }
+
+    /** Jin bills ka paisa hum wapas kholna jante hain. */
+    private function knownBill(Model $bill): bool
+    {
+        return $bill instanceof Sale
+            || $bill instanceof MaterialPurchase
+            || $bill instanceof TransportTrip
+            || $bill instanceof Salary;
+    }
+
+    /**
+     * Party ke khate par is payment ka asar tha ya nahi.
+     *
+     * Tankhwa ka hisaab staff ke khate par nahi chalta, salaries.balance par
+     * chalta hai (staff par balance ka column hi nahi hai), is liye us ka paisa
+     * hatane par staff ko kuch wapas nahi chadhana. Baqi har soorat me chadhta
+     * hai.
+     */
+    private function partyBalanceMoves(?Model $bill): bool
+    {
+        return ! $bill instanceof Salary;
+    }
+
+    /** Bill ki poori rakam, jaisi us bill ko likhne wala code ginta hai. */
+    private function billTotal(Model $bill): int
+    {
+        return match (true) {
+            $bill instanceof Sale => (int) $bill->total,
+            // Jis khareed ka kiraya driver ko gaya, us ka supplier bill
+            // total_cost se kam hai. supplierBill() wahi farq sambhalta hai.
+            $bill instanceof MaterialPurchase => $bill->supplierBill(),
+            $bill instanceof TransportTrip => (int) $bill->rate,
+            $bill instanceof Salary => (int) $bill->amount,
+            default => throw new InvalidArgumentException(self::UNKNOWN_BILL),
+        };
+    }
+
+    /** Bill par ab tak kitna paisa likha hua hai. */
+    private function billPaid(Model $bill): int
+    {
+        return match (true) {
+            $bill instanceof MaterialPurchase => (int) $bill->paid_amount,
+            $bill instanceof Sale,
+            $bill instanceof TransportTrip,
+            $bill instanceof Salary => (int) $bill->paid,
+            default => throw new InvalidArgumentException(self::UNKNOWN_BILL),
+        };
+    }
+
+    /**
+     * Bill ka apna hisaab hilana: $delta me plus rakam = payment lagi, minus
+     * rakam = hat gayi. Har kism wahi column usi tarah chalati hai jaise us par
+     * payment lagate waqt chalta hai, is liye ye alag alag likha hua hai.
+     */
+    private function shiftBill(Model $bill, int $delta): void
+    {
+        if ($bill instanceof Sale) {
+            $paid = (int) $bill->paid + $delta;
+            $bill->update([
+                'paid' => $paid,
+                'balance' => (int) $bill->total - $paid,
+                'status' => $this->billStatus((int) $bill->total, $paid),
+            ]);
+
+            return;
+        }
+
+        if ($bill instanceof MaterialPurchase) {
+            // Khareed par balance ka column nahi hai, bill supplierBill() se banta hai.
+            $paid = (int) $bill->paid_amount + $delta;
+            $bill->update([
+                'paid_amount' => $paid,
+                'payment_status' => $this->billStatus($bill->supplierBill(), $paid),
+            ]);
+
+            return;
+        }
+
+        if ($bill instanceof TransportTrip) {
+            $paid = (int) $bill->paid + $delta;
+            $bill->update([
+                'paid' => $paid,
+                'balance' => (int) $bill->rate - $paid,
+                'status' => $this->billStatus((int) $bill->rate, $paid),
+            ]);
+
+            return;
+        }
+
+        if ($bill instanceof Salary) {
+            $paid = (int) $bill->paid + $delta;
+            $bill->update([
+                'paid' => $paid,
+                'balance' => (int) $bill->amount - $paid,
+                'status' => $this->billStatus((int) $bill->amount, $paid),
+            ]);
+
+            return;
+        }
+
+        throw new InvalidArgumentException(self::UNKNOWN_BILL);
+    }
+
+    /** Bill par se is payment ka paisa utarna, pehle ye dekh kar ke wahan hai bhi. */
+    private function unwindFromBill(Model $bill, Payment $payment): void
+    {
+        $amount = (int) $payment->amount;
+
+        if ($this->billPaid($bill) < $amount) {
+            throw new InvalidArgumentException(self::MISMATCH);
+        }
+
+        $this->shiftBill($bill, -$amount);
+    }
+
+    /**
+     * Khata aur bill ka milan.
+     *
+     * Bill par payment ki poori rakam chadhi thi aur khate par bhi utni hi.
+     * Dono aik na hon to is row ke peeche koi purani gadbad hai, aur andaze par
+     * bill chhedna us gadbad ko chhupa dega.
+     */
+    private function assertLedgerMatchesBill(Payment $payment, int $moved): void
+    {
+        if ($moved !== (int) $payment->amount) {
+            throw new InvalidArgumentException(self::MISMATCH);
+        }
+    }
+
+    /**
+     * Bill par jitni gunjaish bachi hai us se zyada nahi likha ja sakta.
+     *
+     * Payment pehli dafa likhte waqt rakam khud chhoti kar di jati hai, magar
+     * edit par chup chaap kam karna sab se bura hoga: bande ne jo likha wo na
+     * bache to usay saaf bata dena chahiye. Ye jaanch purana asar hatane ke
+     * baad chalti hai, is liye gunjaish me is payment ka apna hissa shamil hai.
+     */
+    private function assertFitsBill(Model $bill, int $amount): void
+    {
+        $room = $this->billTotal($bill) - $this->billPaid($bill);
+
+        if ($amount > $room) {
+            throw ValidationException::withMessages([
+                'amount' => 'Is bill par sirf '.Money::format(max($room, 0)).' ki gunjaish hai, us se zyada nahi likha ja sakta.',
+            ]);
+        }
+    }
+
+    private function billStatus(int $total, int $paid): string
+    {
+        if ($paid <= 0) {
+            return 'unpaid';
+        }
+
+        return $paid >= $total ? 'paid' : 'partial';
     }
 
     private function assertPositive(int $amount): void

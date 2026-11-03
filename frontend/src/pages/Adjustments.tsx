@@ -123,7 +123,7 @@ export default function Adjustments() {
     {
       key: 'actions', label: '', align: 'right', render: (a) => (
         <RowActions>
-          <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setVoucher(toVoucher(a))} />
+          <IconButton icon={Printer} label="Print" tone="primary" onClick={() => setVoucher(toVoucher(a))} />
         </RowActions>
       ),
     },

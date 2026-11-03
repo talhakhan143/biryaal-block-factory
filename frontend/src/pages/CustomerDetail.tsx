@@ -404,17 +404,17 @@ function Receipts({ rows, party, canManage }: { rows: Receipt[]; party: string; 
             <RowActions>
               <IconButton
                 icon={Printer}
-                label="Parchi dekhein / print karein"
+                label="Print"
                 tone="primary"
                 onClick={() => setSlip({ ...r, direction: r.direction ?? 'receipt' })}
               />
               {/* Jo paisa kisi aik bill se juda hai wo yahan se nahi badalta,
                   usay usi bill ki jagah se handle kiya jata hai. */}
               {canManage && !r.allocatable_id && (
-                <IconButton icon={SquarePen} label="Rakam ya tareekh theek karein" tone="primary" onClick={() => setEditing(r)} />
+                <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(r)} />
               )}
               {canManage && !r.allocatable_id && (
-                <IconButton icon={Undo2} label="Rollback (ye entry wapas lein)" tone="red" onClick={async () => {
+                <IconButton icon={Undo2} label="Rollback" tone="red" onClick={async () => {
                   const ok = await confirm({
                     title: `Rollback: ${r.reference}`,
                     message: (
@@ -480,7 +480,7 @@ function Returns({ returns, adjustments, party }: { returns: Return[]; adjustmen
                   <RowActions>
                     <IconButton
                       icon={Printer}
-                      label="Parchi dekhein / print karein"
+                      label="Print"
                       tone="primary"
                       onClick={() => setRet({ ...r, customer: { name: party } })}
                     />
@@ -514,7 +514,7 @@ function Returns({ returns, adjustments, party }: { returns: Return[]; adjustmen
                   <RowActions>
                     <IconButton
                       icon={Printer}
-                      label="Parchi dekhein / print karein"
+                      label="Print"
                       tone="primary"
                       onClick={() => setAdj({ ...a, party_name: party })}
                     />

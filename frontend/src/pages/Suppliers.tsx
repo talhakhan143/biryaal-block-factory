@@ -71,9 +71,9 @@ export default function Suppliers() {
       key: 'actions', label: '', align: 'right', render: (s) => (
         <div onClick={(e) => e.stopPropagation()}>
         <RowActions>
-          <IconButton icon={BookText} label="Khata (quick)" onClick={() => setLedgerId(s.id)} />
-          {can('suppliers.manage') && <IconButton icon={SquarePen} label="Naam, phone ya address theek karein" tone="primary" onClick={() => setEditing(s)} />}
-          <IconButton icon={ArrowRight} label="Poori history" tone="primary" onClick={() => navigate(`/suppliers/${s.id}`)} />
+          <IconButton icon={BookText} label="Khata" onClick={() => setLedgerId(s.id)} />
+          {can('suppliers.manage') && <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(s)} />}
+          <IconButton icon={ArrowRight} label="History" tone="primary" onClick={() => navigate(`/suppliers/${s.id}`)} />
           {can('suppliers.manage') && (
             <IconButton icon={s.is_active ? PowerOff : Power} label={s.is_active ? 'Deactivate' : 'Activate'} tone="amber" onClick={() => toggle.mutate(s)} />
           )}

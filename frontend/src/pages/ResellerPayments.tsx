@@ -87,7 +87,7 @@ export default function ResellerPayments() {
         <RowActions>
           <IconButton
             icon={Printer}
-            label="Parchi dekhein / print karein"
+            label="Print"
             tone="primary"
             onClick={() => setReceipt(asParchi({ ...h, party_name: h.party_name ?? h.party }))}
           />

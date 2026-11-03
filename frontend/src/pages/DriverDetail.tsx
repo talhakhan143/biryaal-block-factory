@@ -278,7 +278,7 @@ function Statement({ rows, balance, onPrint, canPrint, tripOf }: {
           <td className="px-4 py-2 text-right" style={{ color: r.debit ? 'var(--green)' : undefined }}>{r.debit ? formatPaisa(r.debit) : '·'}</td>
           <td className="px-4 py-2 text-right font-semibold">{formatPaisa(r.running)}</td>
           <td className="px-4 py-2 text-right">
-            {canPrint(r) && <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => onPrint(r)} />}
+            {canPrint(r) && <IconButton icon={Printer} label="Print" tone="primary" onClick={() => onPrint(r)} />}
           </td>
         </tr>
       )}
@@ -320,7 +320,7 @@ function Trips({ rows, label, empty, onPrint }: { rows: Trip[]; label: string; e
           <td className="px-4 py-2 text-right" style={{ color: t.balance > 0 ? 'var(--amber)' : undefined }}>{t.balance ? formatPaisa(t.balance) : '·'}</td>
           <td className="px-4 py-2"><Badge color={statusColor[t.status]}>{t.status}</Badge></td>
           <td className="px-4 py-2 text-right">
-            <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => onPrint(t)} />
+            <IconButton icon={Printer} label="Print" tone="primary" onClick={() => onPrint(t)} />
           </td>
         </tr>
       )}
@@ -352,7 +352,7 @@ function Payments({ rows, onPrint }: { rows: PaymentRow[]; onPrint: (r: PaymentR
           <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>{r.notes || r.bank_ref || '·'}</td>
           <td className="px-4 py-2 text-right font-medium" style={{ color: 'var(--green)' }}>{formatPaisa(r.amount)}</td>
           <td className="px-4 py-2 text-right">
-            <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => onPrint(r)} />
+            <IconButton icon={Printer} label="Print" tone="primary" onClick={() => onPrint(r)} />
           </td>
         </tr>
       )}

@@ -118,4 +118,25 @@ class ExpenseController extends Controller
     {
         return new ExpenseResource($expense);
     }
+
+    /** Rakam, tareekh ya tafseel theek karna. Reference wahi rehta hai. */
+    public function update(Request $request, Expense $expense)
+    {
+        $data = $request->validate([
+            'expense_date' => ['sometimes', 'required', 'date'],
+            'category' => ['sometimes', 'required', 'in:electricity,diesel,maintenance,internet,other'],
+            'amount' => ['sometimes', 'required', 'numeric', 'gt:0'],
+            'method' => ['sometimes', 'required', 'in:cash,bank'],
+            'bank_ref' => ['nullable', 'string', 'max:255', 'required_if:method,bank'],
+            'title' => ['sometimes', 'required', 'string', 'max:255'],
+            'notes' => ['nullable', 'string'],
+        ], [
+            'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
+        ]);
+        if (isset($data['amount'])) {
+            $data['amount'] = Money::toPaisa($data['amount']);
+        }
+
+        return new ExpenseResource($this->service->update($expense, $data));
+    }
 }

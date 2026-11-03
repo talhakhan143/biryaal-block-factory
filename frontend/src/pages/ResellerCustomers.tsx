@@ -54,7 +54,7 @@ export default function ResellerCustomers() {
       render: (c) => (
         <div onClick={(e) => e.stopPropagation()}>
           <RowActions>
-            <IconButton icon={ArrowRight} label="Poori history" tone="primary" onClick={() => navigate(`/reseller/customers/${c.id}`)} />
+            <IconButton icon={ArrowRight} label="History" tone="primary" onClick={() => navigate(`/reseller/customers/${c.id}`)} />
           </RowActions>
         </div>
       ),

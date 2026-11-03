@@ -69,7 +69,7 @@ export default function Returns() {
     {
       key: 'actions', label: '', align: 'right', render: (r) => (
         <RowActions>
-          <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setPrintId(r.id)} />
+          <IconButton icon={Printer} label="Print" tone="primary" onClick={() => setPrintId(r.id)} />
         </RowActions>
       ),
     },

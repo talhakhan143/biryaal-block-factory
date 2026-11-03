@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Printer, X } from 'lucide-react'
+import { Printer, SquarePen, X } from 'lucide-react'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
@@ -42,6 +42,7 @@ export default function Expenses() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState<Expense | null>(null)
   // Jo kharcha abhi likha gaya ya jis row ka print dabaya gaya, uski parchi.
   const [voucher, setVoucher] = useState<ExpenseDoc | null>(null)
   const [page, setPage] = useState(1)
@@ -94,6 +95,14 @@ export default function Expenses() {
     },
   })
 
+  const editMut = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => api.patch(`/expenses/${id}`, payload),
+    onSuccess: () => {
+      MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+      setEditing(null)
+    },
+  })
+
   const columns: Column<Expense>[] = [
     { key: 'reference', label: 'Ref', sortable: true, render: (e) => <span className="font-mono text-xs">{e.reference}</span> },
     { key: 'expense_date', label: 'Date', sortable: true, render: (e) => e.expense_date },
@@ -104,7 +113,10 @@ export default function Expenses() {
     {
       key: 'actions', label: '', align: 'right', render: (e) => (
         <RowActions>
-          <IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => setVoucher(e)} />
+          <IconButton icon={Printer} label="Print" tone="primary" onClick={() => setVoucher(e)} />
+          {can('expenses.manage') && (
+            <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(e)} />
+          )}
         </RowActions>
       ),
     },
@@ -235,6 +247,17 @@ export default function Expenses() {
           <ExpenseForm onSubmit={(p) => create.mutate(p)} busy={create.isPending} error={create.error ? apiError(create.error) : ''} />
         </Modal>
       )}
+
+      {editing && (
+        <Modal title={`Theek karein: ${editing.reference}`} onClose={() => setEditing(null)}>
+          <ExpenseForm
+            expense={editing}
+            onSubmit={(payload) => editMut.mutate({ id: editing.id, payload })}
+            busy={editMut.isPending}
+            error={editMut.error ? apiError(editMut.error) : ''}
+          />
+        </Modal>
+      )}
     </div>
   )
 }
@@ -251,11 +274,34 @@ function Chip({ label, onClear }: { label: string; onClear: () => void }) {
   )
 }
 
-function ExpenseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
-  const [form, setForm] = useState({ expense_date: new Date().toISOString().slice(0, 10), category: 'diesel', title: '', amount: '', method: 'cash', bank_ref: '' })
+/**
+ * Naya kharcha likhne aur purana theek karne, dono ka aik hi form.
+ *
+ * Theek karne par nayi entry nahi banti, wahi record badalta hai, is liye
+ * parchi ka reference wahi rehta hai jo pehle de diya gaya tha. Backend andar
+ * se purani ledger entry hata kar nayi lagata hai, to cash aur kharche ka
+ * khata khud nayi rakam par aa jate hain.
+ */
+function ExpenseForm({ expense, onSubmit, busy, error }: { expense?: Expense; onSubmit: (p: Record<string, unknown>) => void; busy: boolean; error: string }) {
+  const [form, setForm] = useState({
+    expense_date: expense?.expense_date ?? new Date().toISOString().slice(0, 10),
+    category: expense?.category ?? 'diesel',
+    title: expense?.title ?? '',
+    // API paisa bhejti hai, form rupay me chalta hai.
+    amount: expense ? String(expense.amount / 100) : '',
+    method: expense?.method ?? 'cash',
+    bank_ref: expense?.bank_ref ?? '',
+  })
   const set = (k: string, v: string) => setForm({ ...form, [k]: v })
+  const amt = Number(form.amount)
+  const bad = !Number.isFinite(amt) || amt <= 0
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, amount: Number(form.amount) }) }} className="space-y-3">
+    <form onSubmit={(e) => { e.preventDefault(); if (bad) return; onSubmit({ ...form, amount: amt }) }} className="space-y-3">
+      {expense && (
+        <div className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+          <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Abhi likha hua</span><span className="font-semibold">{formatPaisa(expense.amount)}</span></div>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <Field label="Date"><Input type="date" value={form.expense_date} onChange={(e) => set('expense_date', e.target.value)} required /></Field>
         <Field label="Category">
@@ -265,10 +311,10 @@ function ExpenseForm({ onSubmit, busy, error }: { onSubmit: (p: Record<string, u
         </Field>
       </div>
       <Field label="Title"><Input value={form.title} onChange={(e) => set('title', e.target.value)} required /></Field>
-      <Field label="Amount (Rs)"><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} required /></Field>
+      <Field label={expense ? 'Nayi rakam (Rs)' : 'Amount (Rs)'}><MoneyInput value={form.amount} onChange={(v) => set('amount', v)} required /></Field>
       <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
       {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
-      <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Save'}</Button>
+      <Button type="submit" disabled={busy || bad} className="w-full">{busy ? 'Saving…' : expense ? 'Save karein' : 'Save'}</Button>
     </form>
   )
 }

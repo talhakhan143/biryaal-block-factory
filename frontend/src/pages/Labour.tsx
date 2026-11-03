@@ -63,7 +63,7 @@ export default function Labour() {
       key: 'actions', label: '', align: 'right', render: (l) => (
         <RowActions>
           {can('labour.manage') && <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(l)} />}
-          {can('labour.manage') && <IconButton icon={CalendarDays} label="Haazri (calendar)" tone="green" onClick={() => setCalId(l.id)} />}
+          {can('labour.manage') && <IconButton icon={CalendarDays} label="Haazri" tone="green" onClick={() => setCalId(l.id)} />}
           <IconButton icon={BookText} label="Ledger" onClick={() => setLedgerId(l.id)} />
           {can('payments.manage') && <IconButton icon={Wallet} label="Pay mazdoor" tone="primary" onClick={() => setPayId(l.id)} />}
           {can('payments.manage') && <IconButton icon={Coins} label="Advance dein" tone="amber" onClick={() => setAdvanceId(l.id)} />}
@@ -191,7 +191,7 @@ function LedgerModal({ id, onClose }: { id: string; onClose: () => void }) {
                     <RowActions>
                       <IconButton
                         icon={Printer}
-                        label="Parchi dekhein / print karein"
+                        label="Print"
                         tone="primary"
                         onClick={() => setReceipt({
                           doc: {

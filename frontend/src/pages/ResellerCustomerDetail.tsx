@@ -233,7 +233,7 @@ function Receipts({ rows, onParchi }: { rows: Receipt[]; onParchi: (r: Receipt) 
           <td className="px-4 py-2" style={{ color: 'var(--muted)' }}>{r.bank_ref || '·'}</td>
           <td className="px-4 py-2 text-right font-medium" style={{ color: 'var(--green)' }}>{formatPaisa(r.amount)}</td>
           <td className="px-4 py-2 text-right">
-            <RowActions><IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => onParchi(r)} /></RowActions>
+            <RowActions><IconButton icon={Printer} label="Print" tone="primary" onClick={() => onParchi(r)} /></RowActions>
           </td>
         </tr>
       )}
@@ -262,7 +262,7 @@ function Rentals({ rows, onParchi }: { rows: Rental[]; onParchi: (r: Rental) => 
           <td className="px-4 py-2 text-right font-medium" style={{ color: r.due > 0 ? 'var(--amber)' : undefined }}>{formatPaisa(r.due)}</td>
           <td className="px-4 py-2"><Badge color={r.status === 'returned' ? 'green' : 'amber'}>{r.status === 'returned' ? 'Wapas aa gaya' : 'Abhi uske paas'}</Badge></td>
           <td className="px-4 py-2 text-right">
-            <RowActions><IconButton icon={Printer} label="Parchi dekhein / print karein" tone="primary" onClick={() => onParchi(r)} /></RowActions>
+            <RowActions><IconButton icon={Printer} label="Print" tone="primary" onClick={() => onParchi(r)} /></RowActions>
           </td>
         </tr>
       )}

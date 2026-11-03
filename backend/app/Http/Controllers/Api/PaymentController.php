@@ -118,7 +118,13 @@ class PaymentController extends Controller
         ]);
     }
 
-    /** Galat likhi hui payment wapas lena. Khata aur bills purani haalat par. */
+    /**
+     * Galat likhi hui payment wapas lena. Khata aur bills purani haalat par.
+     *
+     * Khate me likha lump paisa aur kisi aik bill ka paisa, dono yahin se wapas
+     * hote hain. Jahan na ho sake wahan service khud Roman Urdu me wajah bhejti
+     * hai aur wo 422 ban kar screen par aa jati hai.
+     */
     public function destroy(Payment $payment)
     {
         $this->service->reverse($payment);
@@ -126,7 +132,13 @@ class PaymentController extends Controller
         return response()->noContent();
     }
 
-    /** Rakam, tareekh ya tareeqa theek karna. Reference wahi rehta hai. */
+    /**
+     * Rakam, tareekh ya tareeqa theek karna. Reference wahi rehta hai, is liye
+     * jo parchi bande ko de di gayi wo bekar nahi hoti.
+     *
+     * Jo paisa kisi aik bill ka hai us ki nayi rakam us bill ki gunjaish se
+     * zyada nahi ho sakti; service wahan 422 bhejti hai.
+     */
     public function update(Request $request, Payment $payment)
     {
         $data = $request->validate([
