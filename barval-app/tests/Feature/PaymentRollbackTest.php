@@ -129,7 +129,13 @@ class PaymentRollbackTest extends TestCase
         $this->assertSame(1, Payment::count(), 'Edit se nayi payment nahi banni chahiye.');
     }
 
-    public function test_a_payment_tied_to_one_bill_cannot_be_rolled_back_from_here(): void
+    /**
+     * Pehle ye test sabit karta tha ke aik bill se judi rasid yahan se nahi
+     * chhedi ja sakti. Owner ne saaf kaha ke har row par edit chahiye, aur sab
+     * se zyada galti isi paise me hoti hai, is liye ab wahi row theek bhi hoti
+     * hai aur wapas bhi, bas sath hi us bill ka apna hisaab bhi hilta hai.
+     */
+    public function test_a_payment_tied_to_one_bill_can_be_fixed_and_rolled_back(): void
     {
         $product = $this->readyProduct(100);
         app(SaleService::class)->create([
@@ -137,16 +143,35 @@ class PaymentRollbackTest extends TestCase
             'paid' => 0, 'items' => [['product_id' => $product->id, 'quantity' => 10]],
         ]);
         $sale = Sale::first();
+        $withOpenBill = $this->snapshot();
+        $this->assertSame(50000, (int) $this->customer->fresh()->balance);
 
         $this->postJson("/api/v1/sales/{$sale->id}/receive", [
             'payment_date' => '2026-06-11', 'amount' => 100, 'method' => 'cash',
         ])->assertCreated();
 
         $payment = Payment::whereNotNull('allocatable_id')->firstOrFail();
+        $this->assertSame(10000, (int) $sale->fresh()->paid);
 
-        $this->deleteJson("/api/v1/payments/{$payment->id}")->assertStatus(422);
-        $this->patchJson("/api/v1/payments/{$payment->id}", ['amount' => 50])->assertStatus(422);
-        $this->assertSame(1, Payment::count());
+        // Jaise sau ki jaga dedh sau likhna tha.
+        $this->patchJson("/api/v1/payments/{$payment->id}", ['amount' => 150])
+            ->assertOk()
+            ->assertJsonPath('data.amount', 15000)
+            ->assertJsonPath('data.reference', $payment->reference);
+
+        $this->assertSame(15000, (int) $sale->fresh()->paid);
+        $this->assertSame(35000, (int) $sale->fresh()->balance);
+        $this->assertSame('partial', $sale->fresh()->status);
+        $this->assertSame(35000, (int) $this->customer->fresh()->balance);
+
+        // Bill se zyada nahi likha ja sakta.
+        $this->patchJson("/api/v1/payments/{$payment->id}", ['amount' => 900])->assertStatus(422);
+        $this->assertSame(15000, (int) $sale->fresh()->paid);
+
+        $this->deleteJson("/api/v1/payments/{$payment->id}")->assertNoContent();
+
+        $this->assertSame($withOpenBill, $this->snapshot(), 'Bill dobara poora baqi hona chahiye, bilkul pehle jaisa.');
+        $this->assertSame(0, Payment::count());
     }
 
     public function test_rolling_back_money_paid_to_a_supplier_puts_it_back_too(): void

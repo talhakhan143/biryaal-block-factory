@@ -25,6 +25,12 @@ class StorePurchaseRequest extends FormRequest
             'method' => ['nullable', 'in:cash,bank'],
             'bank_ref' => ['nullable', 'string', 'max:255', 'required_if:method,bank'],
             'notes' => ['nullable', 'string'],
+
+            // Maal laane wala driver. Kiraya is bill me NAHI chadhta, uski apni
+            // alag trip banti hai driver ke naam, taake wo aik hi dafa ginna jaye.
+            'driver_id' => ['nullable', 'uuid', 'exists:drivers,id', 'required_with:freight_rate'],
+            'freight_rate' => ['nullable', 'numeric', 'min:0', 'required_with:driver_id'],  // rupees
+            'freight_paid' => ['nullable', 'numeric', 'min:0', 'lte:freight_rate'],
         ];
     }
 
@@ -32,6 +38,9 @@ class StorePurchaseRequest extends FormRequest
     {
         return [
             'bank_ref.required_if' => 'Bank payment par bank/reference likhna zaroori hai.',
+            'freight_rate.required_with' => 'Driver chuna hai to uska kiraya bhi likhein.',
+            'driver_id.required_with' => 'Kiraya likha hai to laane wala driver bhi chunein.',
+            'freight_paid.lte' => 'Driver ko kiraye se zyada paisa nahi diya ja sakta.',
         ];
     }
 }

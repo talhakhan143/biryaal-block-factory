@@ -43,16 +43,26 @@ class SaleController extends Controller
 
     public function store(StoreSaleRequest $request)
     {
-        $data = $request->validated();
+        $sale = $this->service->create($this->toPaisa($request->validated()));
 
-        if (isset($data['discount'])) {
-            $data['discount'] = Money::toPaisa($data['discount']);
-        }
-        if (isset($data['transport_fare'])) {
-            $data['transport_fare'] = Money::toPaisa($data['transport_fare']);
-        }
-        if (isset($data['paid'])) {
-            $data['paid'] = Money::toPaisa($data['paid']);
+        return new SaleResource($sale);
+    }
+
+    /** Galat likha hua bill theek karna. Invoice number wahi rehta hai. */
+    public function update(StoreSaleRequest $request, Sale $sale)
+    {
+        $data = $this->toPaisa($request->validated());
+
+        return new SaleResource($this->service->update($sale, $data));
+    }
+
+    /** Rupay se paisa, sirf controller ki hadd par. */
+    private function toPaisa(array $data): array
+    {
+        foreach (['discount', 'transport_fare', 'paid'] as $field) {
+            if (isset($data[$field])) {
+                $data[$field] = Money::toPaisa($data[$field]);
+            }
         }
         foreach ($data['items'] as &$item) {
             if (isset($item['unit_price'])) {
@@ -61,9 +71,7 @@ class SaleController extends Controller
         }
         unset($item);
 
-        $sale = $this->service->create($data);
-
-        return new SaleResource($sale);
+        return $data;
     }
 
     public function show(Sale $sale)

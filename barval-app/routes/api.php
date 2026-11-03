@@ -115,6 +115,7 @@ Route::prefix('v1')->group(function () {
         Route::get('purchases', [MaterialPurchaseController::class, 'index'])->middleware('permission:purchases.view');
         Route::get('purchases/{materialPurchase}', [MaterialPurchaseController::class, 'show'])->middleware('permission:purchases.view');
         Route::post('purchases', [MaterialPurchaseController::class, 'store'])->middleware('permission:purchases.manage');
+        Route::patch('purchases/{materialPurchase}', [MaterialPurchaseController::class, 'update'])->middleware('permission:purchases.manage');
         Route::post('purchases/{materialPurchase}/pay', [MaterialPurchaseController::class, 'pay'])->middleware('permission:payments.manage');
 
         // Production
@@ -138,6 +139,7 @@ Route::prefix('v1')->group(function () {
         Route::get('sales', [SaleController::class, 'index'])->middleware('permission:sales.view');
         Route::get('sales/{sale}', [SaleController::class, 'show'])->middleware('permission:sales.view');
         Route::post('sales', [SaleController::class, 'store'])->middleware('permission:sales.manage');
+        Route::patch('sales/{sale}', [SaleController::class, 'update'])->middleware('permission:sales.manage');
         Route::delete('sales/{sale}', [SaleController::class, 'destroy'])->middleware('permission:sales.delete');
         Route::post('sales/{sale}/receive', [SaleController::class, 'receive'])->middleware('permission:payments.receive');
 
@@ -164,6 +166,7 @@ Route::prefix('v1')->group(function () {
         Route::get('expenses/summary', [ExpenseController::class, 'summary'])->middleware('permission:expenses.view');
         Route::get('expenses/{expense}', [ExpenseController::class, 'show'])->middleware('permission:expenses.view');
         Route::post('expenses', [ExpenseController::class, 'store'])->middleware('permission:expenses.manage');
+        Route::patch('expenses/{expense}', [ExpenseController::class, 'update'])->middleware('permission:expenses.manage');
 
         // Vehicles & Drivers
         Route::get('vehicles', [VehicleController::class, 'index'])->middleware('permission:transport.view');
@@ -187,6 +190,7 @@ Route::prefix('v1')->group(function () {
         // Transport trips
         Route::get('transport-trips', [TransportController::class, 'index'])->middleware('permission:transport.view');
         Route::post('transport-trips', [TransportController::class, 'store'])->middleware('permission:transport.manage');
+        Route::patch('transport-trips/{transportTrip}', [TransportController::class, 'update'])->middleware('permission:transport.manage');
         Route::post('transport-trips/{transportTrip}/pay', [TransportController::class, 'pay'])->middleware('permission:payments.manage');
 
         // Dispatch / Challan

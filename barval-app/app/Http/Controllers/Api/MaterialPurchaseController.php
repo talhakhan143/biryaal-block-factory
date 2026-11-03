@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Concerns\HasTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePurchaseRequest;
+use App\Http\Requests\UpdatePurchaseRequest;
 use App\Http\Resources\MaterialPurchaseResource;
 use App\Http\Resources\PaymentResource;
 use App\Models\MaterialPurchase;
@@ -47,7 +48,7 @@ class MaterialPurchaseController extends Controller
         $data = $request->validated();
 
         // convert rupee inputs to integer paisa
-        foreach (['unit_cost', 'loading_cost', 'unloading_cost', 'paid_amount'] as $field) {
+        foreach (['unit_cost', 'loading_cost', 'unloading_cost', 'paid_amount', 'freight_rate', 'freight_paid'] as $field) {
             if (isset($data[$field])) {
                 $data[$field] = Money::toPaisa($data[$field]);
             }
@@ -56,6 +57,23 @@ class MaterialPurchaseController extends Controller
         $purchase = $this->service->record($data);
 
         return new MaterialPurchaseResource($purchase->load(['supplier', 'rawMaterial']));
+    }
+
+    /** Galat likhi hui khareed theek karna. Reference wahi rehta hai. */
+    public function update(UpdatePurchaseRequest $request, MaterialPurchase $materialPurchase)
+    {
+        $data = $request->validated();
+
+        // convert rupee inputs to integer paisa
+        foreach (['unit_cost', 'loading_cost', 'unloading_cost', 'paid_amount', 'freight_rate', 'freight_paid'] as $field) {
+            if (isset($data[$field])) {
+                $data[$field] = Money::toPaisa($data[$field]);
+            }
+        }
+
+        $purchase = $this->service->update($materialPurchase, $data);
+
+        return new MaterialPurchaseResource($purchase->load(['supplier', 'rawMaterial', 'trip.driver']));
     }
 
     public function show(MaterialPurchase $materialPurchase)
