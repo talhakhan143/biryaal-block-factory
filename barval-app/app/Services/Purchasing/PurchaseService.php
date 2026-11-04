@@ -28,6 +28,29 @@ class PurchaseService
     ) {}
 
     /**
+     * Maal ka total aur per unit rate, dono me se jo mila usi se doosra bana lo.
+     *
+     * Owner aksar total se sochta hai: "6 trolley ka Rs 500". Agar sirf rate
+     * se hisaab karein to qty badalte hi total hil jata hai aur farq chup chaap
+     * udhaar me chala jata hai. Is liye total aaye to total hi sach hai, rate
+     * usi se nikalta hai.
+     *
+     * @return array{0:int,1:int} [maal ka total paisa, per unit paisa]
+     */
+    private function goodsAndRate(float $qty, array $data, ?int $fallbackUnit = null): array
+    {
+        if (isset($data['goods_total'])) {
+            $goods = (int) $data['goods_total'];
+
+            return [$goods, $qty > 0 ? (int) round($goods / $qty) : 0];
+        }
+
+        $unit = (int) ($data['unit_cost'] ?? $fallbackUnit ?? 0);
+
+        return [(int) round($qty * $unit), $unit];
+    }
+
+    /**
      * Maal laane wale driver ka kiraya.
      *
      * Kiraya is bill me NAHI chadhta. Uski apni alag trip banti hai driver ke
@@ -100,7 +123,9 @@ class PurchaseService
             'paid' => (int) ($data['freight_paid'] ?? 0),
             'method' => $data['method'] ?? 'cash',
             'bank_ref' => $data['bank_ref'] ?? null,
-            'notes' => "Maal laaya: {$purchase->reference}",
+            // Note khali: khareed ka hawala trip se khud juda hua hai aur
+            // voucher par "Maal is se laaya: <supplier> PUR-xxx" ban kar aata
+            // hai. Yahan dobara likhne se parchi par wahi baat do dafa aati thi.
         ]);
     }
 
@@ -125,7 +150,8 @@ class PurchaseService
             $material = RawMaterial::findOrFail($data['raw_material_id']);
 
             $extras = (int) ($data['loading_cost'] ?? 0) + (int) ($data['unloading_cost'] ?? 0);
-            $totalCost = (int) round($data['quantity'] * $data['unit_cost']) + $extras;
+            [$goods, $unitCost] = $this->goodsAndRate((float) $data['quantity'], $data);
+            $totalCost = $goods + $extras;
 
             $paid = min((int) ($data['paid_amount'] ?? 0), $totalCost);
             $credit = $totalCost - $paid;
@@ -136,7 +162,7 @@ class PurchaseService
                 'raw_material_id' => $material->id,
                 'purchase_date' => $data['purchase_date'],
                 'quantity' => $data['quantity'],
-                'unit_cost' => $data['unit_cost'],
+                'unit_cost' => $unitCost,
                 'transport_cost' => 0,
                 'loading_cost' => $data['loading_cost'] ?? 0,
                 'unloading_cost' => $data['unloading_cost'] ?? 0,
@@ -203,21 +229,31 @@ class PurchaseService
                     ->where('source_id', $purchase->id))
                 ->get();
 
-            $this->assertEditable($purchase, $lines);
+            // Is bill par alag se jo paisa diya ja chuka hai wo apni jagah
+            // qaim rehta hai: wo asli payment hai, uski apni entry hai. Pehle
+            // yahan error diya jata tha ke "pehle wo payment wapas lein", magar
+            // owner ko har galti sudharne ka raasta chahiye, is liye ab usay
+            // hisaab me le kar aage barh jate hain.
+            $allocated = (int) Payment::where('allocatable_type', $purchase->getMorphClass())
+                ->where('allocatable_id', $purchase->id)
+                ->sum('amount');
 
             // Purana asar, sirf khate se parha hua.
             $oldCredit = $this->creditOn($lines, [Account::PAYABLE]);
             $oldCash = $this->creditOn($lines, [Account::CASH, Account::BANK]);
             $wasBank = $this->creditOn($lines, [Account::BANK]) !== 0;
 
+            // Purana supplier ya maal delete ho chuka ho to rukte nahi: jo row
+            // mojood hi nahi uska balance ya stock wapas karne ko kuch hai hi
+            // nahi. Sirf naya chuna hua zaroori hai.
             $oldSupplier = $purchase->supplier;
             $oldMaterial = $purchase->rawMaterial;
-            if (! $oldSupplier || ! $oldMaterial) {
-                throw new InvalidArgumentException('Is khareed ka supplier ya maal hi nahi mila, is liye yahan se theek nahi hoti.');
-            }
 
             $supplier = isset($data['supplier_id']) ? Supplier::findOrFail($data['supplier_id']) : $oldSupplier;
             $material = isset($data['raw_material_id']) ? RawMaterial::findOrFail($data['raw_material_id']) : $oldMaterial;
+            if (! $supplier || ! $material) {
+                throw new InvalidArgumentException('Is khareed par supplier aur maal dono chunein.');
+            }
 
             $oldQty = (float) $purchase->quantity;
             $qty = (float) ($data['quantity'] ?? $oldQty);
@@ -232,13 +268,24 @@ class PurchaseService
             // nikal jata aur maal ki lagat kam ho jati.
             $freight = (int) $purchase->transport_cost;
 
-            $total = (int) round($qty * $unit) + $loading + $unloading + $freight;
-            $paid = (int) ($data['paid_amount'] ?? $oldCash);
+            [$goods, $unit] = $this->goodsAndRate($qty, $data, $unit);
+            $total = $goods + $loading + $unloading + $freight;
+            // Form par "Paid now" poore bill ka diya hua paisa hai, yani jo
+            // khareed ke waqt diya aur jo baad me alag payment se diya. Khareed
+            // ki apni entry me sirf pehla wala jata hai, doosre ki apni entry
+            // pehle se mojood hai.
+            $paid = (int) ($data['paid_amount'] ?? ($oldCash + $allocated));
+            $cashNow = $paid - $allocated;
             $date = $data['purchase_date'] ?? $purchase->purchase_date->toDateString();
             $method = $data['method'] ?? ($wasBank ? 'bank' : 'cash');
 
             if ($total <= 0) {
                 throw new InvalidArgumentException('Bill sifar nahi ho sakta. Quantity aur rate theek se likhein.');
+            }
+            if ($cashNow < 0) {
+                throw new InvalidArgumentException(
+                    'Is bill par alag se '.Money::format($allocated).' diye ja chuke hain, is liye diya hua paisa us se kam nahi ho sakta.'
+                );
             }
             if ($paid > $total) {
                 throw new InvalidArgumentException(
@@ -248,23 +295,27 @@ class PurchaseService
 
             // Stock: purane maal se purani qty wapas, naye maal me nayi qty.
             // Dono alag maal ho sakte hain.
-            $sameMaterial = $material->getKey() === $oldMaterial->getKey();
-            $leftOnOld = (float) $oldMaterial->current_qty - $oldQty + ($sameMaterial ? $qty : 0);
-            if (round($leftOnOld, 3) < 0) {
-                throw new InvalidArgumentException(
-                    'Is tabdeeli se '.$oldMaterial->name.' ka stock minus me chala jata hai. Pehle stock theek karein, phir ye khareed badlein.'
-                );
-            }
+            if ($oldMaterial) {
+                $sameMaterial = $material->getKey() === $oldMaterial->getKey();
+                $leftOnOld = (float) $oldMaterial->current_qty - $oldQty + ($sameMaterial ? $qty : 0);
+                if (round($leftOnOld, 3) < 0) {
+                    throw new InvalidArgumentException(
+                        'Is tabdeeli se '.$oldMaterial->name.' ka stock minus me chala jata hai. Pehle stock theek karein, phir ye khareed badlein.'
+                    );
+                }
 
-            $oldMaterial->decrement('current_qty', $oldQty);
+                $oldMaterial->decrement('current_qty', $oldQty);
+            }
             $material->increment('current_qty', $qty);
 
             // Supplier ka khata: purana udhaar utar kar naya chadhao. Supplier
             // badla ho to purana apne aap saaf ho jata hai.
-            if ($oldCredit !== 0) {
+            if ($oldCredit !== 0 && $oldSupplier) {
                 $oldSupplier->decrement('balance', $oldCredit);
             }
-            $credit = $total - $paid;
+            // Khareed ki apni udhaari: alag payment ne jo utara wo uski apni
+            // entry me pehle se utar chuka hai, is liye yahan sirf cashNow ghatate hain.
+            $credit = $total - $cashNow;
             if ($credit > 0) {
                 $supplier->increment('balance', $credit);
             }
@@ -295,8 +346,8 @@ class PurchaseService
             // Nayi entry bilkul wahi shape jo record() likhti hai.
             $cashAccount = CashAccountResolver::code($method);
             $newLines = [['account' => Account::INVENTORY, 'debit' => $total, 'memo' => 'Material purchase']];
-            if ($paid > 0) {
-                $newLines[] = ['account' => $cashAccount, 'credit' => $paid];
+            if ($cashNow > 0) {
+                $newLines[] = ['account' => $cashAccount, 'credit' => $cashNow];
             }
             if ($credit > 0) {
                 $newLines[] = ['account' => Account::PAYABLE, 'credit' => $credit, 'memo' => $supplier->name];
@@ -313,57 +364,6 @@ class PurchaseService
 
             return $purchase->fresh(['supplier', 'rawMaterial', 'trip.driver']);
         });
-    }
-
-    /**
-     * Ye khareed yahan se badli ja sakti hai ya nahi.
-     *
-     * Teen soorat me nahi:
-     *  - Khate me iski koi entry hi nahi. Phir purana asar maloom nahi, aur
-     *    andaze par books badalna sab se bura kaam hai.
-     *  - Is bill par baad me paisa diya gaya. Us paise ne supplier ka khata
-     *    aur is row ka paid_amount dono hila diya, aur wo asar yahan se khola
-     *    nahi ja sakta. Pehle wo payment wapas lein.
-     *  - Purani entry jis me kiraya bill ke andar chadh kar driver ko gaya tha
-     *    (khate me 2100 clearing wali line). Usay dobara likha jaye to
-     *    clearing me sirf driver wali taraf reh jati hai aur kiraya books me
-     *    latak jata hai.
-     *
-     * Jis trip par kiraya seedha driver ke naam likha gaya hai (ab ka tareeqa,
-     * jahan purchase par kiraya sifar hota hai) wo yahan rukawat nahi, kyunki
-     * us trip ka apna khata alag hai aur row bhi wahi rehti hai, is liye
-     * material_purchase_id kahin toota nahi.
-     *
-     * @param  Collection<int,JournalLine>  $lines
-     */
-    private function assertEditable(MaterialPurchase $purchase, Collection $lines): void
-    {
-        if ($lines->isEmpty()) {
-            throw new InvalidArgumentException('Is khareed ka khate me koi entry nahi mili, is liye yahan se theek nahi hoti.');
-        }
-
-        if (Payment::where('allocatable_type', $purchase->getMorphClass())->where('allocatable_id', $purchase->id)->exists()) {
-            throw new InvalidArgumentException(
-                'Is bill par "Pay" karke paisa diya gaya hai, is liye yahan se tabdeeli nahi hoti. Pehle wo payment wapas lein, phir ye khareed theek karein.'
-            );
-        }
-
-        // Doosri layer: lump payment aur System ka reconcile bina kisi link ke
-        // paid_amount hila dete hain. Jo rakam is purchase ne khud likhi thi wo
-        // uske cash wali line me hai, farq aaya to kuch aur is bill par lag
-        // chuka hai.
-        if ((int) $purchase->paid_amount !== $this->creditOn($lines, [Account::CASH, Account::BANK])) {
-            throw new InvalidArgumentException(
-                'Is supplier ko di gayi payment is bill par lag chuki hai, is liye yahan se tabdeeli nahi hoti. Pehle Payments me se wo payment wapas lein, phir ye khareed theek karein.'
-            );
-        }
-
-        if ($this->creditOn($lines, [Account::TRANSPORT_CLEARING]) !== 0
-            || ((int) $purchase->transport_cost > 0 && $purchase->trip()->exists())) {
-            throw new InvalidArgumentException(
-                'Ye purani entry hai jis ka kiraya bill ke andar chadha hua hai aur driver ke khate se juda hua hai, is liye yahan se nahi badalti. Pehle "Maal ka Kiraya" par us trip ko theek karein.'
-            );
-        }
     }
 
     /**

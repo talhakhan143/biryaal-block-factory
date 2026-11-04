@@ -48,7 +48,7 @@ class MaterialPurchaseController extends Controller
         $data = $request->validated();
 
         // convert rupee inputs to integer paisa
-        foreach (['unit_cost', 'loading_cost', 'unloading_cost', 'paid_amount', 'freight_rate', 'freight_paid'] as $field) {
+        foreach (['unit_cost', 'goods_total', 'loading_cost', 'unloading_cost', 'paid_amount', 'freight_rate', 'freight_paid'] as $field) {
             if (isset($data[$field])) {
                 $data[$field] = Money::toPaisa($data[$field]);
             }
@@ -56,7 +56,7 @@ class MaterialPurchaseController extends Controller
 
         $purchase = $this->service->record($data);
 
-        return new MaterialPurchaseResource($purchase->load(['supplier', 'rawMaterial']));
+        return new MaterialPurchaseResource($purchase->load(['supplier', 'rawMaterial', 'trip.driver']));
     }
 
     /** Galat likhi hui khareed theek karna. Reference wahi rehta hai. */
@@ -65,7 +65,7 @@ class MaterialPurchaseController extends Controller
         $data = $request->validated();
 
         // convert rupee inputs to integer paisa
-        foreach (['unit_cost', 'loading_cost', 'unloading_cost', 'paid_amount', 'freight_rate', 'freight_paid'] as $field) {
+        foreach (['unit_cost', 'goods_total', 'loading_cost', 'unloading_cost', 'paid_amount', 'freight_rate', 'freight_paid'] as $field) {
             if (isset($data[$field])) {
                 $data[$field] = Money::toPaisa($data[$field]);
             }

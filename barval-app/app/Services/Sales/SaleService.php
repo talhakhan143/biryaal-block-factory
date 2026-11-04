@@ -144,7 +144,16 @@ class SaleService
         }
 
         return DB::transaction(function () use ($sale, $data) {
-            $this->assertEditable($sale);
+            // Yahan pehle teen rokein thin: challan ban chuka ho, maal wapas aa
+            // chuka ho, ya is bill par paisa receive ho chuka ho. Owner ko har
+            // galti sudharne ka raasta chahiye, is liye ab rokte nahi:
+            //  - challan aur return apni alag dastavez hain, unka apna hisaab
+            //    hai, bill badalne se wo hilte nahi.
+            //  - receive ki hui payment apni jagah qaim rehti hai. Uske baad
+            //    InvoiceAllocator customer ke balance se har bill ka paid aur
+            //    baqi dobara bana deta hai, is liye hisaab khud theek ho jata hai.
+            // Jo rok bachi hai wo asli hai: stock minus me nahi ja sakta, aur
+            // bill sifar ka nahi ho sakta.
             $sale->load('items.product', 'customer');
             $oldCustomer = $sale->customer;
 
@@ -256,20 +265,6 @@ class SaleService
 
             return $sale->fresh(['items.product', 'customer']);
         });
-    }
-
-    /** Delete aur edit, dono par yehi teen rokein lagti hain. */
-    private function assertEditable(Sale $sale): void
-    {
-        if ($sale->dispatches()->exists()) {
-            throw new InvalidArgumentException('Is order ki delivery (challan) ban chuki hai, pehle wo handle karein.');
-        }
-        if (SalesReturn::where('sale_id', $sale->id)->exists()) {
-            throw new InvalidArgumentException('Is invoice par block wapas aa chuke hain, is liye yahan se tabdeeli nahi hoti.');
-        }
-        if ($sale->allocatedPayments()->exists()) {
-            throw new InvalidArgumentException('Is invoice par alag se payment receive ho chuki hai, pehle wo reverse karein.');
-        }
     }
 
     /**

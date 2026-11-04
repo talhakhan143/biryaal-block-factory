@@ -62,7 +62,7 @@ class TransportController extends Controller
             $data['paid'] = Money::toPaisa($data['paid']);
         }
 
-        return new TransportTripResource($this->service->recordTrip($data)->load(['vehicle', 'driver']));
+        return new TransportTripResource($this->service->recordTrip($data)->load(['vehicle', 'driver', 'dispatch.customer', 'dispatch.sale.customer', 'materialPurchase.supplier']));
     }
 
     /**

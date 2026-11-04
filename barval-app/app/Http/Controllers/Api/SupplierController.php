@@ -51,6 +51,15 @@ class SupplierController extends Controller
 
     public function destroy(Supplier $supplier)
     {
+        // Jis supplier se maal liya ja chuka hai usay delete karne se un
+        // khareedon ka supplier gayab ho jata tha, aur phir wo bill kahin se
+        // theek hi nahi hota tha. Raw material par yehi rok pehle se hai.
+        if ($supplier->purchases()->exists()) {
+            return response()->json([
+                'message' => 'Is supplier se maal liya ja chuka hai, is liye delete nahi hota. Istemal band karna ho to "Active" off kar dein.',
+            ], 422);
+        }
+
         $supplier->delete();
 
         return response()->noContent();

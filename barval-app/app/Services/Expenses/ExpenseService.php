@@ -8,7 +8,6 @@ use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Services\Accounting\CashAccountResolver;
 use App\Services\Accounting\LedgerService;
-use App\Support\Money;
 use App\Support\Sequence;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -75,12 +74,6 @@ class ExpenseService
                 ->where('source_id', $expense->id)
                 ->get();
 
-            if ($entries->isEmpty()) {
-                throw new InvalidArgumentException(
-                    'Is kharche ki khate me koi entry nahi mili, is liye yahan se badla nahi ja sakta. Accounts wale se check karwayein.'
-                );
-            }
-
             // Usool: purana asar row ke amount column se nahi, khate ki lines se
             // parho. Column baad me bhi badal sakta hai, line aik dafa likhi
             // jati hai aur phir hilti nahi.
@@ -92,15 +85,11 @@ class ExpenseService
                 ->filter(fn (JournalLine $l) => $l->account?->code === Account::EXPENSE)
                 ->sum(fn (JournalLine $l) => (int) $l->debit - (int) $l->credit);
 
-            // Khata aur row aik doosre se ulat hain to andaze se badalna sab se
-            // khatarnak soorat hai: kisi ko pata bhi nahi chalega. Ruk jao.
-            if ($posted !== (int) $expense->amount) {
-                throw new InvalidArgumentException(
-                    'Is kharche ka khata row se mel nahi khata (khate me '.Money::format($posted)
-                    .', row par '.Money::format((int) $expense->amount)
-                    .'), is liye yahan se badalna theek nahi. Accounts wale se check karwayein.'
-                );
-            }
+            // Khata aur row aik doosre se ulat hon to rukte nahi: khate ko sach
+            // maan kar utna hi wapas lete hain jitna waqai likha gaya tha, aur
+            // nayi rakam dobara likh dete hain. Row ka purana ghalat figure is
+            // tarah apne aap theek ho jata hai. Entry hi na ho to purana asar
+            // sifar hai, sirf nayi entry banti hai.
 
             $entries->each(function (JournalEntry $entry) {
                 $entry->lines()->delete();

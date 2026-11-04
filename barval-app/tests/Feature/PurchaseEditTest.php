@@ -160,23 +160,44 @@ class PurchaseEditTest extends TestCase
         $this->assertSame(10.0, (float) $crush->fresh()->current_qty, 'Crush par 4 + 6.');
     }
 
-    public function test_a_bill_paid_from_its_own_pay_button_cannot_be_edited_from_here(): void
+    public function test_a_bill_already_paid_from_its_pay_button_can_still_be_edited(): void
     {
-        $purchase = $this->buy();
+        // Pehle yahan error aata tha ("pehle wo payment wapas lein"). Owner ne
+        // kaha errors hatao aur doosri table ka kaam khud karo, is liye ab wo
+        // payment apni jagah qaim rehti hai aur bill phir bhi theek hota hai.
+        $purchase = $this->buy();   // Rs 51,000 ka bill, Rs 20,000 mauqe par diya
 
         $this->postJson("/api/v1/purchases/{$purchase->id}/pay", [
             'payment_date' => '2026-06-12', 'amount' => 5000, 'method' => 'cash',
         ])->assertCreated();
+        $this->assertSame(2500000, (int) $purchase->fresh()->paid_amount, 'Rs 20,000 + Rs 5,000.');
+
+        // 10 ki jagah 8 trolley. Naya bill = 8 x Rs 5,000 + Rs 1,000 loading = Rs 41,000.
+        $this->patchJson("/api/v1/purchases/{$purchase->id}", ['quantity' => 8])->assertOk();
+
+        $purchase->refresh();
+        $this->assertSame(4100000, (int) $purchase->total_cost);
+        $this->assertSame(2500000, (int) $purchase->paid_amount, 'Di hui dono payment apni jagah rehti hain.');
+        $this->assertSame(1600000, (int) $this->supplier->fresh()->balance, 'Supplier ka baqi naye bill ke hisaab se.');
+        $this->assertSame((int) JournalLine::sum('debit'), (int) JournalLine::sum('credit'));
+    }
+
+    public function test_a_bill_cannot_be_cut_below_what_is_already_paid_on_it(): void
+    {
+        // Ye rok asli hai, kaghazi nahi: bill us rakam se kam nahi ho sakta jo
+        // supplier ko pehle hi di ja chuki hai.
+        $purchase = $this->buy();
+
+        $this->postJson("/api/v1/purchases/{$purchase->id}/pay", [
+            'payment_date' => '2026-06-12', 'amount' => 30000, 'method' => 'cash',
+        ])->assertCreated();
 
         $before = $this->snapshot();
-        $this->patchJson("/api/v1/purchases/{$purchase->id}", ['quantity' => 2])
-            ->assertStatus(422)
-            ->assertJsonPath('message', 'Is bill par "Pay" karke paisa diya gaya hai, is liye yahan se tabdeeli nahi hoti. Pehle wo payment wapas lein, phir ye khareed theek karein.');
-
+        $this->patchJson("/api/v1/purchases/{$purchase->id}", ['quantity' => 2])->assertStatus(422);
         $this->assertSame($before, $this->snapshot(), 'Rukne wali edit se kuch bhi nahi hilna chahiye.');
     }
 
-    public function test_a_lump_supplier_payment_also_locks_the_bill(): void
+    public function test_a_lump_supplier_payment_no_longer_locks_the_bill(): void
     {
         $purchase = $this->buy();
 
@@ -188,12 +209,16 @@ class PurchaseEditTest extends TestCase
         ]);
         $this->assertSame(5100000, (int) $purchase->fresh()->paid_amount);
 
-        $this->patchJson("/api/v1/purchases/{$purchase->id}", ['quantity' => 2])
-            ->assertStatus(422)
-            ->assertJsonPath('message', 'Is supplier ko di gayi payment is bill par lag chuki hai, is liye yahan se tabdeeli nahi hoti. Pehle Payments me se wo payment wapas lein, phir ye khareed theek karein.');
+        // Pehle yahan error aata tha. Ab bill badal jata hai aur lump payment
+        // apni jagah rehti hai, bas naya baqi us ke hisaab se banta hai.
+        $this->patchJson("/api/v1/purchases/{$purchase->id}", ['quantity' => 8])->assertOk();
+
+        $purchase->refresh();
+        $this->assertSame(4100000, (int) $purchase->total_cost);
+        $this->assertSame((int) JournalLine::sum('debit'), (int) JournalLine::sum('credit'));
     }
 
-    public function test_an_old_bill_whose_kiraya_sits_inside_it_cannot_be_edited(): void
+    public function test_an_old_bill_whose_kiraya_sits_inside_it_keeps_that_kiraya(): void
     {
         $purchase = $this->buy();
         $driver = Driver::create(['name' => 'Akram', 'is_active' => true]);
@@ -209,9 +234,15 @@ class PurchaseEditTest extends TestCase
             'balance' => 800000, 'status' => 'unpaid',
         ]);
 
-        $this->patchJson("/api/v1/purchases/{$purchase->id}", ['quantity' => 2])
-            ->assertStatus(422)
-            ->assertJsonPath('message', 'Ye purani entry hai jis ka kiraya bill ke andar chadha hua hai aur driver ke khate se juda hua hai, is liye yahan se nahi badalti. Pehle "Maal ka Kiraya" par us trip ko theek karein.');
+        // Pehle yahan error aata tha. Ab edit chalti hai, aur purana kiraya
+        // bill ke andar hi rehta hai: usay chup chaap nikal dena maal ki lagat
+        // ghalat kar deta.
+        $this->patchJson("/api/v1/purchases/{$purchase->id}", ['quantity' => 8])->assertOk();
+
+        $purchase->refresh();
+        $this->assertSame(800000, (int) $purchase->transport_cost, 'Purana kiraya bill me hi rehta hai.');
+        $this->assertSame(4900000, (int) $purchase->total_cost, '8 x Rs 5,000 + Rs 1,000 loading + Rs 8,000 purana kiraya.');
+        $this->assertSame((int) JournalLine::sum('debit'), (int) JournalLine::sum('credit'));
     }
 
     public function test_a_clearing_line_on_the_bill_blocks_the_edit_too(): void

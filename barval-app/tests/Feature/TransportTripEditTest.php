@@ -165,31 +165,40 @@ class TransportTripEditTest extends TestCase
         $this->assertSame($before, $this->snapshot(), 'Mana ki hui edit se kuch nahi hilna chahiye.');
     }
 
-    public function test_a_trip_whose_fare_was_already_paid_cannot_be_edited(): void
+    public function test_a_trip_whose_fare_was_already_paid_can_still_be_edited(): void
     {
-        $trip = $this->inboundTrip();
+        // Pehle yahan error aata tha. Ab alag se di gayi payment apni jagah
+        // qaim rehti hai aur kiraya phir bhi theek hota hai.
+        $trip = $this->inboundTrip();   // kiraya Rs 5,000, mauqe par Rs 2,000 diya
 
         $this->postJson("/api/v1/transport-trips/{$trip->id}/pay", [
             'payment_date' => '2026-06-12', 'amount' => 1000, 'method' => 'cash',
         ])->assertCreated();
-        $this->assertSame(1, Payment::whereNotNull('allocatable_id')->count());
+        $this->assertSame(300000, (int) $trip->fresh()->paid, 'Rs 2,000 + Rs 1,000.');
 
-        $before = $this->snapshot();
+        // Kiraya Rs 9,000 kar do, diya hua Rs 3,000 hi rehta hai.
         $this->patchJson("/api/v1/transport-trips/{$trip->id}", [
             'driver_id' => $this->driver->id,
             'trip_date' => '2026-06-10',
             'rate' => 9000,
-            'paid' => 2000,
-        ])->assertStatus(422);
+            'paid' => 3000,
+        ])->assertOk();
 
-        $this->assertSame($before, $this->snapshot());
+        $trip->refresh();
+        $this->assertSame(900000, (int) $trip->rate);
+        $this->assertSame(300000, (int) $trip->paid, 'Di hui dono payment apni jagah.');
+        $this->assertSame(600000, (int) $trip->balance);
+        $this->assertSame(600000, (int) $this->driver->fresh()->balance, 'Driver ko utna hi dena baqi.');
+        $this->assertSame((int) JournalLine::sum('debit'), (int) JournalLine::sum('credit'));
     }
 
     /**
-     * Doosri deewar: lump payment trip ke paid column ko hila deti hai magar
-     * us trip ke sath judti nahi. Us soorat me bhi edit ruk jani chahiye.
+     * Lump payment trip ke paid column ko hila deti hai magar us trip ke sath
+     * judti nahi. Pehle is par edit ruk jati thi, ab chalti hai: purana asar
+     * khate ki line se parha jata hai, is liye column ka hila hua figure
+     * hisaab kharab nahi karta.
      */
-    public function test_a_trip_touched_by_a_lump_driver_payment_cannot_be_edited(): void
+    public function test_a_trip_touched_by_a_lump_driver_payment_can_still_be_edited(): void
     {
         $trip = $this->inboundTrip();
 
@@ -198,15 +207,15 @@ class TransportTripEditTest extends TestCase
         ]);
         $this->assertSame(300000, (int) $trip->fresh()->paid, 'Lump payment trip ke column hila deti hai.');
 
-        $before = $this->snapshot();
         $this->patchJson("/api/v1/transport-trips/{$trip->id}", [
             'driver_id' => $this->driver->id,
             'trip_date' => '2026-06-10',
             'rate' => 9000,
-            'paid' => 2000,
-        ])->assertStatus(422);
+            'paid' => 3000,
+        ])->assertOk();
 
-        $this->assertSame($before, $this->snapshot());
+        $this->assertSame(900000, (int) $trip->fresh()->rate);
+        $this->assertSame((int) JournalLine::sum('debit'), (int) JournalLine::sum('credit'));
     }
 
     public function test_linking_a_purchase_afterwards_shows_the_driver_on_the_purchase_row(): void
