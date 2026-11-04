@@ -100,6 +100,14 @@ export interface PurchaseDoc {
   total_cost: number
   supplier_bill?: number
   paid_amount: number
+  /** Maal laane wale driver ki trip. Kiraya supplier ke bill me nahi hota. */
+  freight_driver?: {
+    driver_name?: string | null
+    trip_reference?: string
+    rate: number
+    paid: number
+    balance: number
+  } | null
   bank_ref?: string | null
   notes?: string | null
 }
@@ -110,10 +118,24 @@ export function PurchaseBill({ purchase, subtitle, onClose }: { purchase: Purcha
   const goods = Math.round(purchase.quantity * unit)
   const bill = purchase.supplier_bill ?? purchase.total_cost
   const extras: { label: string; value: number }[] = [
-    { label: 'Kiraya', value: purchase.transport_cost ?? 0 },
+    // Purani entries ka kiraya bill ke andar chadha hua hai, wo yahin rehta hai.
+    { label: 'Kiraya (bill me)', value: purchase.transport_cost ?? 0 },
     { label: 'Loading', value: purchase.loading_cost ?? 0 },
     { label: 'Unloading', value: purchase.unloading_cost ?? 0 },
   ].filter((e) => e.value > 0)
+
+  // Naya kiraya driver ke naam alag likha jata hai, supplier ke bill me nahi.
+  // Parchi par phir bhi dikhana zaroori hai, warna banda samajhta hai kiraya
+  // likha hi nahi gaya. Kul lagat ke NEECHE aata hai taake supplier ke bill me
+  // mila na samjha jaye.
+  const f = purchase.freight_driver
+  const kiraya: { label: string; value: number; strong?: boolean }[] = f && f.rate > 0
+    ? [
+      { label: `Kiraya, ${f.driver_name ?? 'driver'} ko${f.trip_reference ? ` (${f.trip_reference})` : ''}`, value: f.rate },
+      ...(f.paid > 0 ? [{ label: 'Kiraya diya', value: f.paid }] : []),
+      ...(f.balance > 0 ? [{ label: 'Kiraya baqi', value: f.balance }] : []),
+    ]
+    : []
 
   return (
     <InvoiceSheet
@@ -137,8 +159,10 @@ export function PurchaseBill({ purchase, subtitle, onClose }: { purchase: Purcha
         ...(bill !== purchase.total_cost ? [{ label: 'Supplier ko dena', value: bill }] : []),
         { label: 'Diya', value: purchase.paid_amount },
         { label: 'Baqi', value: Math.max(bill - purchase.paid_amount, 0) },
+        ...kiraya,
       ]}
-      footNote={purchase.notes || undefined}
+      footNote={[purchase.notes, f && f.rate > 0 ? 'Kiraya supplier ke bill me nahi hai, wo driver ko alag diya jata hai.' : null]
+        .filter(Boolean).join(' ') || undefined}
       onClose={onClose}
     />
   )

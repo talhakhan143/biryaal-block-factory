@@ -129,12 +129,13 @@ class ExpenseEditTest extends TestCase
         $this->assertSame($before, $this->snapshot(), 'Nakaam edit ke baad har figure wahi hona chahiye.');
     }
 
-    public function test_an_expense_whose_ledger_entry_is_missing_cannot_be_edited(): void
+    public function test_an_expense_whose_ledger_entry_is_missing_gets_a_fresh_one(): void
     {
         $expense = $this->diesel(600000);
 
-        // Aisa kharcha jiska khate me nishan hi nahi: naya post karna uska
-        // matlab hota 5000 par wo debit lagana jo pehle kabhi laga hi nahi tha.
+        // Aisa kharcha jiska khate me nishan hi nahi. Pehle yahan error aata
+        // tha. Ab purana asar sifar maan kar sirf nayi entry likh dete hain,
+        // is tarah row aur khata dobara mil jate hain.
         JournalEntry::where('source_type', $expense->getMorphClass())
             ->where('source_id', $expense->id)
             ->get()
@@ -142,13 +143,13 @@ class ExpenseEditTest extends TestCase
                 $entry->lines()->delete();
                 $entry->delete();
             });
-        $before = $this->snapshot();
 
-        $this->patchJson("/api/v1/expenses/{$expense->id}", ['amount' => 1000])
-            ->assertStatus(422)
-            ->assertJsonPath('message', 'Is kharche ki khate me koi entry nahi mili, is liye yahan se badla nahi ja sakta. Accounts wale se check karwayein.');
+        $this->patchJson("/api/v1/expenses/{$expense->id}", ['amount' => 1000])->assertOk();
 
-        $this->assertSame($before, $this->snapshot());
+        $this->assertSame(100000, (int) $expense->fresh()->amount);
+        $this->assertSame(1, JournalEntry::where('source_type', $expense->getMorphClass())
+            ->where('source_id', $expense->id)->count(), 'Aik nayi entry ban jaye.');
+        $this->assertSame((int) JournalLine::sum('debit'), (int) JournalLine::sum('credit'));
     }
 
     /**

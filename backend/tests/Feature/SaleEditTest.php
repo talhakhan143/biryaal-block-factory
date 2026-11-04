@@ -150,21 +150,29 @@ class SaleEditTest extends TestCase
         $this->assertSame(500000, (int) $doosra->fresh()->balance, 'Naye customer par chadh jaye.');
     }
 
-    public function test_a_bill_with_money_received_on_it_cannot_be_edited(): void
+    public function test_a_bill_with_money_received_on_it_can_still_be_edited(): void
     {
-        $sale = $this->sell(100);
+        // Pehle yahan error aata tha ("pehle wo payment reverse karein"). Owner
+        // ne kaha errors hatao, is liye ab receive ki hui payment apni jagah
+        // qaim rehti hai aur bill ka paid/baqi InvoiceAllocator dobara bana
+        // deta hai customer ke balance se.
+        $sale = $this->sell(100);   // Rs 5,000 ka bill, poora udhaar
         $this->postJson("/api/v1/sales/{$sale->id}/receive", [
-            'amount' => 100,
+            'amount' => 100,        // rupay
             'payment_date' => '2026-11-03',
             'method' => 'cash',
         ])->assertSuccessful();
+        $this->assertSame(490000, (int) $this->customer->fresh()->balance);
 
-        $before = [$this->ready(), (int) $this->customer->fresh()->balance];
+        // 100 block se 40: naya bill Rs 2,000.
+        $this->edit($sale, ['items' => [['product_id' => $this->product->id, 'quantity' => 40]]])
+            ->assertSuccessful();
 
-        $this->edit($sale, ['items' => [['product_id' => $this->product->id, 'quantity' => 10]]])
-            ->assertStatus(422);
-
-        $this->assertSame($before, [$this->ready(), (int) $this->customer->fresh()->balance], 'Nakaam edit se kuch nahi hilna chahiye.');
+        $this->assertSame(960, $this->ready(), '60 block wapas.');
+        $this->assertSame(200000, (int) $sale->fresh()->total);
+        $this->assertSame(190000, (int) $this->customer->fresh()->balance, 'Rs 2,000 bill me se Rs 100 mil chuke.');
+        $this->assertSame(10000, (int) $sale->fresh()->paid, 'Allocator ne receive hui rakam bill par laga di.');
+        $this->assertSame((int) JournalLine::sum('debit'), (int) JournalLine::sum('credit'));
     }
 
     public function test_an_empty_bill_is_refused(): void

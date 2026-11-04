@@ -10,6 +10,7 @@ use App\Models\Payment;
 use App\Models\TransportTrip;
 use App\Services\Accounting\CashAccountResolver;
 use App\Services\Accounting\LedgerService;
+use App\Support\Money;
 use App\Support\Sequence;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -122,26 +123,16 @@ class TransportService
                 );
             }
 
-            // Pehli deewar: is trip par alag se paisa diya ja chuka ho to
-            // kiraya hilane se wo payment hawa me latak jayegi.
-            $tied = Payment::where('allocatable_type', $trip->getMorphClass())
+            // Is trip par alag se jo paisa diya ja chuka hai wo apni jagah qaim
+            // rehta hai, uski apni entry hai. Pehle yahan error diya jata tha,
+            // ab usay hisaab me le kar aage barh jate hain.
+            $allocated = (int) Payment::where('allocatable_type', $trip->getMorphClass())
                 ->where('allocatable_id', $trip->getKey())
-                ->first();
-            if ($tied) {
-                throw new InvalidArgumentException(
-                    "Is trip ka paisa {$tied->reference} se diya ja chuka hai, is liye kiraya yahan se nahi badalta. Pehle wo payment wapas lein, phir kiraya theek karein."
-                );
-            }
+                ->sum('amount');
 
             $entries = JournalEntry::where('source_type', $trip->getMorphClass())
                 ->where('source_id', $trip->getKey())
                 ->get();
-            if ($entries->isEmpty()) {
-                throw new InvalidArgumentException(
-                    'Is trip ki khate me koi entry nahi mili, is liye yahan se theek nahi ho sakti.'
-                );
-            }
-
             $lines = JournalLine::with('account')->whereIn('journal_entry_id', $entries->modelKeys())->get();
             $net = fn (string $code) => (int) $lines
                 ->filter(fn (JournalLine $l) => $l->account?->code === $code)
@@ -155,19 +146,20 @@ class TransportService
             $oldCash = $net(Account::CASH) + $oldBank;
             $oldBankRef = $lines->first(fn (JournalLine $l) => $l->account?->code === Account::BANK)?->memo;
 
-            // Doosri deewar: row aur khata aik baat na kehte hon to beech me
-            // koi lump payment is trip par lag chuki hai.
-            if ($oldCash !== (int) $trip->paid) {
-                throw new InvalidArgumentException(
-                    'Is trip ka kuch paisa baad me driver ki alag payment se diya gaya hai, is liye kiraya yahan se nahi badalta. Pehle wo payment wapas lein.'
-                );
-            }
-
             $rate = (int) ($data['rate'] ?? $trip->rate);
             if ($rate <= 0) {
                 throw new InvalidArgumentException('Kiraya sifar nahi ho sakta.');
             }
-            $paid = min(max((int) ($data['paid'] ?? $oldCash), 0), $rate);
+            // Form par "diya" poore kiraye ka diya hua paisa hai: trip ke waqt
+            // jo diya aur baad me alag payment se jo diya. Trip ki apni entry
+            // me sirf pehla wala jata hai.
+            $paid = min(max((int) ($data['paid'] ?? ($oldCash + $allocated)), 0), $rate);
+            $cashNow = $paid - $allocated;
+            if ($cashNow < 0) {
+                throw new InvalidArgumentException(
+                    'Is trip par alag se '.Money::format($allocated).' diye ja chuke hain, is liye diya hua paisa us se kam nahi ho sakta.'
+                );
+            }
             $balance = $rate - $paid;
             $date = $data['trip_date'] ?? $trip->trip_date->toDateString();
             $driverId = $data['driver_id'] ?? $trip->driver_id;
@@ -190,8 +182,8 @@ class TransportService
             if ($oldPayable !== 0 && $trip->driver_id) {
                 Driver::whereKey($trip->driver_id)->decrement('balance', $oldPayable);
             }
-            if ($balance > 0 && $driverId) {
-                Driver::whereKey($driverId)->increment('balance', $balance);
+            if ($rate - $cashNow > 0 && $driverId) {
+                Driver::whereKey($driverId)->increment('balance', $rate - $cashNow);
             }
 
             $trip->update([
@@ -217,11 +209,13 @@ class TransportService
                 ? Account::EXPENSE
                 : Account::TRANSPORT_CLEARING;
             $newLines = [['account' => $costAccount, 'debit' => $rate, 'memo' => $kind === TransportTrip::INBOUND ? 'Maal laane ka kiraya' : 'Driver freight']];
-            if ($paid > 0) {
-                $newLines[] = ['account' => $cashAccount, 'credit' => $paid, 'memo' => $method === 'bank' ? $bankRef : null];
+            if ($cashNow > 0) {
+                $newLines[] = ['account' => $cashAccount, 'credit' => $cashNow, 'memo' => $method === 'bank' ? $bankRef : null];
             }
-            if ($balance > 0) {
-                $newLines[] = ['account' => Account::PAYABLE, 'credit' => $balance, 'memo' => 'Driver dues'];
+            // Trip ki apni udhaari: alag payment ne jo utara wo apni entry me
+            // utar chuka hai, is liye yahan rate me se sirf cashNow ghatate hain.
+            if ($rate - $cashNow > 0) {
+                $newLines[] = ['account' => Account::PAYABLE, 'credit' => $rate - $cashNow, 'memo' => 'Driver dues'];
             }
 
             $this->ledger->post($date, $description, $newLines, $trip);
@@ -241,14 +235,12 @@ class TransportService
     public function removeTrip(TransportTrip $trip): void
     {
         DB::transaction(function () use ($trip) {
-            $tied = Payment::where('allocatable_type', $trip->getMorphClass())
+            // Alag se di gayi payment is trip se jura hua rishta kho degi, is
+            // liye usay khol dete hain: paisa driver ko mila tha, wo uske khate
+            // me advance ban kar reh jata hai.
+            Payment::where('allocatable_type', $trip->getMorphClass())
                 ->where('allocatable_id', $trip->getKey())
-                ->first();
-            if ($tied) {
-                throw new InvalidArgumentException(
-                    "Is trip ka paisa {$tied->reference} se diya ja chuka hai, is liye driver yahan se nahi hatta. Pehle wo payment wapas lein."
-                );
-            }
+                ->update(['allocatable_type' => null, 'allocatable_id' => null]);
 
             $entries = JournalEntry::where('source_type', $trip->getMorphClass())
                 ->where('source_id', $trip->getKey())
@@ -260,12 +252,6 @@ class TransportService
             $oldCash = (int) $lines
                 ->filter(fn (JournalLine $l) => in_array($l->account?->code, [Account::CASH, Account::BANK], true))
                 ->sum(fn (JournalLine $l) => (int) $l->credit - (int) $l->debit);
-
-            if ($oldCash !== (int) $trip->paid) {
-                throw new InvalidArgumentException(
-                    'Is trip ka kuch paisa baad me driver ki alag payment se diya gaya hai, is liye driver yahan se nahi hatta. Pehle wo payment wapas lein.'
-                );
-            }
 
             $entries->each(function (JournalEntry $entry) {
                 $entry->lines()->delete();

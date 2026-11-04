@@ -56,7 +56,7 @@ class MaterialPurchaseController extends Controller
 
         $purchase = $this->service->record($data);
 
-        return new MaterialPurchaseResource($purchase->load(['supplier', 'rawMaterial']));
+        return new MaterialPurchaseResource($purchase->load(['supplier', 'rawMaterial', 'trip.driver']));
     }
 
     /** Galat likhi hui khareed theek karna. Reference wahi rehta hai. */
