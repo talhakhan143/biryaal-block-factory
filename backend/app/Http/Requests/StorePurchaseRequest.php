@@ -19,6 +19,11 @@ class StorePurchaseRequest extends FormRequest
             'purchase_date' => ['required', 'date'],
             'quantity' => ['required', 'numeric', 'gt:0'],
             'unit_cost' => ['required', 'numeric', 'min:0'],   // rupees
+            // Owner aksar total se sochta hai, per unit rate se nahi: "6 trolley
+            // ka Rs 500". Ye khana aaye to maal ka total wahi rehta hai aur rate
+            // usi se nikala jata hai, warna qty badalne par rakam udhaar me chali
+            // jati thi.
+            'goods_total' => ['nullable', 'numeric', 'min:0'],
             'loading_cost' => ['nullable', 'numeric', 'min:0'],
             'unloading_cost' => ['nullable', 'numeric', 'min:0'],
             'paid_amount' => ['nullable', 'numeric', 'min:0'],

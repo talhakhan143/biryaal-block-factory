@@ -131,6 +131,17 @@ class DriverController extends Controller
 
     public function destroy(Driver $driver)
     {
+        // transport_trips.driver_id par nullOnDelete laga hua hai, is liye
+        // delete kabhi exception nahi deta: trip zinda reh jati hai aur uska
+        // driver chup chaap khali ho jata hai. Phir us khareed ka kiraya bina
+        // kisi naam ke para rehta hai aur form par aisa lagta hai jaise system
+        // ne khud rakam likh di ho. Is liye pehle hi rok dete hain.
+        if ($driver->trips()->exists()) {
+            return response()->json([
+                'message' => 'Is driver ki trips likhi ja chuki hain, is liye delete nahi hota. Istemal band karna ho to "Active" off kar dein.',
+            ], 422);
+        }
+
         try {
             $driver->delete();
         } catch (QueryException) {

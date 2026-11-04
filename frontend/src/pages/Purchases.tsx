@@ -40,6 +40,8 @@ interface PurchaseValues {
   purchase_date: string
   quantity: string
   unit_cost: string
+  /** Khali rehta hai jab tak banda khud total na likhe. */
+  goods_total: string
   loading_cost: string
   paid_amount: string
   method: string
@@ -53,6 +55,7 @@ const toValues = (p: Purchase): PurchaseValues => ({
   purchase_date: p.purchase_date,
   quantity: String(p.quantity),
   unit_cost: String((p.unit_cost ?? 0) / 100),
+  goods_total: '',
   loading_cost: String((p.loading_cost ?? 0) / 100),
   paid_amount: String((p.paid_amount ?? 0) / 100),
   method: p.bank_ref ? 'bank' : 'cash',
@@ -254,10 +257,14 @@ function PurchaseForm({ initial, freight = 0, attached, submitLabel = 'Record Pu
   const drivers = useList<{ id: string; name: string; vehicle_name?: string }>('drivers', { per_page: 200 })
   const [form, setForm] = useState<PurchaseValues>(initial ?? {
     supplier_id: '', raw_material_id: '', purchase_date: new Date().toISOString().slice(0, 10),
-    quantity: '', unit_cost: '', loading_cost: '0', paid_amount: '0', method: 'cash', bank_ref: '',
+    quantity: '', unit_cost: '', goods_total: '', loading_cost: '0', paid_amount: '0', method: 'cash', bank_ref: '',
   })
   // Driver bill ka hissa nahi hai, is liye alag state me rehta hai: kiraya
   // driver ki apni trip banata hai, maal ki lagat me nahi chadhta.
+  // Owner kabhi rate likhta hai, kabhi poora total. Jo aakhri dafa chhua gaya
+  // wahi sach maana jata hai: qty badalne par doosra usi se bana lete hain,
+  // warna farq chup chaap udhaar me chala jata tha.
+  const [lastTouched, setLastTouched] = useState<'unit' | 'total'>('unit')
   const [driverId, setDriverId] = useState(attached?.driver_id ?? '')
   const [freightRate, setFreightRate] = useState(attached ? String(attached.rate / 100) : '')
   const [freightPaid, setFreightPaid] = useState(attached ? String(attached.paid / 100) : '0')
@@ -268,10 +275,13 @@ function PurchaseForm({ initial, freight = 0, attached, submitLabel = 'Record Pu
   // Kiraya yahan jaan bujh kar nahi hai. Maal laane wale driver ka kiraya
   // "Maal ka Kiraya" wale page par us driver ke naam likha jata hai. Dono
   // jagah likhne se wahi kiraya do dafa gin liya jata.
+  const round2 = (n: number) => Math.round(n * 100) / 100
   const rs = (n: number) => 'Rs ' + n.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const qty = Number(form.quantity) || 0
   const unit = Number(form.unit_cost) || 0
-  const goods = qty * unit
+  const typedTotal = Number(form.goods_total) || 0
+  const goods = lastTouched === 'total' ? typedTotal : qty * unit
+  const shownUnit = lastTouched === 'total' && qty > 0 ? typedTotal / qty : unit
   const extras = Number(form.loading_cost) || 0
   const total = goods + extras + freight
   const supplierBill = total
@@ -282,9 +292,13 @@ function PurchaseForm({ initial, freight = 0, attached, submitLabel = 'Record Pu
   // Driver aur kiraya aik doosre ke baghair adhoore hain. Aik likha aur doosra
   // chhoot gaya to entry chup chaap gir jati, is liye dono taraf rok lagai hai.
   const rate = Number(freightRate) || 0
+  // Driver delete ho jane par trip ka driver khali ho jata hai aur kiraya trip
+  // par para reh jata hai. Us soorat me banda samajhta hai rakam khud se aa gayi,
+  // is liye saaf bata dete hain ke ye purana kiraya hai aur kahan se aaya.
+  const orphanKiraya = !!attached && !attached.driver_id && !driverId && rate > 0
   const freightBad = driverId && rate <= 0
     ? 'Driver chuna hai to uska kiraya bhi likhein.'
-    : !driverId && rate > 0
+    : !driverId && rate > 0 && !orphanKiraya
       ? 'Kiraya likha hai to laane wala driver bhi chunein.'
       : (Number(freightPaid) || 0) > rate
         ? 'Driver ko kiraye se zyada paisa nahi diya ja sakta.'
@@ -298,7 +312,9 @@ function PurchaseForm({ initial, freight = 0, attached, submitLabel = 'Record Pu
         onSubmit({
           ...form,
           quantity: Number(form.quantity),
-          unit_cost: Number(form.unit_cost),
+          // Jo khana aakhri dafa chhua gaya wahi server ko bhejte hain,
+          // doosra server khud bana leta hai.
+          ...(lastTouched === 'total' ? { goods_total: typedTotal } : { unit_cost: unit }),
           loading_cost: Number(form.loading_cost),
           paid_amount: Number(form.paid_amount),
           // Theek karte waqt driver_id hamesha jata hai: khali bhejna hi wo
@@ -326,41 +342,21 @@ function PurchaseForm({ initial, freight = 0, attached, submitLabel = 'Record Pu
       <div className="grid grid-cols-2 gap-3">
         <Field label="Date"><Input type="date" value={form.purchase_date} onChange={(e) => set('purchase_date', e.target.value)} required /></Field>
         <Field label="Quantity"><Input type="number" step="0.001" value={form.quantity} onChange={(e) => set('quantity', e.target.value)} required /></Field>
-        <Field label="Unit cost (Rs)"><MoneyInput value={form.unit_cost} onChange={(v) => set('unit_cost', v)} required /></Field>
+        <Field label="Unit cost (Rs)">
+          <MoneyInput value={lastTouched === 'total' ? (qty > 0 ? String(round2(typedTotal / qty)) : '') : form.unit_cost}
+            onChange={(v) => { setLastTouched('unit'); set('unit_cost', v) }} />
+        </Field>
+        <Field label="Maal ka total (Rs)">
+          <MoneyInput value={lastTouched === 'total' ? form.goods_total : String(round2(qty * unit))}
+            onChange={(v) => { setLastTouched('total'); set('goods_total', v) }} />
+        </Field>
         <Field label="Loading (Rs, total)"><MoneyInput value={form.loading_cost} onChange={(v) => set('loading_cost', v)} /></Field>
         <Field label="Paid now (Rs)"><MoneyInput value={form.paid_amount} onChange={(v) => set('paid_amount', v)} /></Field>
       </div>
 
-      {/* Maal laane wala driver, nayi khareed par bhi aur theek karte waqt bhi.
-          Galat driver chun liya ho to yahin se badalta hai, aur "Koi driver nahi"
-          karne par uska kiraya poora hat jata hai. */}
-      {(
-        <div className="rounded-lg px-3 py-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-          <Field label="Laane wala driver (marzi se)">
-            <Select value={driverId} onChange={(e) => setDriverId(e.target.value)}>
-              <option value="">Koi driver nahi</option>
-              {drivers.data?.data.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}{d.vehicle_name ? ` (${d.vehicle_name})` : ''}</option>
-              ))}
-            </Select>
-          </Field>
-          {/* Kiraya ke khane hamesha nazar aate hain. Pehle driver chunne par
-              khulte the aur banda samajhta tha yahan kiraya likha hi nahi ja sakta. */}
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <Field label="Kiraya (Rs)"><MoneyInput value={freightRate} onChange={setFreightRate} /></Field>
-            <Field label="Kiraya abhi diya (Rs)"><MoneyInput value={freightPaid} onChange={setFreightPaid} /></Field>
-          </div>
-          {freightBad && <p className="mt-2 text-sm" style={{ color: 'var(--red)' }}>{freightBad}</p>}
-          <p className="mt-2 text-xs" style={{ color: 'var(--muted)' }}>
-            Kiraya is bill me nahi chadhta. Driver ke naam alag likha jata hai, bilkul waise jaise "Maal ka Kiraya"
-            page par, is liye wo aik hi dafa ginna jata hai.
-          </p>
-        </div>
-      )}
-
       {/* Live bill total */}
       <div className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-        <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Maal ({qty || 0} × {rs(unit)})</span><span>{rs(goods)}</span></div>
+        <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Maal ({qty || 0} × {rs(shownUnit)})</span><span>{rs(goods)}</span></div>
         <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Loading</span><span>{rs(extras)}</span></div>
         {freight > 0 && (
           // Purani entry ka kiraya. Form me iska khana nahi, magar bill me
@@ -381,6 +377,53 @@ function PurchaseForm({ initial, freight = 0, attached, submitLabel = 'Record Pu
       {overpaid && <p className="text-sm" style={{ color: 'var(--red)' }}>Supplier ko diya hua amount uske bill ({rs(supplierBill)}) se zyada hai. Kam karein.</p>}
 
       <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
+
+      {/* Maal laane wala driver, nayi khareed par bhi aur theek karte waqt bhi.
+          Galat driver chun liya ho to yahin se badalta hai, aur "Koi driver nahi"
+          karne par uska kiraya poora hat jata hai. */}
+      {(
+        <div className="rounded-lg px-3 py-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+          <Field label="Laane wala driver (marzi se)">
+            <Select value={driverId} onChange={(e) => setDriverId(e.target.value)}>
+              <option value="">Koi driver nahi</option>
+              {drivers.data?.data.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}{d.vehicle_name ? ` (${d.vehicle_name})` : ''}</option>
+              ))}
+            </Select>
+          </Field>
+          {/* Kiraya ke khane hamesha nazar aate hain. Pehle driver chunne par
+              khulte the aur banda samajhta tha yahan kiraya likha hi nahi ja sakta. */}
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <Field label="Kiraya (Rs)"><MoneyInput value={freightRate} onChange={setFreightRate} /></Field>
+            <Field label="Kiraya abhi diya (Rs)"><MoneyInput value={freightPaid} onChange={setFreightPaid} /></Field>
+          </div>
+          {/* Kiraya ka apna hisaab yahin, supplier ke bill se bilkul alag. */}
+          {rate > 0 && (
+            <div className="mt-3 border-t pt-2 text-sm" style={{ borderColor: 'var(--border)' }}>
+              <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Kiraya</span><span>{rs(rate)}</span></div>
+              <div className="flex justify-between"><span style={{ color: 'var(--muted)' }}>Abhi diya</span><span>{rs(Number(freightPaid) || 0)}</span></div>
+              <div className="flex justify-between font-semibold">
+                <span>Driver ko baqi</span>
+                <span style={{ color: rate - (Number(freightPaid) || 0) > 0 ? 'var(--amber)' : 'var(--green)' }}>
+                  {rs(Math.max(rate - (Number(freightPaid) || 0), 0))}
+                </span>
+              </div>
+            </div>
+          )}
+          {orphanKiraya && (
+            <p className="mt-2 text-xs" style={{ color: 'var(--amber)' }}>
+              Is khareed par kiraya {rs(rate)} pehle se laga hua hai, magar us trip ka driver record se hat chuka hai.
+              Naya driver chun lein, ya kiraya 0 kar dein to wo trip hat jayegi.
+            </p>
+          )}
+          {freightBad && <p className="mt-2 text-sm" style={{ color: 'var(--red)' }}>{freightBad}</p>}
+          <p className="mt-2 text-xs" style={{ color: 'var(--muted)' }}>
+            Kiraya is bill me nahi chadhta. Driver ke naam alag likha jata hai, bilkul waise jaise "Maal ka Kiraya"
+            page par, is liye wo aik hi dafa ginna jata hai.
+          </p>
+        </div>
+      )}
+
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" disabled={busy || overpaid || !!freightBad} className="w-full">{busy ? 'Saving…' : submitLabel}</Button>
     </form>

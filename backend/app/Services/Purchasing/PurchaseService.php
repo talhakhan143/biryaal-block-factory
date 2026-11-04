@@ -28,6 +28,29 @@ class PurchaseService
     ) {}
 
     /**
+     * Maal ka total aur per unit rate, dono me se jo mila usi se doosra bana lo.
+     *
+     * Owner aksar total se sochta hai: "6 trolley ka Rs 500". Agar sirf rate
+     * se hisaab karein to qty badalte hi total hil jata hai aur farq chup chaap
+     * udhaar me chala jata hai. Is liye total aaye to total hi sach hai, rate
+     * usi se nikalta hai.
+     *
+     * @return array{0:int,1:int} [maal ka total paisa, per unit paisa]
+     */
+    private function goodsAndRate(float $qty, array $data, ?int $fallbackUnit = null): array
+    {
+        if (isset($data['goods_total'])) {
+            $goods = (int) $data['goods_total'];
+
+            return [$goods, $qty > 0 ? (int) round($goods / $qty) : 0];
+        }
+
+        $unit = (int) ($data['unit_cost'] ?? $fallbackUnit ?? 0);
+
+        return [(int) round($qty * $unit), $unit];
+    }
+
+    /**
      * Maal laane wale driver ka kiraya.
      *
      * Kiraya is bill me NAHI chadhta. Uski apni alag trip banti hai driver ke
@@ -125,7 +148,8 @@ class PurchaseService
             $material = RawMaterial::findOrFail($data['raw_material_id']);
 
             $extras = (int) ($data['loading_cost'] ?? 0) + (int) ($data['unloading_cost'] ?? 0);
-            $totalCost = (int) round($data['quantity'] * $data['unit_cost']) + $extras;
+            [$goods, $unitCost] = $this->goodsAndRate((float) $data['quantity'], $data);
+            $totalCost = $goods + $extras;
 
             $paid = min((int) ($data['paid_amount'] ?? 0), $totalCost);
             $credit = $totalCost - $paid;
@@ -136,7 +160,7 @@ class PurchaseService
                 'raw_material_id' => $material->id,
                 'purchase_date' => $data['purchase_date'],
                 'quantity' => $data['quantity'],
-                'unit_cost' => $data['unit_cost'],
+                'unit_cost' => $unitCost,
                 'transport_cost' => 0,
                 'loading_cost' => $data['loading_cost'] ?? 0,
                 'unloading_cost' => $data['unloading_cost'] ?? 0,
@@ -242,7 +266,8 @@ class PurchaseService
             // nikal jata aur maal ki lagat kam ho jati.
             $freight = (int) $purchase->transport_cost;
 
-            $total = (int) round($qty * $unit) + $loading + $unloading + $freight;
+            [$goods, $unit] = $this->goodsAndRate($qty, $data, $unit);
+            $total = $goods + $loading + $unloading + $freight;
             // Form par "Paid now" poore bill ka diya hua paisa hai, yani jo
             // khareed ke waqt diya aur jo baad me alag payment se diya. Khareed
             // ki apni entry me sirf pehla wala jata hai, doosre ki apni entry
