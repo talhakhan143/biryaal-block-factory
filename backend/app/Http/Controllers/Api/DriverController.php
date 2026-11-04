@@ -10,10 +10,10 @@ use App\Http\Resources\TransportTripResource;
 use App\Models\Driver;
 use App\Models\Payment;
 use App\Models\TransportTrip;
+use App\Services\Parties\PartyPurgeService;
 use App\Services\Payments\PaymentService;
 use App\Services\Transport\DriverHistoryService;
 use App\Support\Money;
-use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 
 class DriverController extends Controller
@@ -129,26 +129,24 @@ class DriverController extends Controller
         return new PaymentResource(($this->payments->advanceToParty($driver, $data))->load(['party', 'allocatable']));
     }
 
-    public function destroy(Driver $driver)
+    /**
+     * Poora record mitana: is bande ki har entry bhi sath jati hai.
+     *
+     * Owner ka faisla: koi recycle bin nahi, seedha delete. Screen par Urdu me
+     * warning aati hai aur usay naam likh kar confirm karna parta hai, is liye
+     * yahan dobara nahi poochte.
+     */
+    public function destroy(Driver $driver, PartyPurgeService $purge)
     {
-        // transport_trips.driver_id par nullOnDelete laga hua hai, is liye
-        // delete kabhi exception nahi deta: trip zinda reh jati hai aur uska
-        // driver chup chaap khali ho jata hai. Phir us khareed ka kiraya bina
-        // kisi naam ke para rehta hai aur form par aisa lagta hai jaise system
-        // ne khud rakam likh di ho. Is liye pehle hi rok dete hain.
-        if ($driver->trips()->exists()) {
-            return response()->json([
-                'message' => 'Is driver ki trips likhi ja chuki hain, is liye delete nahi hota. Istemal band karna ho to "Active" off kar dein.',
-            ], 422);
-        }
-
-        try {
-            $driver->delete();
-        } catch (QueryException) {
-            return response()->json(['message' => 'Driver ka record use me hai, delete nahi ho sakta. Inactive karein.'], 422);
-        }
+        $purge->purgeDriver($driver);
 
         return response()->noContent();
+    }
+
+    /** Mitane se pehle: kya kya sath jayega, taake warning me ginti likhi ja sake. */
+    public function deletePreview(Driver $driver, PartyPurgeService $purge)
+    {
+        return response()->json(['data' => $purge->preview($driver)]);
     }
 
     public function ledger(Driver $driver)

@@ -5,10 +5,11 @@ import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import { ArrowRight, BookText, HandCoins, SquarePen } from 'lucide-react'
-import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, Table } from '../components/ui'
+import { ArrowRight, BookText, HandCoins, SquarePen, Trash2 } from 'lucide-react'
+import { Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, Table, useConfirm } from '../components/ui'
 import CustomerForm from '../components/CustomerForm'
 import { PaymentReceipt, type PaymentDoc } from '../components/receipts'
+import { confirmPurge } from '../lib/purgeConfirm'
 import { MONEY_KEYS } from '../lib/queryKeys'
 
 interface Customer {
@@ -46,6 +47,18 @@ export default function Customers() {
     else { setSort(key); setDir(key === 'created_at' ? 'desc' : 'asc') }
     setPage(1)
   }
+
+  const confirm = useConfirm()
+
+  const del = useMutation({
+    mutationFn: (id: string) => api.delete(`/customers/${id}`),
+    onSuccess: () => {
+      // Us bande ki har entry gayi hai: bill, challan, wapsi, payments. Is liye
+      // stock, khata aur dashboard sab dobara mangwane parte hain.
+      MONEY_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
+      qc.invalidateQueries({ queryKey: ['customers'] })
+    },
+  })
 
   const save = useMutation({
     mutationFn: (payload: Record<string, string>) =>
@@ -87,6 +100,11 @@ export default function Customers() {
             <IconButton icon={BookText} label="Khata" onClick={() => setLedgerId(c.id)} />
             {can('customers.manage') && <IconButton icon={SquarePen} label="Edit" tone="primary" onClick={() => setEditing(c)} />}
             <IconButton icon={ArrowRight} label="History" tone="primary" onClick={() => navigate(`/customers/${c.id}`)} />
+            {can('customers.delete') && (
+              <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
+                if (await confirmPurge(confirm, { kind: 'customer', id: c.id, name: c.name })) del.mutate(c.id)
+              }} />
+            )}
           </RowActions>
         </div>
       ),

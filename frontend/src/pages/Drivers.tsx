@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { formatPaisa } from '../lib/money'
+import { confirmPurge } from '../lib/purgeConfirm'
 import { useAuth } from '../lib/auth'
 import { SquarePen, ArrowRight, BookText, Coins, Trash2, Wallet } from 'lucide-react'
 import { AdvanceForm, Badge, Button, type Column, DataTable, Field, IconButton, Input, MethodField, Modal, MoneyInput, OutstandingNote, PageHeader, RowActions, Spinner, StatTile, Table, Tabs, useConfirm } from '../components/ui'
@@ -90,7 +91,7 @@ export default function Drivers() {
           {can('payments.manage') && <IconButton icon={Coins} label="Advance dein" tone="amber" onClick={() => setAdvanceId(d.id)} />}
           {can('transport.delete') && (
             <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
-              if (await confirm({ title: 'Driver delete karein?', message: `"${d.name}" delete ho jayega. Yeh wapas nahi aayega.`, confirmText: 'Delete' })) del.mutate(d.id)
+              if (await confirmPurge(confirm, { kind: 'driver', id: d.id, name: d.name })) del.mutate(d.id)
             }} />
           )}
         </RowActions>

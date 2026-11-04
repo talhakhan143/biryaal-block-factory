@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../lib/api'
 import { useList } from '../lib/hooks'
 import { formatPaisa } from '../lib/money'
+import { confirmPurge } from '../lib/purgeConfirm'
 import { useAuth } from '../lib/auth'
 import { SquarePen, ArrowRight, BookText, Power, PowerOff, Trash2 } from 'lucide-react'
 import { Badge, Button, type Column, DataTable, Field, IconButton, Input, Modal, PageHeader, RowActions, Spinner, Table, useConfirm } from '../components/ui'
@@ -79,7 +80,7 @@ export default function Suppliers() {
           )}
           {can('suppliers.delete') && (
             <IconButton icon={Trash2} label="Delete" tone="red" onClick={async () => {
-              if (await confirm({ title: 'Supplier delete karein?', message: `"${s.name}" delete ho jayega.`, confirmText: 'Delete' })) del.mutate(s.id)
+              if (await confirmPurge(confirm, { kind: 'supplier', id: s.id, name: s.name })) del.mutate(s.id)
             }} />
           )}
         </RowActions>
