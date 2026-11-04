@@ -203,6 +203,12 @@ export interface TripDoc {
   reference: string
   trip_date: string
   kind?: string
+  /** Kis ka kaam tha: maal kis supplier se laaya, ya kis customer ko bheja. */
+  for?: {
+    side: 'customer' | 'supplier'
+    name?: string | null
+    reference?: string | null
+  } | null
   driver?: { name: string } | null
   vehicle_label?: string | null
   from_location?: string | null
@@ -218,6 +224,16 @@ export function KirayaVoucher({ trip, onClose }: { trip: TripDoc; onClose: () =>
   const inbound = trip.kind === 'in'
   const route = [trip.from_location, trip.to_location].filter(Boolean).join(' se ')
 
+  // Driver ko parchi dete waqt sab se pehla sawal yehi hota hai: ye kiraya kis
+  // kaam ka tha. Sirf reference likhna kaafi nahi, naam bhi chahiye.
+  const f = trip.for
+  const kaam = !f?.name && !f?.reference
+    ? null
+    : [
+      (f.side === 'supplier' ? 'Maal is se laaya: ' : 'Maal is ko bheja: ') + (f.name ?? 'naam nahi'),
+      f.reference ?? null,
+    ].filter(Boolean).join('  ')
+
   return (
     <InvoiceSheet
       docType="Kiraya Voucher"
@@ -226,7 +242,7 @@ export function KirayaVoucher({ trip, onClose }: { trip: TripDoc; onClose: () =>
       customer={trip.driver?.name ?? 'Driver'}
       partyLabel="Driver"
       meta={inbound ? 'Maal laaya' : 'Maal bheja'}
-      details={[trip.vehicle_label || '', route].filter(Boolean)}
+      details={[trip.vehicle_label || '', route, kaam || ''].filter(Boolean)}
       lines={[{
         name: inbound ? 'Maal laane ka kiraya' : 'Maal bhejne ka kiraya',
         qty: '',
