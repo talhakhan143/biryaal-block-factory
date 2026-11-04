@@ -72,6 +72,7 @@ Route::prefix('v1')->group(function () {
             Route::post('suppliers', [SupplierController::class, 'store']);
             Route::put('suppliers/{supplier}', [SupplierController::class, 'update']);
         });
+        Route::get('suppliers/{supplier}/delete-preview', [SupplierController::class, 'deletePreview'])->middleware('permission:suppliers.delete');
         Route::delete('suppliers/{supplier}', [SupplierController::class, 'destroy'])->middleware('permission:suppliers.delete');
 
         // Aik hi dabbe se poore system me dhoondna. Har group apne apne
@@ -89,6 +90,7 @@ Route::prefix('v1')->group(function () {
             Route::post('customers', [CustomerController::class, 'store']);
             Route::put('customers/{customer}', [CustomerController::class, 'update']);
         });
+        Route::get('customers/{customer}/delete-preview', [CustomerController::class, 'deletePreview'])->middleware('permission:customers.delete');
         Route::delete('customers/{customer}', [CustomerController::class, 'destroy'])->middleware('permission:customers.delete');
 
         // Raw materials
@@ -183,6 +185,7 @@ Route::prefix('v1')->group(function () {
             Route::post('drivers', [DriverController::class, 'store']);
             Route::put('drivers/{driver}', [DriverController::class, 'update']);
         });
+        Route::get('drivers/{driver}/delete-preview', [DriverController::class, 'deletePreview'])->middleware('permission:transport.delete');
         Route::delete('drivers/{driver}', [DriverController::class, 'destroy'])->middleware('permission:transport.delete');
         Route::post('drivers/{driver}/pay', [DriverController::class, 'pay'])->middleware('permission:payments.manage');
         Route::post('drivers/{driver}/advance', [DriverController::class, 'advance'])->middleware('permission:payments.manage');

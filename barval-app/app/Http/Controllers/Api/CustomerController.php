@@ -11,9 +11,8 @@ use App\Http\Resources\SaleResource;
 use App\Http\Resources\SalesReturnResource;
 use App\Models\Customer;
 use App\Services\Customers\CustomerHistoryService;
-use App\Support\Money;
+use App\Services\Parties\PartyPurgeService;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
 
 class CustomerController extends Controller
 {
@@ -52,25 +51,24 @@ class CustomerController extends Controller
         return new CustomerResource($customer);
     }
 
-    public function destroy(Customer $customer)
+    /**
+     * Poora record mitana: is bande ki har entry bhi sath jati hai.
+     *
+     * Owner ka faisla: koi recycle bin nahi, seedha delete. Screen par Urdu me
+     * warning aati hai aur usay naam likh kar confirm karna parta hai, is liye
+     * yahan dobara nahi poochte.
+     */
+    public function destroy(Customer $customer, PartyPurgeService $purge)
     {
-        // Balance par kuch para ho to delete nahi. Minus balance ka matlab is
-        // ka paisa hamare paas hai; usay list se gayab karna sab se bura hai.
-        $balance = (int) $customer->balance;
-        if ($balance > 0) {
-            throw ValidationException::withMessages([
-                'customer' => 'Is customer se '.Money::format($balance).' lena baqi hai. Pehle hisaab saaf karein, phir delete.',
-            ]);
-        }
-        if ($balance < 0) {
-            throw ValidationException::withMessages([
-                'customer' => 'Is customer ka '.Money::format(-$balance).' advance hamare paas jama hai. Pehle wo adjust ya wapas karein, phir delete.',
-            ]);
-        }
-
-        $customer->delete();
+        $purge->purgeCustomer($customer);
 
         return response()->noContent();
+    }
+
+    /** Mitane se pehle: kya kya sath jayega, taake warning me ginti likhi ja sake. */
+    public function deletePreview(Customer $customer, PartyPurgeService $purge)
+    {
+        return response()->json(['data' => $purge->preview($customer)]);
     }
 
     /**

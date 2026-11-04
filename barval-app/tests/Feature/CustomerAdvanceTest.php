@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Customer;
 use App\Models\JournalLine;
+use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
@@ -270,18 +271,36 @@ class CustomerAdvanceTest extends TestCase
         ]);
     }
 
-    public function test_a_customer_holding_an_advance_cannot_be_deleted(): void
+    public function test_deleting_a_customer_takes_his_advance_out_of_cash_too(): void
     {
+        // Pehle yahan rok thi: advance jama ho to delete nahi hota tha. Owner
+        // ka faisla badal gaya: "esa smjo wo banda kabi aya he nhe tha", yani
+        // us ka diya hua paisa bhi khate se nikal jata hai.
+        //
+        // Iska matlab hai cash utna hi kam ho jata hai jitna us ne diya tha.
+        // Agar wo paisa waqai daraaz me para hai to wo farq banta hai, is liye
+        // screen par Urdu warning me ye baat saaf likhi hui hai.
         $customer = Customer::create(['name' => 'Haji Ashraf']);
         app(PaymentService::class)->advanceFromCustomer($customer, [
             'payment_date' => '2026-06-01', 'amount' => 10000000, 'method' => 'cash',
         ]);
 
-        $this->deleteJson("/api/v1/customers/{$customer->id}")
-            ->assertStatus(422)
-            ->assertJsonFragment(['customer' => ['Is customer ka Rs 100,000.00 advance hamare paas jama hai. Pehle wo adjust ya wapas karein, phir delete.']]);
+        $cashBefore = $this->accountNet('1000');
+        $this->assertSame(10000000, $cashBefore, 'Advance se cash barha tha.');
 
-        $this->assertNotNull(Customer::find($customer->id));
+        $this->deleteJson("/api/v1/customers/{$customer->id}")->assertNoContent();
+
+        $this->assertNull(Customer::find($customer->id));
+        $this->assertSame(0, Payment::count(), 'Us ki payment bhi gayi.');
+        $this->assertSame(0, $this->accountNet('1000'), 'Cash wapas wahin jahan pehle tha.');
+        $this->assertSame((int) JournalLine::sum('debit'), (int) JournalLine::sum('credit'));
+    }
+
+    private function accountNet(string $code): int
+    {
+        $lines = JournalLine::query()->whereHas('account', fn ($q) => $q->where('code', $code));
+
+        return (int) $lines->clone()->sum('debit') - (int) $lines->clone()->sum('credit');
     }
 
     public function test_a_cash_sale_never_picks_up_a_later_udhaar(): void

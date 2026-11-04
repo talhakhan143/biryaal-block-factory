@@ -9,6 +9,7 @@ use App\Http\Resources\PaymentResource;
 use App\Http\Resources\SupplierResource;
 use App\Models\Payment;
 use App\Models\Supplier;
+use App\Services\Parties\PartyPurgeService;
 use App\Services\Suppliers\SupplierHistoryService;
 use Illuminate\Http\Request;
 
@@ -49,20 +50,24 @@ class SupplierController extends Controller
         return new SupplierResource($supplier);
     }
 
-    public function destroy(Supplier $supplier)
+    /**
+     * Poora record mitana: is bande ki har entry bhi sath jati hai.
+     *
+     * Owner ka faisla: koi recycle bin nahi, seedha delete. Screen par Urdu me
+     * warning aati hai aur usay naam likh kar confirm karna parta hai, is liye
+     * yahan dobara nahi poochte.
+     */
+    public function destroy(Supplier $supplier, PartyPurgeService $purge)
     {
-        // Jis supplier se maal liya ja chuka hai usay delete karne se un
-        // khareedon ka supplier gayab ho jata tha, aur phir wo bill kahin se
-        // theek hi nahi hota tha. Raw material par yehi rok pehle se hai.
-        if ($supplier->purchases()->exists()) {
-            return response()->json([
-                'message' => 'Is supplier se maal liya ja chuka hai, is liye delete nahi hota. Istemal band karna ho to "Active" off kar dein.',
-            ], 422);
-        }
-
-        $supplier->delete();
+        $purge->purgeSupplier($supplier);
 
         return response()->noContent();
+    }
+
+    /** Mitane se pehle: kya kya sath jayega, taake warning me ginti likhi ja sake. */
+    public function deletePreview(Supplier $supplier, PartyPurgeService $purge)
+    {
+        return response()->json(['data' => $purge->preview($supplier)]);
     }
 
     /**
