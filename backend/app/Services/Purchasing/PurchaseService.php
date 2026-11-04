@@ -123,7 +123,9 @@ class PurchaseService
             'paid' => (int) ($data['freight_paid'] ?? 0),
             'method' => $data['method'] ?? 'cash',
             'bank_ref' => $data['bank_ref'] ?? null,
-            'notes' => "Maal laaya: {$purchase->reference}",
+            // Note khali: khareed ka hawala trip se khud juda hua hai aur
+            // voucher par "Maal is se laaya: <supplier> PUR-xxx" ban kar aata
+            // hai. Yahan dobara likhne se parchi par wahi baat do dafa aati thi.
         ]);
     }
 
