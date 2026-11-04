@@ -265,6 +265,21 @@ function PurchaseForm({ initial, freight = 0, attached, submitLabel = 'Record Pu
   // wahi sach maana jata hai: qty badalne par doosra usi se bana lete hain,
   // warna farq chup chaap udhaar me chala jata tha.
   const [lastTouched, setLastTouched] = useState<'unit' | 'total'>('unit')
+  /**
+   * Jo bill pehle se poora chukaya hua tha, usay theek karte waqt bhi poora hi
+   * rehna chahiye: rakam ghalat likhi gayi thi, paisa to poora de diya gaya tha.
+   * Aise bill par "Paid now" total ke sath chalta hai, warna farq chup chaap
+   * udhaar ban jata tha.
+   *
+   * Jo bill jaan bujh kar aadha chukaya gaya tha us par haath nahi lagate:
+   * usay apne aap barha dena matlab wo cash likhna jo kabhi diya hi nahi gaya.
+   */
+  const [paidFollowsTotal, setPaidFollowsTotal] = useState(() => {
+    if (!initial) return false
+    const t0 = (Number(initial.quantity) || 0) * (Number(initial.unit_cost) || 0)
+      + (Number(initial.loading_cost) || 0) + freight
+    return t0 > 0 && Math.abs((Number(initial.paid_amount) || 0) - t0) < 0.005
+  })
   const [driverId, setDriverId] = useState(attached?.driver_id ?? '')
   const [freightRate, setFreightRate] = useState(attached ? String(attached.rate / 100) : '')
   const [freightPaid, setFreightPaid] = useState(attached ? String(attached.paid / 100) : '0')
@@ -285,7 +300,7 @@ function PurchaseForm({ initial, freight = 0, attached, submitLabel = 'Record Pu
   const extras = Number(form.loading_cost) || 0
   const total = goods + extras + freight
   const supplierBill = total
-  const paid = Number(form.paid_amount) || 0
+  const paid = paidFollowsTotal ? supplierBill : (Number(form.paid_amount) || 0)
   const remaining = supplierBill - paid
   const overpaid = paid > supplierBill && supplierBill > 0
 
@@ -316,7 +331,7 @@ function PurchaseForm({ initial, freight = 0, attached, submitLabel = 'Record Pu
           // doosra server khud bana leta hai.
           ...(lastTouched === 'total' ? { goods_total: typedTotal } : { unit_cost: unit }),
           loading_cost: Number(form.loading_cost),
-          paid_amount: Number(form.paid_amount),
+          paid_amount: paid,
           // Theek karte waqt driver_id hamesha jata hai: khali bhejna hi wo
           // ishara hai ke pehle laga hua driver aur uska kiraya hata do. Nayi
           // khareed me khali ho to key bheji hi nahi jaati.
@@ -351,7 +366,16 @@ function PurchaseForm({ initial, freight = 0, attached, submitLabel = 'Record Pu
             onChange={(v) => { setLastTouched('total'); set('goods_total', v) }} />
         </Field>
         <Field label="Loading (Rs, total)"><MoneyInput value={form.loading_cost} onChange={(v) => set('loading_cost', v)} /></Field>
-        <Field label="Paid now (Rs)"><MoneyInput value={form.paid_amount} onChange={(v) => set('paid_amount', v)} /></Field>
+        <Field label="Paid now (Rs)">
+          <MoneyInput
+            value={paidFollowsTotal ? String(round2(supplierBill)) : form.paid_amount}
+            onChange={(v) => {
+              // Haath se likhi rakam par bharosa, siwaye is ke ke wo poora bill hi ho.
+              setPaidFollowsTotal((Number(v) || 0) === round2(supplierBill) && supplierBill > 0)
+              set('paid_amount', v)
+            }}
+          />
+        </Field>
       </div>
 
       {/* Live bill total */}
@@ -374,6 +398,16 @@ function PurchaseForm({ initial, freight = 0, attached, submitLabel = 'Record Pu
           </>
         )}
       </div>
+      {!paidFollowsTotal && remaining > 0 && supplierBill > 0 && (
+        <button
+          type="button"
+          onClick={() => { setPaidFollowsTotal(true); set('paid_amount', String(round2(supplierBill))) }}
+          className="text-xs font-semibold underline-offset-2 hover:underline"
+          style={{ color: 'var(--primary)' }}
+        >
+          Poora paisa de diya hai? {rs(supplierBill)} kar dein
+        </button>
+      )}
       {overpaid && <p className="text-sm" style={{ color: 'var(--red)' }}>Supplier ko diya hua amount uske bill ({rs(supplierBill)}) se zyada hai. Kam karein.</p>}
 
       <MethodField method={form.method} bankRef={form.bank_ref} onChange={(m, b) => setForm({ ...form, method: m, bank_ref: b })} />
